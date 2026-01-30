@@ -40,10 +40,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/your-org/maya-mcp"
-Documentation = "https://your-org.github.io/maya-mcp"
-Repository = "https://github.com/your-org/maya-mcp"
-Issues = "https://github.com/your-org/maya-mcp/issues"
+Homepage = "https://gitlab.pixel-nexus.com/rigging/gg_mayamcp"
+Documentation = "https://gitlab.pixel-nexus.com/rigging/gg_mayamcp/-/blob/main/README.md"
+Repository = "https://gitlab.pixel-nexus.com/rigging/gg_mayamcp"
+Issues = "https://gitlab.pixel-nexus.com/rigging/gg_mayamcp/-/issues"
 
 [project.scripts]
 maya-mcp = "maya_mcp.server:main"
