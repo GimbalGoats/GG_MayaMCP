@@ -13,7 +13,7 @@ import pytest
 
 from maya_mcp.tools.nodes import nodes_list
 from maya_mcp.tools.scene import scene_info
-from maya_mcp.tools.selection import selection_get, selection_set
+from maya_mcp.tools.selection import selection_clear, selection_get, selection_set
 
 
 class TestSceneInfo:
@@ -267,6 +267,40 @@ class TestSelectionSet:
         """Set selection rejects both add and deselect flags."""
         with pytest.raises(ValueError, match="Cannot specify both"):
             selection_set(["pCube1"], add=True, deselect=True)
+
+
+class TestSelectionClear:
+    """Tests for the selection.clear tool."""
+
+    def test_selection_clear_success(self) -> None:
+        """Clear selection returns empty selection."""
+        mock_client = MagicMock()
+        mock_response = json.dumps([])
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.selection.get_client", return_value=mock_client):
+            result = selection_clear()
+
+        assert result["count"] == 0
+        assert result["selection"] == []
+        mock_client.execute.assert_called_once()
+        call_arg = mock_client.execute.call_args[0][0]
+        assert "clear=True" in call_arg
+
+    def test_selection_clear_result_shape(self) -> None:
+        """Clear selection result includes all required fields."""
+        mock_client = MagicMock()
+        mock_response = json.dumps([])
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.selection.get_client", return_value=mock_client):
+            result = selection_clear()
+
+        assert "selection" in result
+        assert "count" in result
+        assert isinstance(result["selection"], list)
+        assert isinstance(result["count"], int)
+        assert result["count"] == len(result["selection"])
 
 
 class TestResultShapes:
