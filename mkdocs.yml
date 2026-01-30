@@ -1,0 +1,107 @@
+site_name: Maya MCP
+site_description: MCP server for controlling Autodesk Maya via commandPort
+site_author: Maya MCP Contributors
+site_url: https://your-org.github.io/maya-mcp
+
+repo_name: your-org/maya-mcp
+repo_url: https://github.com/your-org/maya-mcp
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - content.code.copy
+    - content.code.annotate
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.top
+    - search.highlight
+    - search.share
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [src]
+          options:
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            docstring_style: google
+            docstring_section_style: spacy
+            merge_init_into_class: true
+            show_signature_annotations: true
+            separate_signature: true
+            signature_crossrefs: true
+            members_order: source
+            filters:
+              - "!^_"
+              - "^__init__$"
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Overview: index.md
+      - PRD: prd.md
+  - Specification:
+      - Architecture: spec/overview.md
+      - Tools: spec/tools.md
+      - Transport: spec/transport.md
+      - Security: spec/security.md
+  - Architecture Decisions:
+      - ADR-0001 CommandPort: adr/0001-commandport.md
+  - API Reference:
+      - Python API: api/reference.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/your-org/maya-mcp
+
+copyright: Copyright &copy; 2025 Maya MCP Contributors
