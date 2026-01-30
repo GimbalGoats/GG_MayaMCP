@@ -15,31 +15,36 @@ variables:
 cache:
   paths:
     - .cache/pip
-    - .venv/
 
-.python-setup: &python-setup
+# Lightweight setup for lint jobs (no full deps)
+.lint-setup: &lint-setup
   image: python:3.10-slim
   before_script:
-    - python -m venv .venv
-    - source .venv/bin/activate
     - pip install --upgrade pip
-    - pip install -e ".[dev]"
+    - pip install -e ".[lint]"
+
+# Test setup needs pytest
+.test-setup: &test-setup
+  image: python:3.10-slim
+  before_script:
+    - pip install --upgrade pip
+    - pip install -e ".[test]"
 
 ruff-lint:
-  <<: *python-setup
+  <<: *lint-setup
   stage: lint
   script:
     - ruff check .
     - ruff format --check .
 
 mypy:
-  <<: *python-setup
+  <<: *lint-setup
   stage: lint
   script:
     - mypy src/
 
 pytest:
-  <<: *python-setup
+  <<: *test-setup
   stage: test
   script:
     # Skip integration tests in CI (they require Maya running)

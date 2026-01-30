@@ -28,8 +28,8 @@ from mcp.types import ToolAnnotations
 from maya_mcp.tools.attributes import attributes_get, attributes_set
 from maya_mcp.tools.connection import maya_connect, maya_disconnect
 from maya_mcp.tools.health import health_check
-from maya_mcp.tools.nodes import nodes_list
-from maya_mcp.tools.scene import scene_info
+from maya_mcp.tools.nodes import nodes_create, nodes_delete, nodes_list
+from maya_mcp.tools.scene import scene_info, scene_redo, scene_undo
 from maya_mcp.tools.selection import selection_clear, selection_get, selection_set
 
 # Create the FastMCP server instance
@@ -42,7 +42,11 @@ Available tools:
 - maya.connect: Connect to Maya commandPort
 - maya.disconnect: Disconnect from Maya
 - scene.info: Get current scene information (file path, FPS, frame range, etc.)
+- scene.undo: Undo the last operation (critical for error recovery)
+- scene.redo: Redo the last undone operation
 - nodes.list: List nodes by type or pattern
+- nodes.create: Create a new node with optional name, parent, and attributes
+- nodes.delete: Delete one or more nodes (with optional hierarchy deletion)
 - attributes.get: Get attribute values from a node (batch supported)
 - attributes.set: Set attribute values on a node (batch supported)
 - selection.get: Get current selection
@@ -146,6 +150,44 @@ def tool_scene_info() -> dict[str, Any]:
     return scene_info()
 
 
+@mcp.tool(
+    name="scene.undo",
+    description="Undo the last operation in Maya. Critical for LLM error recovery.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_scene_undo() -> dict[str, Any]:
+    """Undo the last Maya operation.
+
+    Returns success status, description of undone action, and availability
+    of further undo/redo operations.
+    """
+    return scene_undo()
+
+
+@mcp.tool(
+    name="scene.redo",
+    description="Redo the last undone operation in Maya.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_scene_redo() -> dict[str, Any]:
+    """Redo the last undone Maya operation.
+
+    Returns success status, description of redone action, and availability
+    of further undo/redo operations.
+    """
+    return scene_redo()
+
+
 # Register node tools
 @mcp.tool(
     name="nodes.list",
@@ -183,6 +225,66 @@ def tool_nodes_list(
         'truncated' (True) and 'total_count' fields.
     """
     return nodes_list(node_type=node_type, pattern=pattern, long_names=long_names, limit=limit)
+
+
+@mcp.tool(
+    name="nodes.create",
+    description="Create a new node in Maya with optional name, parent, and initial attributes.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_nodes_create(
+    node_type: Annotated[str, "Type of node to create (e.g., 'transform', 'locator', 'joint')"],
+    name: Annotated[str | None, "Desired node name (Maya may modify for uniqueness)"] = None,
+    parent: Annotated[str | None, "Parent node to parent under"] = None,
+    attributes: Annotated[
+        dict[str, Any] | None,
+        "Initial attribute values to set after creation",
+    ] = None,
+) -> dict[str, Any]:
+    """Create a new Maya node.
+
+    Args:
+        node_type: Type of node to create.
+        name: Desired node name (optional).
+        parent: Parent node to parent under (optional).
+        attributes: Initial attribute values (optional).
+
+    Returns:
+        Dictionary with node name, type, parent, attributes_set list,
+        and attribute_errors (if any).
+    """
+    return nodes_create(node_type=node_type, name=name, parent=parent, attributes=attributes)
+
+
+@mcp.tool(
+    name="nodes.delete",
+    description="Delete one or more nodes from the Maya scene.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_nodes_delete(
+    nodes: Annotated[list[str], "Node names to delete"],
+    hierarchy: Annotated[bool, "Delete entire hierarchy below each node"] = False,
+) -> dict[str, Any]:
+    """Delete Maya nodes.
+
+    Args:
+        nodes: List of node names to delete.
+        hierarchy: If True, delete entire hierarchy below each node.
+
+    Returns:
+        Dictionary with deleted list, count, and errors (if any nodes failed).
+    """
+    return nodes_delete(nodes=nodes, hierarchy=hierarchy)
 
 
 # Register attribute tools

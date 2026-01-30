@@ -6,6 +6,7 @@ This module provides tools for querying and manipulating Maya scenes.
 from __future__ import annotations
 
 import ast
+import json
 from typing import Any
 
 from maya_mcp.transport import get_client
@@ -138,4 +139,133 @@ print(json.dumps(result))
         "fps": fps,
         "frame_range": [data.get("min_time", 1.0), data.get("max_time", 24.0)],
         "up_axis": data.get("up_axis", "y"),
+    }
+
+
+def scene_undo() -> dict[str, Any]:
+    """Undo the last operation in Maya.
+
+    Critical for LLM error recovery - allows reverting mistakes made
+    during automated operations.
+
+    Returns:
+        Dictionary with undo result:
+            - success: Whether undo succeeded
+            - undone: Description of the undone action, or None
+            - can_undo: Whether more undo operations are available
+            - can_redo: Whether redo is now available
+
+    Raises:
+        MayaUnavailableError: If not connected to Maya.
+        MayaCommandError: If Maya command execution fails.
+
+    Example:
+        >>> result = scene_undo()
+        >>> if result['success']:
+        ...     print(f"Undone: {result['undone']}")
+    """
+    client = get_client()
+
+    command = """
+import maya.cmds as cmds
+import json
+
+result = {"success": False, "undone": None, "can_undo": False, "can_redo": False}
+
+# Check if undo is available
+can_undo = cmds.undoInfo(query=True, undoQueueEmpty=True) == False
+result["can_undo"] = can_undo
+
+if can_undo:
+    # Get the name of the operation that will be undone
+    undone_name = cmds.undoInfo(query=True, undoName=True)
+    # Perform the undo
+    cmds.undo()
+    result["success"] = True
+    result["undone"] = undone_name if undone_name else None
+
+# Check states after undo
+result["can_undo"] = cmds.undoInfo(query=True, undoQueueEmpty=True) == False
+result["can_redo"] = cmds.undoInfo(query=True, redoQueueEmpty=True) == False
+
+print(json.dumps(result))
+"""
+
+    response = client.execute(command)
+
+    # Parse the JSON response
+    try:
+        data = json.loads(response)
+    except (ValueError, json.JSONDecodeError):
+        data = ast.literal_eval(response)
+
+    return {
+        "success": data.get("success", False),
+        "undone": data.get("undone"),
+        "can_undo": data.get("can_undo", False),
+        "can_redo": data.get("can_redo", False),
+    }
+
+
+def scene_redo() -> dict[str, Any]:
+    """Redo the last undone operation in Maya.
+
+    Allows re-applying an operation that was previously undone.
+
+    Returns:
+        Dictionary with redo result:
+            - success: Whether redo succeeded
+            - redone: Description of the redone action, or None
+            - can_undo: Whether undo is now available
+            - can_redo: Whether more redo operations are available
+
+    Raises:
+        MayaUnavailableError: If not connected to Maya.
+        MayaCommandError: If Maya command execution fails.
+
+    Example:
+        >>> result = scene_redo()
+        >>> if result['success']:
+        ...     print(f"Redone: {result['redone']}")
+    """
+    client = get_client()
+
+    command = """
+import maya.cmds as cmds
+import json
+
+result = {"success": False, "redone": None, "can_undo": False, "can_redo": False}
+
+# Check if redo is available
+can_redo = cmds.undoInfo(query=True, redoQueueEmpty=True) == False
+result["can_redo"] = can_redo
+
+if can_redo:
+    # Get the name of the operation that will be redone
+    redone_name = cmds.undoInfo(query=True, redoName=True)
+    # Perform the redo
+    cmds.redo()
+    result["success"] = True
+    result["redone"] = redone_name if redone_name else None
+
+# Check states after redo
+result["can_undo"] = cmds.undoInfo(query=True, undoQueueEmpty=True) == False
+result["can_redo"] = cmds.undoInfo(query=True, redoQueueEmpty=True) == False
+
+print(json.dumps(result))
+"""
+
+    response = client.execute(command)
+
+    # Parse the JSON response
+    try:
+        data = json.loads(response)
+    except (ValueError, json.JSONDecodeError):
+        data = ast.literal_eval(response)
+
+    return {
+        "success": data.get("success", False),
+        "redone": data.get("redone"),
+        "can_undo": data.get("can_undo", False),
+        "can_redo": data.get("can_redo", False),
     }
