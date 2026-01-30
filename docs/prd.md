@@ -150,12 +150,12 @@ Direct integration is problematic because:
 - [x] Test infrastructure with mocks
 - [x] MkDocs documentation
 
-### M1: Core Tools
+### M1: Core Tools ✅
 
-- [ ] Implement scene.info
-- [ ] Implement nodes.list with type filtering
-- [ ] Implement selection.get/set
-- [ ] Integration tests with real Maya
+- [x] Implement scene.info
+- [x] Implement nodes.list with type filtering
+- [x] Implement selection.get/set
+- [x] Integration tests with real Maya
 
 ### M2: Extended Tools
 
