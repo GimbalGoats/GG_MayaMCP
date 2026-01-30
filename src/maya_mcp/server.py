@@ -23,6 +23,7 @@ from __future__ import annotations
 from typing import Annotated, Any, Literal
 
 from fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 
 from maya_mcp.tools.connection import maya_connect, maya_disconnect
 from maya_mcp.tools.health import health_check
@@ -56,6 +57,12 @@ Before using Maya tools, ensure Maya is running with commandPort enabled:
 @mcp.tool(
     name="health.check",
     description="Check the health status of the Maya connection",
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
 )
 def tool_health_check() -> dict[str, Any]:
     """Check Maya connection health.
@@ -70,6 +77,12 @@ def tool_health_check() -> dict[str, Any]:
 @mcp.tool(
     name="maya.connect",
     description="Establish a connection to Maya's commandPort",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
 )
 def tool_maya_connect(
     host: Annotated[str, "Target host (localhost only)"] = "localhost",
@@ -95,6 +108,12 @@ def tool_maya_connect(
 @mcp.tool(
     name="maya.disconnect",
     description="Close the connection to Maya",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
 )
 def tool_maya_disconnect() -> dict[str, Any]:
     """Disconnect from Maya commandPort.
@@ -109,6 +128,12 @@ def tool_maya_disconnect() -> dict[str, Any]:
 @mcp.tool(
     name="scene.info",
     description="Get information about the current Maya scene",
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
 )
 def tool_scene_info() -> dict[str, Any]:
     """Get current scene information.
@@ -121,7 +146,14 @@ def tool_scene_info() -> dict[str, Any]:
 # Register node tools
 @mcp.tool(
     name="nodes.list",
-    description="List nodes in the Maya scene, optionally filtered by type",
+    description="List nodes in the Maya scene, optionally filtered by type. "
+    "Returns max 500 nodes by default to limit response size.",
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
 )
 def tool_nodes_list(
     node_type: Annotated[
@@ -130,6 +162,10 @@ def tool_nodes_list(
     ] = None,
     pattern: Annotated[str, "Name pattern filter (supports wildcards)"] = "*",
     long_names: Annotated[bool, "Return full DAG paths"] = False,
+    limit: Annotated[
+        int | None,
+        "Max nodes to return (default 500, use 0 for unlimited)",
+    ] = 500,
 ) -> dict[str, Any]:
     """List Maya nodes.
 
@@ -137,17 +173,27 @@ def tool_nodes_list(
         node_type: Filter by node type (optional).
         pattern: Name pattern with wildcards.
         long_names: Return full DAG paths if True.
+        limit: Max nodes to return. Default 500. Set to 0 for unlimited.
 
     Returns:
-        Node list with nodes array and count.
+        Node list with nodes array, count. If truncated, includes
+        'truncated' (True) and 'total_count' fields.
     """
-    return nodes_list(node_type=node_type, pattern=pattern, long_names=long_names)
+    return nodes_list(
+        node_type=node_type, pattern=pattern, long_names=long_names, limit=limit
+    )
 
 
 # Register selection tools
 @mcp.tool(
     name="selection.get",
     description="Get the current selection in Maya",
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
 )
 def tool_selection_get() -> dict[str, Any]:
     """Get current Maya selection.
@@ -161,6 +207,12 @@ def tool_selection_get() -> dict[str, Any]:
 @mcp.tool(
     name="selection.set",
     description="Set the Maya selection",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
 )
 def tool_selection_set(
     nodes: Annotated[list[str], "Node names to select"],
@@ -183,6 +235,12 @@ def tool_selection_set(
 @mcp.tool(
     name="selection.clear",
     description="Clear the Maya selection (deselect all)",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
 )
 def tool_selection_clear() -> dict[str, Any]:
     """Clear Maya selection.
