@@ -186,6 +186,47 @@ cmds.commandPort(
 4. **Sanitize error messages** - No paths, no stack traces
 5. **Test with malicious inputs** - Fuzz testing recommended
 
+## MCP Security Considerations
+
+This section documents how Maya MCP addresses security patterns from the [MCP Security Specification](https://modelcontextprotocol.io/specification/2025-06-18/basic/security_best_practices).
+
+### Why OAuth Is Not Needed
+
+The MCP spec recommends OAuth 2.1 for remote MCP servers. Maya MCP does **not** implement OAuth because:
+
+| MCP Spec Recommendation | Maya MCP Approach | Rationale |
+|-------------------------|-------------------|-----------|
+| OAuth 2.1 for auth | Not implemented | Localhost-only; no network exposure |
+| Token validation | Not needed | No tokens; single-user local process |
+| Scope-based permissions | Tool allowlist | All exposed tools are intentional |
+
+**Key principle**: Maya MCP is a **local development tool**, not a remote service. The security boundary is the local machine, not a network.
+
+### Confused Deputy Prevention
+
+The MCP spec warns about "confused deputy" attacks where a server is tricked into performing actions on behalf of an attacker.
+
+**Why this is N/A for Maya MCP:**
+- Maya MCP does not proxy requests to other services
+- Maya MCP does not use credentials from clients
+- All actions affect only the local Maya instance
+
+### Session Security
+
+| MCP Spec Pattern | Maya MCP Status |
+|------------------|-----------------|
+| Session hijacking | Low risk (localhost, stdio transport) |
+| No auth via sessions | ✅ Sessions are connection state, not auth |
+| Secure session IDs | N/A (no session IDs in transport) |
+
+### Data Handling
+
+| Pattern | Implementation |
+|---------|----------------|
+| No secrets in errors | ✅ Paths sanitized, no stack traces |
+| No credential storage | ✅ No credentials used |
+| Input validation | ✅ All inputs validated, injection blocked |
+
 ## Security Checklist
 
 Before deploying:

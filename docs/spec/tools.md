@@ -139,8 +139,6 @@ Close the connection to Maya.
 
 Get information about the current Maya scene.
 
-**Status**: Stub (Not Yet Implemented)
-
 **Input**: None
 
 **Output**:
@@ -173,8 +171,6 @@ Get information about the current Maya scene.
 
 List nodes in the scene, optionally filtered by type.
 
-**Status**: Stub (Not Yet Implemented)
-
 **Input**:
 
 | Field | Type | Required | Default | Description |
@@ -182,6 +178,7 @@ List nodes in the scene, optionally filtered by type.
 | `node_type` | `string` | No | `null` | Filter by node type (e.g., "transform", "mesh") |
 | `pattern` | `string` | No | `"*"` | Name pattern filter (supports wildcards) |
 | `long_names` | `boolean` | No | `false` | Return full DAG paths |
+| `limit` | `integer` | No | `500` | Max nodes to return. Use 0 for unlimited. |
 
 **Output**:
 
@@ -189,6 +186,8 @@ List nodes in the scene, optionally filtered by type.
 |-------|------|-------------|
 | `nodes` | `string[]` | List of node names |
 | `count` | `integer` | Number of nodes returned |
+| `truncated` | `boolean` | True if results were truncated (only present if limit hit) |
+| `total_count` | `integer` | Total matching nodes before limit (only present if truncated) |
 
 **Example Request**:
 
@@ -208,6 +207,17 @@ List nodes in the scene, optionally filtered by type.
 }
 ```
 
+**Example Response (Truncated)**:
+
+```json
+{
+  "nodes": ["node1", "node2", "...500 total..."],
+  "count": 500,
+  "truncated": true,
+  "total_count": 1234
+}
+```
+
 ---
 
 ## Selection Tools
@@ -215,8 +225,6 @@ List nodes in the scene, optionally filtered by type.
 ### `selection.get`
 
 Get the current selection in Maya.
-
-**Status**: Stub (Not Yet Implemented)
 
 **Input**: None
 
@@ -241,8 +249,6 @@ Get the current selection in Maya.
 ### `selection.set`
 
 Set the Maya selection.
-
-**Status**: Stub (Not Yet Implemented)
 
 **Input**:
 
@@ -279,6 +285,30 @@ Set the Maya selection.
 
 ---
 
+### `selection.clear`
+
+Clear the Maya selection (deselect all).
+
+**Input**: None
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `selection` | `string[]` | Empty array |
+| `count` | `integer` | 0 |
+
+**Example Response**:
+
+```json
+{
+  "selection": [],
+  "count": 0
+}
+```
+
+---
+
 ## Error Responses
 
 All tools may return errors in a consistent format:
@@ -305,7 +335,30 @@ All tools may return errors in a consistent format:
 
 ## Tool Annotations
 
-All tools include MCP annotations to help clients understand their behavior:
+All tools include MCP annotations to help AI clients understand their behavior and make safe decisions.
+
+### Annotation Types
+
+| Annotation | Description |
+|------------|-------------|
+| `readOnlyHint` | Tool only reads data, doesn't modify Maya state |
+| `destructiveHint` | Tool may make irreversible changes |
+| `idempotentHint` | Calling multiple times has same effect as calling once |
+| `openWorldHint` | Tool interacts with external systems (always `false` for Maya MCP) |
+
+### Why Annotations Matter
+
+**For AI Clients:**
+- Read-only tools can be called without user confirmation
+- Destructive tools should prompt for confirmation
+- Idempotent tools can be safely retried on failure
+
+**For Maya MCP:**
+- All tools are `openWorldHint: false` (localhost-only, no external systems)
+- Selection tools are not idempotent (state depends on prior state)
+- No tools are destructive (Maya has undo for scene changes)
+
+### Tool Annotation Table
 
 | Tool | readOnlyHint | destructiveHint | idempotentHint |
 |------|--------------|-----------------|----------------|
@@ -316,3 +369,35 @@ All tools include MCP annotations to help clients understand their behavior:
 | `nodes.list` | true | false | true |
 | `selection.get` | true | false | true |
 | `selection.set` | false | false | false |
+| `selection.clear` | false | false | true |
+
+---
+
+## Token Budget Considerations
+
+Large Maya scenes can contain thousands of nodes. To prevent token budget explosion in AI clients, Maya MCP implements output limits.
+
+### Default Limits
+
+| Tool | Default Limit | Configurable |
+|------|---------------|--------------|
+| `nodes.list` | 500 nodes | Yes (`limit` param) |
+
+### Handling Truncated Results
+
+When results are truncated, the response includes additional fields:
+
+```json
+{
+  "nodes": ["node1", "node2", "..."],
+  "count": 500,
+  "truncated": true,
+  "total_count": 12345
+}
+```
+
+**Best Practices for AI Clients:**
+1. Check for `truncated: true` in responses
+2. Use `pattern` or `node_type` filters to narrow results
+3. Increase `limit` only when necessary (e.g., `limit: 1000`)
+4. Use `limit: 0` with caution (unlimited results)

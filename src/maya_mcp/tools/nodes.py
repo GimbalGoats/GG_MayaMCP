@@ -13,6 +13,9 @@ from maya_mcp.transport import get_client
 # Characters that are not allowed in patterns for security
 FORBIDDEN_PATTERN_CHARS = frozenset([";", "|", "&", "$", "`", "\n", "\r", '"', "'"])
 
+# Default limit for node listing to prevent token budget explosion
+DEFAULT_NODE_LIMIT = 500
+
 
 def _validate_pattern(pattern: str) -> None:
     """Validate a node name pattern for security.
@@ -31,6 +34,7 @@ def nodes_list(
     node_type: str | None = None,
     pattern: str = "*",
     long_names: bool = False,
+    limit: int | None = DEFAULT_NODE_LIMIT,
 ) -> dict[str, Any]:
     """List nodes in the Maya scene.
 
@@ -43,11 +47,16 @@ def nodes_list(
             Default is "*" (all names).
         long_names: If True, return full DAG paths. If False, return
             short names.
+        limit: Maximum number of nodes to return. Default is 500.
+            Set to None or 0 for unlimited (use with caution in large scenes).
+            When truncated, response includes 'truncated' and 'total_count'.
 
     Returns:
         Dictionary with node list:
             - nodes: List of node names
-            - count: Number of nodes in the list
+            - count: Number of nodes returned
+            - truncated: True if results were truncated (only if limit hit)
+            - total_count: Total nodes matching before limit (only if truncated)
 
     Raises:
         MayaUnavailableError: If not connected to Maya.
@@ -104,7 +113,20 @@ print(json.dumps(nodes))
     if not isinstance(nodes, list):
         nodes = []
 
-    return {
+    # Apply limit to prevent token budget explosion
+    total_count = len(nodes)
+    truncated = False
+    if limit and limit > 0 and total_count > limit:
+        nodes = nodes[:limit]
+        truncated = True
+
+    result: dict[str, Any] = {
         "nodes": nodes,
         "count": len(nodes),
     }
+
+    if truncated:
+        result["truncated"] = True
+        result["total_count"] = total_count
+
+    return result
