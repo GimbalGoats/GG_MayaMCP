@@ -50,6 +50,40 @@ BUFFER_SIZE = 4096
 _client: CommandPortClient | None = None
 
 
+def _parse_maya_response(raw_response: str) -> str:
+    """Parse Maya commandPort response to extract the actual output.
+
+    Maya's commandPort with echoOutput=True returns responses in a format like:
+        'None\\n\\x00<actual_output>\\n\\x00\\n\\n\\x00'
+
+    This function extracts the actual output, stripping:
+        - The 'None\\n' prefix (from print() return value)
+        - Null byte delimiters (\\x00)
+        - Extra whitespace
+
+    Args:
+        raw_response: Raw response string from Maya commandPort.
+
+    Returns:
+        The extracted output string, or empty string if no output found.
+
+    Example:
+        >>> _parse_maya_response('None\\n\\x00{"test": 1}\\n\\x00\\n\\n\\x00')
+        '{"test": 1}'
+    """
+    if not raw_response:
+        return ""
+
+    # Remove null bytes and split into parts
+    parts = raw_response.replace("\x00", "\n").split("\n")
+
+    # Filter out empty strings and 'None' (from print() return)
+    filtered = [p.strip() for p in parts if p.strip() and p.strip() != "None"]
+
+    # Return the first non-empty part (the actual output)
+    return filtered[0] if filtered else ""
+
+
 def get_client() -> CommandPortClient:
     """Get the global CommandPortClient instance.
 
@@ -275,7 +309,10 @@ class CommandPortClient:
                     # No more data available
                     break
 
-            response = b"".join(response_parts).decode("utf-8").strip()
+            raw_response = b"".join(response_parts).decode("utf-8").strip()
+
+            # Parse Maya's response format to extract actual output
+            response = _parse_maya_response(raw_response)
 
             # Update state on success
             self.state.update_contact()
