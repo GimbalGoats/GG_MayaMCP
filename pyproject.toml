@@ -84,6 +84,12 @@ ignore = [
     "B008",   # do not perform function calls in argument defaults
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "ARG001",  # Unused function argument (pytest fixtures are often dependencies)
+    "ARG002",  # Unused method argument (pytest fixtures are often dependencies)
+]
+
 [tool.ruff.lint.isort]
 known-first-party = ["maya_mcp"]
 
@@ -128,4 +134,7 @@ addopts = [
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
+]
+markers = [
+    "integration: marks tests as integration tests requiring Maya (deselect with '-m \"not integration\"')",
 ]
