@@ -25,6 +25,7 @@ from typing import Annotated, Any, Literal
 from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
+from maya_mcp.tools.attributes import attributes_get, attributes_set
 from maya_mcp.tools.connection import maya_connect, maya_disconnect
 from maya_mcp.tools.health import health_check
 from maya_mcp.tools.nodes import nodes_list
@@ -42,6 +43,8 @@ Available tools:
 - maya.disconnect: Disconnect from Maya
 - scene.info: Get current scene information (file path, FPS, frame range, etc.)
 - nodes.list: List nodes by type or pattern
+- attributes.get: Get attribute values from a node (batch supported)
+- attributes.set: Set attribute values on a node (batch supported)
 - selection.get: Get current selection
 - selection.set: Set selection (replace, add, or deselect)
 - selection.clear: Clear the selection (deselect all)
@@ -180,6 +183,63 @@ def tool_nodes_list(
         'truncated' (True) and 'total_count' fields.
     """
     return nodes_list(node_type=node_type, pattern=pattern, long_names=long_names, limit=limit)
+
+
+# Register attribute tools
+@mcp.tool(
+    name="attributes.get",
+    description="Get one or more attribute values from a Maya node. "
+    "Supports batch queries to reduce tool call chaining.",
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_attributes_get(
+    node: Annotated[str, "Node name to query"],
+    attributes: Annotated[list[str], "Attribute names to get (e.g., ['translateX', 'visibility'])"],
+) -> dict[str, Any]:
+    """Get attribute values from a Maya node.
+
+    Args:
+        node: Node name to query.
+        attributes: List of attribute names to retrieve.
+
+    Returns:
+        Dictionary with node, attributes (name→value map), count,
+        and errors (if any attributes failed).
+    """
+    return attributes_get(node=node, attributes=attributes)
+
+
+@mcp.tool(
+    name="attributes.set",
+    description="Set one or more attribute values on a Maya node. "
+    "Supports batch operations to reduce tool call chaining.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_attributes_set(
+    node: Annotated[str, "Node name to modify"],
+    attributes: Annotated[dict[str, Any], "Map of attribute name to value"],
+) -> dict[str, Any]:
+    """Set attribute values on a Maya node.
+
+    Args:
+        node: Node name to modify.
+        attributes: Dictionary mapping attribute names to values.
+
+    Returns:
+        Dictionary with node, set (list of attrs set), count,
+        and errors (if any attributes failed).
+    """
+    return attributes_set(node=node, attributes=attributes)
 
 
 # Register selection tools

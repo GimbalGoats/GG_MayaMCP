@@ -8,8 +8,9 @@ Tools use a hierarchical naming scheme:
 
 - `health.*` - Health and diagnostics
 - `maya.*` - Connection management
-- `scene.*` - Scene-level operations
-- `nodes.*` - Node operations
+- `scene.*` - Scene-level operations (info, undo, redo)
+- `nodes.*` - Node operations (list, create, delete)
+- `attributes.*` - Attribute operations (get, set)
 - `selection.*` - Selection management
 
 ## Health Tools
@@ -220,6 +221,153 @@ List nodes in the scene, optionally filtered by type.
 
 ---
 
+## Attribute Tools
+
+### `attributes.get`
+
+Get one or more attribute values from a node.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `node` | `string` | Yes | - | Node name to query |
+| `attributes` | `string[]` | Yes | - | Attribute names to get (e.g., `["translateX", "visibility"]`) |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `node` | `string` | Node name queried |
+| `attributes` | `object` | Map of attribute name to value |
+| `count` | `integer` | Number of attributes returned |
+| `errors` | `object \| null` | Map of attribute name to error message (for attrs that failed) |
+
+**Example Request**:
+
+```json
+{
+  "node": "pCube1",
+  "attributes": ["translateX", "translateY", "translateZ", "visibility"]
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "node": "pCube1",
+  "attributes": {
+    "translateX": 0.0,
+    "translateY": 5.0,
+    "translateZ": -2.5,
+    "visibility": true
+  },
+  "count": 4,
+  "errors": null
+}
+```
+
+**Example Response (Partial Failure)**:
+
+```json
+{
+  "node": "pCube1",
+  "attributes": {
+    "translateX": 0.0,
+    "translateY": 5.0
+  },
+  "count": 2,
+  "errors": {
+    "nonExistentAttr": "Attribute 'nonExistentAttr' not found on node 'pCube1'"
+  }
+}
+```
+
+**Supported Value Types**:
+
+| Maya Type | JSON Type | Example |
+|-----------|-----------|---------|
+| `double`, `float` | `number` | `5.0` |
+| `int`, `long`, `short` | `integer` | `42` |
+| `bool` | `boolean` | `true` |
+| `string` | `string` | `"hello"` |
+| `enum` | `integer` | `2` (enum index) |
+| `double3` (compound) | `[number, number, number]` | `[1.0, 2.0, 3.0]` |
+
+---
+
+### `attributes.set`
+
+Set one or more attribute values on a node.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `node` | `string` | Yes | - | Node name to modify |
+| `attributes` | `object` | Yes | - | Map of attribute name to value |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `node` | `string` | Node name modified |
+| `set` | `string[]` | Attributes successfully set |
+| `count` | `integer` | Number of attributes set |
+| `errors` | `object \| null` | Map of attribute name to error message (for attrs that failed) |
+
+**Example Request**:
+
+```json
+{
+  "node": "pCube1",
+  "attributes": {
+    "translateX": 10.0,
+    "translateY": 5.0,
+    "visibility": false
+  }
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "node": "pCube1",
+  "set": ["translateX", "translateY", "visibility"],
+  "count": 3,
+  "errors": null
+}
+```
+
+**Example Response (Partial Failure)**:
+
+```json
+{
+  "node": "pCube1",
+  "set": ["translateX", "translateY"],
+  "count": 2,
+  "errors": {
+    "lockedAttr": "Attribute 'lockedAttr' is locked"
+  }
+}
+```
+
+**Common Transform Attributes**:
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `translateX`, `translateY`, `translateZ` | `number` | Position |
+| `rotateX`, `rotateY`, `rotateZ` | `number` | Rotation (degrees) |
+| `scaleX`, `scaleY`, `scaleZ` | `number` | Scale |
+| `visibility` | `boolean` | Node visibility |
+| `translate` | `[x, y, z]` | Compound position |
+| `rotate` | `[x, y, z]` | Compound rotation |
+| `scale` | `[x, y, z]` | Compound scale |
+
+---
+
 ## Selection Tools
 
 ### `selection.get`
@@ -367,6 +515,8 @@ All tools include MCP annotations to help AI clients understand their behavior a
 | `maya.disconnect` | false | false | true |
 | `scene.info` | true | false | true |
 | `nodes.list` | true | false | true |
+| `attributes.get` | true | false | true |
+| `attributes.set` | false | false | true |
 | `selection.get` | true | false | true |
 | `selection.set` | false | false | false |
 | `selection.clear` | false | false | true |
