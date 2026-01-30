@@ -78,6 +78,52 @@ print(json.dumps(selection))
     }
 
 
+def selection_clear() -> dict[str, Any]:
+    """Clear the Maya selection.
+
+    Deselects all currently selected nodes.
+
+    Returns:
+        Dictionary with empty selection state:
+            - selection: Empty list
+            - count: 0
+
+    Raises:
+        MayaUnavailableError: If not connected to Maya.
+        MayaCommandError: If Maya command execution fails.
+
+    Example:
+        >>> result = selection_clear()
+        >>> print(f"Selection cleared: {result['count']} items")
+    """
+    client = get_client()
+
+    command = """
+import maya.cmds as cmds
+import json
+
+cmds.select(clear=True)
+selection = cmds.ls(selection=True) or []
+print(json.dumps(selection))
+"""
+
+    response = client.execute(command)
+
+    # Parse the JSON response
+    try:
+        selection = json.loads(response)
+    except json.JSONDecodeError:
+        selection = []
+
+    if not isinstance(selection, list):
+        selection = []
+
+    return {
+        "selection": selection,
+        "count": len(selection),
+    }
+
+
 def selection_set(
     nodes: list[str],
     add: bool = False,

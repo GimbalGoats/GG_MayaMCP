@@ -28,7 +28,7 @@ from maya_mcp.tools.connection import maya_connect, maya_disconnect
 from maya_mcp.tools.health import health_check
 from maya_mcp.tools.nodes import nodes_list
 from maya_mcp.tools.scene import scene_info
-from maya_mcp.tools.selection import selection_get, selection_set
+from maya_mcp.tools.selection import selection_clear, selection_get, selection_set
 
 # Create the FastMCP server instance
 mcp = FastMCP(
@@ -39,10 +39,11 @@ Available tools:
 - health.check: Check connection status to Maya
 - maya.connect: Connect to Maya commandPort
 - maya.disconnect: Disconnect from Maya
-- scene.info: Get current scene information (not yet implemented)
-- nodes.list: List nodes by type (not yet implemented)
-- selection.get: Get current selection (not yet implemented)
-- selection.set: Set selection (not yet implemented)
+- scene.info: Get current scene information (file path, FPS, frame range, etc.)
+- nodes.list: List nodes by type or pattern
+- selection.get: Get current selection
+- selection.set: Set selection (replace, add, or deselect)
+- selection.clear: Clear the selection (deselect all)
 
 Before using Maya tools, ensure Maya is running with commandPort enabled:
     import maya.cmds as cmds
@@ -177,6 +178,21 @@ def tool_selection_set(
         New selection state with selection array and count.
     """
     return selection_set(nodes=nodes, add=add, deselect=deselect)
+
+
+@mcp.tool(
+    name="selection.clear",
+    description="Clear the Maya selection (deselect all)",
+)
+def tool_selection_clear() -> dict[str, Any]:
+    """Clear Maya selection.
+
+    Deselects all currently selected nodes.
+
+    Returns:
+        Empty selection state with selection array and count of 0.
+    """
+    return selection_clear()
 
 
 def main() -> None:
