@@ -1,0 +1,49 @@
+# GitLab CI/CD Pipeline for Maya MCP
+# Runs only on merge requests (not on every push)
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+stages:
+  - lint
+  - test
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+cache:
+  paths:
+    - .cache/pip
+    - .venv/
+
+.python-setup: &python-setup
+  image: python:3.10-slim
+  before_script:
+    - python -m venv .venv
+    - source .venv/bin/activate
+    - pip install --upgrade pip
+    - pip install -e ".[dev]"
+
+ruff-lint:
+  <<: *python-setup
+  stage: lint
+  script:
+    - ruff check .
+    - ruff format --check .
+
+mypy:
+  <<: *python-setup
+  stage: lint
+  script:
+    - mypy src/
+
+pytest:
+  <<: *python-setup
+  stage: test
+  script:
+    - pytest --junitxml=report.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
