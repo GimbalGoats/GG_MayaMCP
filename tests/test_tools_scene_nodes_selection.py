@@ -11,8 +11,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from maya_mcp.tools.nodes import nodes_list
-from maya_mcp.tools.scene import scene_info
+from maya_mcp.tools.nodes import nodes_create, nodes_delete, nodes_list
+from maya_mcp.tools.scene import scene_info, scene_redo, scene_undo
 from maya_mcp.tools.selection import selection_clear, selection_get, selection_set
 
 
@@ -97,6 +97,144 @@ class TestSceneInfo:
             assert result["fps"] == expected_fps, f"Failed for time_unit={time_unit}"
 
 
+class TestSceneUndo:
+    """Tests for the scene.undo tool."""
+
+    def test_scene_undo_success(self) -> None:
+        """Undo succeeds when undo queue is not empty."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "success": True,
+                "undone": "setAttr pCube1.translateX",
+                "can_undo": True,
+                "can_redo": True,
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):
+            result = scene_undo()
+
+        assert result["success"] is True
+        assert result["undone"] == "setAttr pCube1.translateX"
+        assert result["can_undo"] is True
+        assert result["can_redo"] is True
+
+    def test_scene_undo_nothing_to_undo(self) -> None:
+        """Undo fails when undo queue is empty."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "success": False,
+                "undone": None,
+                "can_undo": False,
+                "can_redo": False,
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):
+            result = scene_undo()
+
+        assert result["success"] is False
+        assert result["undone"] is None
+        assert result["can_undo"] is False
+
+    def test_scene_undo_result_shape(self) -> None:
+        """Undo result includes all required fields."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "success": True,
+                "undone": "createNode",
+                "can_undo": False,
+                "can_redo": True,
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):
+            result = scene_undo()
+
+        assert "success" in result
+        assert "undone" in result
+        assert "can_undo" in result
+        assert "can_redo" in result
+        assert isinstance(result["success"], bool)
+        assert isinstance(result["can_undo"], bool)
+        assert isinstance(result["can_redo"], bool)
+
+
+class TestSceneRedo:
+    """Tests for the scene.redo tool."""
+
+    def test_scene_redo_success(self) -> None:
+        """Redo succeeds when redo queue is not empty."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "success": True,
+                "redone": "setAttr pCube1.translateX",
+                "can_undo": True,
+                "can_redo": False,
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):
+            result = scene_redo()
+
+        assert result["success"] is True
+        assert result["redone"] == "setAttr pCube1.translateX"
+        assert result["can_undo"] is True
+        assert result["can_redo"] is False
+
+    def test_scene_redo_nothing_to_redo(self) -> None:
+        """Redo fails when redo queue is empty."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "success": False,
+                "redone": None,
+                "can_undo": True,
+                "can_redo": False,
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):
+            result = scene_redo()
+
+        assert result["success"] is False
+        assert result["redone"] is None
+        assert result["can_redo"] is False
+
+    def test_scene_redo_result_shape(self) -> None:
+        """Redo result includes all required fields."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "success": True,
+                "redone": "delete",
+                "can_undo": True,
+                "can_redo": True,
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):
+            result = scene_redo()
+
+        assert "success" in result
+        assert "redone" in result
+        assert "can_undo" in result
+        assert "can_redo" in result
+        assert isinstance(result["success"], bool)
+        assert isinstance(result["can_undo"], bool)
+        assert isinstance(result["can_redo"], bool)
+
+
 class TestNodesList:
     """Tests for the nodes.list tool."""
 
@@ -171,6 +309,264 @@ class TestNodesList:
         mock_client.execute.assert_called_once()
         call_arg = mock_client.execute.call_args[0][0]
         assert "long=True" in call_arg
+
+
+class TestNodesCreate:
+    """Tests for the nodes.create tool."""
+
+    def test_nodes_create_simple(self) -> None:
+        """Create a simple node without options."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "node": "transform1",
+                "node_type": "transform",
+                "parent": None,
+                "attributes_set": [],
+                "attribute_errors": {},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_create("transform")
+
+        assert result["node"] == "transform1"
+        assert result["node_type"] == "transform"
+        assert result["parent"] is None
+        assert result["attributes_set"] == []
+        assert result["attribute_errors"] is None
+
+    def test_nodes_create_with_name(self) -> None:
+        """Create a node with a specific name."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "node": "myLocator",
+                "node_type": "transform",
+                "parent": None,
+                "attributes_set": [],
+                "attribute_errors": {},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_create("transform", name="myLocator")
+
+        assert result["node"] == "myLocator"
+
+    def test_nodes_create_with_parent(self) -> None:
+        """Create a node under a parent."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "node": "child1",
+                "node_type": "transform",
+                "parent": "group1",
+                "attributes_set": [],
+                "attribute_errors": {},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_create("transform", name="child1", parent="group1")
+
+        assert result["node"] == "child1"
+        assert result["parent"] == "group1"
+
+    def test_nodes_create_with_attributes(self) -> None:
+        """Create a node with initial attributes."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "node": "myNode",
+                "node_type": "transform",
+                "parent": None,
+                "attributes_set": ["translateX", "translateY"],
+                "attribute_errors": {},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_create(
+                "transform",
+                name="myNode",
+                attributes={"translateX": 10.0, "translateY": 5.0},
+            )
+
+        assert result["node"] == "myNode"
+        assert result["attributes_set"] == ["translateX", "translateY"]
+        assert result["attribute_errors"] is None
+
+    def test_nodes_create_with_attribute_errors(self) -> None:
+        """Create a node with some attribute errors."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "node": "myNode",
+                "node_type": "transform",
+                "parent": None,
+                "attributes_set": ["translateX"],
+                "attribute_errors": {"badAttr": "Attribute 'badAttr' not found"},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_create(
+                "transform",
+                name="myNode",
+                attributes={"translateX": 10.0, "badAttr": 5.0},
+            )
+
+        assert result["node"] == "myNode"
+        assert result["attributes_set"] == ["translateX"]
+        assert result["attribute_errors"] is not None
+        assert "badAttr" in result["attribute_errors"]
+
+    def test_nodes_create_invalid_node_type(self) -> None:
+        """Create rejects invalid node type characters."""
+        with pytest.raises(ValueError, match="Invalid characters"):
+            nodes_create("transform; rm -rf /")
+
+    def test_nodes_create_invalid_name(self) -> None:
+        """Create rejects invalid node name characters."""
+        with pytest.raises(ValueError, match="Invalid characters"):
+            nodes_create("transform", name="node; bad")
+
+    def test_nodes_create_result_shape(self) -> None:
+        """Create result includes all required fields."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "node": "node1",
+                "node_type": "transform",
+                "parent": None,
+                "attributes_set": [],
+                "attribute_errors": {},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_create("transform")
+
+        assert "node" in result
+        assert "node_type" in result
+        assert "parent" in result
+        assert "attributes_set" in result
+        assert "attribute_errors" in result
+
+
+class TestNodesDelete:
+    """Tests for the nodes.delete tool."""
+
+    def test_nodes_delete_single(self) -> None:
+        """Delete a single node."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "deleted": ["pCube1"],
+                "errors": {},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_delete(["pCube1"])
+
+        assert result["deleted"] == ["pCube1"]
+        assert result["count"] == 1
+        assert result["errors"] is None
+
+    def test_nodes_delete_multiple(self) -> None:
+        """Delete multiple nodes."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "deleted": ["pCube1", "pSphere1"],
+                "errors": {},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_delete(["pCube1", "pSphere1"])
+
+        assert result["deleted"] == ["pCube1", "pSphere1"]
+        assert result["count"] == 2
+        assert result["errors"] is None
+
+    def test_nodes_delete_with_hierarchy(self) -> None:
+        """Delete node with hierarchy flag."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "deleted": ["group1"],
+                "errors": {},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_delete(["group1"], hierarchy=True)
+
+        assert result["deleted"] == ["group1"]
+        mock_client.execute.assert_called_once()
+        call_arg = mock_client.execute.call_args[0][0]
+        assert "delete_hierarchy = True" in call_arg
+
+    def test_nodes_delete_partial_failure(self) -> None:
+        """Delete with some nodes failing."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "deleted": ["pCube1"],
+                "errors": {"pSphere1": "Node 'pSphere1' does not exist"},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_delete(["pCube1", "pSphere1"])
+
+        assert result["deleted"] == ["pCube1"]
+        assert result["count"] == 1
+        assert result["errors"] is not None
+        assert "pSphere1" in result["errors"]
+
+    def test_nodes_delete_empty_list(self) -> None:
+        """Delete rejects empty nodes list."""
+        with pytest.raises(ValueError, match="cannot be empty"):
+            nodes_delete([])
+
+    def test_nodes_delete_invalid_name(self) -> None:
+        """Delete rejects invalid node name characters."""
+        with pytest.raises(ValueError, match="Invalid characters"):
+            nodes_delete(["node; bad"])
+
+    def test_nodes_delete_result_shape(self) -> None:
+        """Delete result includes all required fields."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "deleted": ["node1"],
+                "errors": {},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_delete(["node1"])
+
+        assert "deleted" in result
+        assert "count" in result
+        assert "errors" in result
+        assert isinstance(result["deleted"], list)
+        assert isinstance(result["count"], int)
 
 
 class TestSelectionGet:

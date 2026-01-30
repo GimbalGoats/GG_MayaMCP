@@ -166,6 +166,84 @@ Get information about the current Maya scene.
 
 ---
 
+### `scene.undo`
+
+Undo the last operation in Maya. Critical for LLM error recovery.
+
+**Input**: None
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | `boolean` | Whether undo succeeded |
+| `undone` | `string \| null` | Description of the undone action |
+| `can_undo` | `boolean` | Whether more undo operations are available |
+| `can_redo` | `boolean` | Whether redo is now available |
+
+**Example Response**:
+
+```json
+{
+  "success": true,
+  "undone": "setAttr pCube1.translateX",
+  "can_undo": true,
+  "can_redo": true
+}
+```
+
+**Example Response (Nothing to Undo)**:
+
+```json
+{
+  "success": false,
+  "undone": null,
+  "can_undo": false,
+  "can_redo": false
+}
+```
+
+---
+
+### `scene.redo`
+
+Redo the last undone operation in Maya.
+
+**Input**: None
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | `boolean` | Whether redo succeeded |
+| `redone` | `string \| null` | Description of the redone action |
+| `can_undo` | `boolean` | Whether undo is now available |
+| `can_redo` | `boolean` | Whether more redo operations are available |
+
+**Example Response**:
+
+```json
+{
+  "success": true,
+  "redone": "setAttr pCube1.translateX",
+  "can_undo": true,
+  "can_redo": false
+}
+```
+
+**Example Response (Nothing to Redo)**:
+
+```json
+{
+  "success": false,
+  "redone": null,
+  "can_undo": true,
+  "can_redo": false
+}
+```
+
+---
+
 ## Node Tools
 
 ### `nodes.list`
@@ -218,6 +296,122 @@ List nodes in the scene, optionally filtered by type.
   "total_count": 1234
 }
 ```
+
+---
+
+### `nodes.create`
+
+Create a new node in Maya with optional name, parent, and initial attributes.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `node_type` | `string` | Yes | - | Type of node to create (e.g., "transform", "locator", "joint") |
+| `name` | `string` | No | `null` | Desired node name (Maya may modify for uniqueness) |
+| `parent` | `string` | No | `null` | Parent node to parent under |
+| `attributes` | `object` | No | `null` | Initial attribute values to set after creation |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `node` | `string` | Name of the created node |
+| `node_type` | `string` | Type of node created |
+| `parent` | `string \| null` | Parent node (if parented) |
+| `attributes_set` | `string[]` | Attributes successfully set (if any) |
+| `attribute_errors` | `object \| null` | Errors for attributes that failed to set |
+
+**Example Request**:
+
+```json
+{
+  "node_type": "transform",
+  "name": "myLocator",
+  "parent": "group1",
+  "attributes": {
+    "translateX": 10.0,
+    "translateY": 5.0
+  }
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "node": "myLocator",
+  "node_type": "transform",
+  "parent": "group1",
+  "attributes_set": ["translateX", "translateY"],
+  "attribute_errors": null
+}
+```
+
+**Supported Node Types**:
+
+| Category | Types |
+|----------|-------|
+| DAG nodes | `transform`, `joint`, `locator`, `camera`, `light` |
+| Shape nodes | `mesh`, `nurbsCurve`, `nurbsSurface` |
+| DG nodes | `multiplyDivide`, `blendColors`, `condition` |
+
+---
+
+### `nodes.delete`
+
+Delete one or more nodes from the Maya scene.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `nodes` | `string[]` | Yes | - | Node names to delete |
+| `hierarchy` | `boolean` | No | `false` | Delete entire hierarchy below each node |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `deleted` | `string[]` | Nodes successfully deleted |
+| `count` | `integer` | Number of nodes deleted |
+| `errors` | `object \| null` | Map of node name to error message (for nodes that failed) |
+
+**Example Request**:
+
+```json
+{
+  "nodes": ["pCube1", "pSphere1"],
+  "hierarchy": false
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "deleted": ["pCube1", "pSphere1"],
+  "count": 2,
+  "errors": null
+}
+```
+
+**Example Response (Partial Failure)**:
+
+```json
+{
+  "deleted": ["pCube1"],
+  "count": 1,
+  "errors": {
+    "pSphere1": "Node 'pSphere1' does not exist"
+  }
+}
+```
+
+**Notes**:
+- Deleting a transform also deletes its shape nodes
+- With `hierarchy: true`, all descendant nodes are also deleted
+- Use `scene.undo` to recover accidentally deleted nodes
 
 ---
 
@@ -514,7 +708,11 @@ All tools include MCP annotations to help AI clients understand their behavior a
 | `maya.connect` | false | false | true |
 | `maya.disconnect` | false | false | true |
 | `scene.info` | true | false | true |
+| `scene.undo` | false | false | false |
+| `scene.redo` | false | false | false |
 | `nodes.list` | true | false | true |
+| `nodes.create` | false | false | false |
+| `nodes.delete` | false | false | true |
 | `attributes.get` | true | false | true |
 | `attributes.set` | false | false | true |
 | `selection.get` | true | false | true |

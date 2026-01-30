@@ -1,4 +1,4 @@
-"""Integration tests for scene.info tool.
+"""Integration tests for scene tools.
 
 These tests require a running Maya instance with commandPort enabled.
 """
@@ -153,5 +153,177 @@ class TestSceneInfoIntegration:
 
             assert result["frame_range"][0] == 10.0
             assert result["frame_range"][1] == 100.0
+        finally:
+            transport_module._client = original_client
+
+
+class TestSceneUndoIntegration:
+    """Integration tests for the scene.undo tool."""
+
+    def test_scene_undo_after_operation(
+        self, maya_client: CommandPortClient, clean_scene: None
+    ) -> None:
+        """scene.undo reverts the last operation."""
+        import maya_mcp.transport.commandport as transport_module
+        from maya_mcp.tools.scene import scene_undo
+
+        original_client = transport_module._client
+        transport_module._client = maya_client
+
+        try:
+            # Create a node (undoable operation)
+            maya_client.execute("import maya.cmds as cmds; cmds.polyCube(name='undoTestCube')")
+
+            # Verify it exists
+            exists_before = maya_client.execute(
+                "import maya.cmds as cmds; print(cmds.objExists('undoTestCube'))"
+            )
+            assert "True" in exists_before
+
+            # Undo
+            result = scene_undo()
+
+            assert result["success"] is True
+            assert result["undone"] is not None
+
+            # Verify it's gone
+            exists_after = maya_client.execute(
+                "import maya.cmds as cmds; print(cmds.objExists('undoTestCube'))"
+            )
+            assert "False" in exists_after
+        finally:
+            transport_module._client = original_client
+
+    def test_scene_undo_returns_required_fields(
+        self, maya_client: CommandPortClient, clean_scene: None
+    ) -> None:
+        """scene.undo returns all required fields."""
+        import maya_mcp.transport.commandport as transport_module
+        from maya_mcp.tools.scene import scene_undo
+
+        original_client = transport_module._client
+        transport_module._client = maya_client
+
+        try:
+            # Create something to undo
+            maya_client.execute("import maya.cmds as cmds; cmds.polyCube()")
+
+            result = scene_undo()
+
+            assert "success" in result
+            assert "undone" in result
+            assert "can_undo" in result
+            assert "can_redo" in result
+            assert isinstance(result["success"], bool)
+            assert isinstance(result["can_undo"], bool)
+            assert isinstance(result["can_redo"], bool)
+        finally:
+            transport_module._client = original_client
+
+    def test_scene_undo_sets_can_redo(
+        self, maya_client: CommandPortClient, clean_scene: None
+    ) -> None:
+        """scene.undo sets can_redo to True after successful undo."""
+        import maya_mcp.transport.commandport as transport_module
+        from maya_mcp.tools.scene import scene_undo
+
+        original_client = transport_module._client
+        transport_module._client = maya_client
+
+        try:
+            # Create something to undo
+            maya_client.execute("import maya.cmds as cmds; cmds.polyCube()")
+
+            result = scene_undo()
+
+            assert result["success"] is True
+            assert result["can_redo"] is True
+        finally:
+            transport_module._client = original_client
+
+
+class TestSceneRedoIntegration:
+    """Integration tests for the scene.redo tool."""
+
+    def test_scene_redo_after_undo(self, maya_client: CommandPortClient, clean_scene: None) -> None:
+        """scene.redo re-applies an undone operation."""
+        import maya_mcp.transport.commandport as transport_module
+        from maya_mcp.tools.scene import scene_redo, scene_undo
+
+        original_client = transport_module._client
+        transport_module._client = maya_client
+
+        try:
+            # Create a node
+            maya_client.execute("import maya.cmds as cmds; cmds.polyCube(name='redoTestCube')")
+
+            # Undo it
+            scene_undo()
+
+            # Verify it's gone
+            exists_after_undo = maya_client.execute(
+                "import maya.cmds as cmds; print(cmds.objExists('redoTestCube'))"
+            )
+            assert "False" in exists_after_undo
+
+            # Redo it
+            result = scene_redo()
+
+            assert result["success"] is True
+            assert result["redone"] is not None
+
+            # Verify it's back
+            exists_after_redo = maya_client.execute(
+                "import maya.cmds as cmds; print(cmds.objExists('redoTestCube'))"
+            )
+            assert "True" in exists_after_redo
+        finally:
+            transport_module._client = original_client
+
+    def test_scene_redo_returns_required_fields(
+        self, maya_client: CommandPortClient, clean_scene: None
+    ) -> None:
+        """scene.redo returns all required fields."""
+        import maya_mcp.transport.commandport as transport_module
+        from maya_mcp.tools.scene import scene_redo, scene_undo
+
+        original_client = transport_module._client
+        transport_module._client = maya_client
+
+        try:
+            # Create and undo to enable redo
+            maya_client.execute("import maya.cmds as cmds; cmds.polyCube()")
+            scene_undo()
+
+            result = scene_redo()
+
+            assert "success" in result
+            assert "redone" in result
+            assert "can_undo" in result
+            assert "can_redo" in result
+            assert isinstance(result["success"], bool)
+            assert isinstance(result["can_undo"], bool)
+            assert isinstance(result["can_redo"], bool)
+        finally:
+            transport_module._client = original_client
+
+    def test_scene_redo_nothing_to_redo(
+        self, maya_client: CommandPortClient, clean_scene: None
+    ) -> None:
+        """scene.redo fails when nothing to redo."""
+        import maya_mcp.transport.commandport as transport_module
+        from maya_mcp.tools.scene import scene_redo
+
+        original_client = transport_module._client
+        transport_module._client = maya_client
+
+        try:
+            # Perform an action to clear redo queue
+            maya_client.execute("import maya.cmds as cmds; cmds.polyCube()")
+
+            result = scene_redo()
+
+            assert result["success"] is False
+            assert result["redone"] is None
         finally:
             transport_module._client = original_client
