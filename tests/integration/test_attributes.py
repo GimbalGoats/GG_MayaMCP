@@ -36,9 +36,7 @@ class TestAttributesGetIntegration:
 
     def test_get_multiple_attributes(self, test_cube: str) -> None:
         """Get multiple attributes in batch."""
-        result = attributes_get(
-            test_cube, ["translateX", "translateY", "translateZ", "visibility"]
-        )
+        result = attributes_get(test_cube, ["translateX", "translateY", "translateZ", "visibility"])
 
         assert result["node"] == test_cube
         assert result["count"] == 4
@@ -109,9 +107,7 @@ class TestAttributesSetIntegration:
         assert result["errors"] is None
 
         # Verify values
-        get_result = attributes_get(
-            test_cube, ["translateX", "translateY", "translateZ"]
-        )
+        get_result = attributes_get(test_cube, ["translateX", "translateY", "translateZ"])
         assert abs(get_result["attributes"]["translateX"] - 10.0) < 0.001
         assert abs(get_result["attributes"]["translateY"] - 20.0) < 0.001
         assert abs(get_result["attributes"]["translateZ"] - 30.0) < 0.001
@@ -133,9 +129,7 @@ class TestAttributesSetIntegration:
 
     def test_set_nonexistent_attribute(self, test_cube: str) -> None:
         """Set returns error for nonexistent attribute."""
-        result = attributes_set(
-            test_cube, {"translateX": 5.0, "nonExistentAttr": 10.0}
-        )
+        result = attributes_set(test_cube, {"translateX": 5.0, "nonExistentAttr": 10.0})
 
         assert result["count"] == 1
         assert "translateX" in result["set"]
@@ -149,9 +143,7 @@ class TestAttributesSetIntegration:
 
     def test_set_rotation_attributes(self, test_cube: str) -> None:
         """Set rotation attributes (commonly used transform)."""
-        result = attributes_set(
-            test_cube, {"rotateX": 45.0, "rotateY": 90.0, "rotateZ": 180.0}
-        )
+        result = attributes_set(test_cube, {"rotateX": 45.0, "rotateY": 90.0, "rotateZ": 180.0})
 
         assert result["count"] == 3
         assert result["errors"] is None
@@ -164,9 +156,7 @@ class TestAttributesSetIntegration:
 
     def test_set_scale_attributes(self, test_cube: str) -> None:
         """Set scale attributes (commonly used transform)."""
-        result = attributes_set(
-            test_cube, {"scaleX": 2.0, "scaleY": 3.0, "scaleZ": 0.5}
-        )
+        result = attributes_set(test_cube, {"scaleX": 2.0, "scaleY": 3.0, "scaleZ": 0.5})
 
         assert result["count"] == 3
         assert result["errors"] is None
@@ -185,18 +175,14 @@ class TestAttributesRoundTrip:
     def test_get_set_get_roundtrip(self, test_cube: str) -> None:
         """Values survive a get→set→get roundtrip."""
         # Get original values
-        original = attributes_get(
-            test_cube, ["translateX", "translateY", "translateZ"]
-        )
+        original = attributes_get(test_cube, ["translateX", "translateY", "translateZ"])
 
         # Set new values
         new_values = {"translateX": 100.0, "translateY": 200.0, "translateZ": 300.0}
         attributes_set(test_cube, new_values)
 
         # Get and verify new values
-        updated = attributes_get(
-            test_cube, ["translateX", "translateY", "translateZ"]
-        )
+        updated = attributes_get(test_cube, ["translateX", "translateY", "translateZ"])
 
         for attr, expected in new_values.items():
             assert abs(updated["attributes"][attr] - expected) < 0.001

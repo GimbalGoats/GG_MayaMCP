@@ -47,9 +47,7 @@ class TestAttributesGet:
         mock_client.execute.return_value = mock_response
 
         with patch("maya_mcp.tools.attributes.get_client", return_value=mock_client):
-            result = attributes_get(
-                "pCube1", ["translateX", "translateY", "visibility"]
-            )
+            result = attributes_get("pCube1", ["translateX", "translateY", "visibility"])
 
         assert result["node"] == "pCube1"
         assert result["attributes"]["translateX"] == 0.0
@@ -64,9 +62,7 @@ class TestAttributesGet:
         mock_response = json.dumps(
             {
                 "values": {"translateX": 5.0},
-                "errors": {
-                    "nonExistent": "Attribute 'nonExistent' not found on node 'pCube1'"
-                },
+                "errors": {"nonExistent": "Attribute 'nonExistent' not found on node 'pCube1'"},
             }
         )
         mock_client.execute.return_value = mock_response
@@ -163,9 +159,7 @@ class TestAttributesSet:
         mock_client.execute.return_value = mock_response
 
         with patch("maya_mcp.tools.attributes.get_client", return_value=mock_client):
-            result = attributes_set(
-                "pCube1", {"translateX": 5.0, "lockedAttr": 10.0}
-            )
+            result = attributes_set("pCube1", {"translateX": 5.0, "lockedAttr": 10.0})
 
         assert result["node"] == "pCube1"
         assert result["set"] == ["translateX"]
