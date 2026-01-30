@@ -179,9 +179,7 @@ def tool_nodes_list(
         Node list with nodes array, count. If truncated, includes
         'truncated' (True) and 'total_count' fields.
     """
-    return nodes_list(
-        node_type=node_type, pattern=pattern, long_names=long_names, limit=limit
-    )
+    return nodes_list(node_type=node_type, pattern=pattern, long_names=long_names, limit=limit)
 
 
 # Register selection tools
