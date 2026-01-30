@@ -8,8 +8,9 @@ Tools use a hierarchical naming scheme:
 
 - `health.*` - Health and diagnostics
 - `maya.*` - Connection management
-- `scene.*` - Scene-level operations
-- `nodes.*` - Node operations
+- `scene.*` - Scene-level operations (info, undo, redo)
+- `nodes.*` - Node operations (list, create, delete)
+- `attributes.*` - Attribute operations (get, set)
 - `selection.*` - Selection management
 
 ## Health Tools

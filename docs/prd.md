@@ -159,10 +159,22 @@ Direct integration is problematic because:
 
 ### M2: Extended Tools
 
-- [ ] Node attribute get/set
-- [ ] Node creation/deletion
-- [ ] Transform operations
-- [ ] Undo/redo support
+**Design Principle**: Workflow-first, not API-first. Tools should consolidate
+multiple Maya commands into single high-level operations that match how AI
+agents actually work. See [Block's MCP Playbook](https://engineering.block.xyz/blog/blocks-playbook-for-designing-mcp-servers).
+
+- [ ] `attributes.get` - Get attribute values (single or batch)
+- [ ] `attributes.set` - Set attribute values (single or batch)
+- [ ] `nodes.create` - Create nodes with optional name, parent, and initial attributes
+- [ ] `nodes.delete` - Delete nodes with optional hierarchy deletion
+- [ ] `scene.undo` - Undo last operation (critical for LLM error recovery)
+- [ ] `scene.redo` - Redo last undone operation
+
+**Rationale for changes from original plan:**
+- Transform operations (translate, rotate, scale) ARE attributes - covered by `attributes.set`
+- Batch attribute operations reduce tool call chaining
+- Node creation with initialization avoids create→set→parent call chains
+- Undo/redo enables LLM self-correction without user intervention
 
 ## Appendix: Alternatives Considered
 
