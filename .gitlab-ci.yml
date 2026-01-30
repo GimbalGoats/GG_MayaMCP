@@ -42,7 +42,8 @@ pytest:
   <<: *python-setup
   stage: test
   script:
-    - pytest --junitxml=report.xml
+    # Skip integration tests in CI (they require Maya running)
+    - pytest --junitxml=report.xml --ignore=tests/integration
   artifacts:
     when: always
     reports:
