@@ -177,6 +177,31 @@ python -m maya_mcp.server
 
 ---
 
+### OpenCode
+
+**Config location:** `.opencode/mcps/maya.json`
+
+```json
+{
+  "name": "maya",
+  "command": "uvx",
+  "args": ["maya-mcp"]
+}
+```
+
+**Alternative (using pip install):**
+```json
+{
+  "name": "maya",
+  "command": "maya-mcp",
+  "args": []
+}
+```
+
+**Full guide:** See [OpenCode Integration Guide](docs/usage/opencode-integration.md) for skill-based setup, troubleshooting, and advanced configuration.
+
+---
+
 ### Using FastMCP CLI
 
 If you have FastMCP installed, you can auto-configure clients:
