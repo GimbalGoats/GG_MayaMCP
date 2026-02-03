@@ -9,6 +9,7 @@ import json
 from typing import Any
 
 from maya_mcp.transport import get_client
+from maya_mcp.utils.response_guard import guard_response_size
 
 # Characters that are not allowed in patterns for security
 FORBIDDEN_PATTERN_CHARS = frozenset([";", "|", "&", "$", "`", "\n", "\r", '"', "'"])
@@ -146,6 +147,9 @@ print(json.dumps(nodes))
     if truncated:
         result["truncated"] = True
         result["total_count"] = total_count
+
+    # Apply response size guard to prevent token budget explosion
+    result = guard_response_size(result, list_key="nodes")
 
     return result
 
