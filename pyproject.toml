@@ -133,6 +133,12 @@ pretty = true
 module = "tests.*"
 disallow_untyped_defs = false
 
+[[tool.mypy.overrides]]
+# Maya panel uses dynamic Qt imports (PySide2/PySide6) and Maya-specific classes
+# that cannot be type-checked outside Maya
+module = "maya_mcp.maya_panel.*"
+ignore_errors = true
+
 # Pytest configuration
 [tool.pytest.ini_options]
 testpaths = ["tests"]
