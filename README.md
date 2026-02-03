@@ -179,26 +179,37 @@ python -m maya_mcp.server
 
 ### OpenCode
 
-**Config location:** `.opencode/mcps/maya.json`
+**Config location:** `opencode.jsonc` (or `opencode.json`) in project root
 
-```json
+```jsonc
 {
-  "name": "maya",
-  "command": "uvx",
-  "args": ["maya-mcp"]
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "maya": {
+      "type": "local",
+      "command": ["uvx", "maya-mcp"],
+      "enabled": true
+    }
+  }
 }
 ```
 
 **Alternative (using pip install):**
-```json
+```jsonc
 {
-  "name": "maya",
-  "command": "maya-mcp",
-  "args": []
+  "mcp": {
+    "maya": {
+      "type": "local",
+      "command": ["maya-mcp"],
+      "enabled": true
+    }
+  }
 }
 ```
 
-**Full guide:** See [OpenCode Integration Guide](docs/usage/opencode-integration.md) for skill-based setup, troubleshooting, and advanced configuration.
+**Important:** Restart OpenCode after editing config for changes to take effect.
+
+**Full guide:** See [OpenCode Integration Guide](docs/usage/opencode-integration.md) for troubleshooting and advanced configuration.
 
 ---
 
