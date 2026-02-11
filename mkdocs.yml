@@ -89,6 +89,9 @@ nav:
   - Getting Started:
       - Overview: index.md
       - PRD: prd.md
+  - Usage:
+      - OpenCode Integration: usage/opencode-integration.md
+      - Maya Control Panel: usage/maya-panel.md
   - Specification:
       - Architecture: spec/overview.md
       - Tools: spec/tools.md

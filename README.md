@@ -177,6 +177,42 @@ python -m maya_mcp.server
 
 ---
 
+### OpenCode
+
+**Config location:** `opencode.jsonc` (or `opencode.json`) in project root
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "maya": {
+      "type": "local",
+      "command": ["uvx", "maya-mcp"],
+      "enabled": true
+    }
+  }
+}
+```
+
+**Alternative (using pip install):**
+```jsonc
+{
+  "mcp": {
+    "maya": {
+      "type": "local",
+      "command": ["maya-mcp"],
+      "enabled": true
+    }
+  }
+}
+```
+
+**Important:** Restart OpenCode after editing config for changes to take effect.
+
+**Full guide:** See [OpenCode Integration Guide](docs/usage/opencode-integration.md) for troubleshooting and advanced configuration.
+
+---
+
 ### Using FastMCP CLI
 
 If you have FastMCP installed, you can auto-configure clients:

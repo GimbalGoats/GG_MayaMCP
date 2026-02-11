@@ -9,6 +9,7 @@ import json
 from typing import Any
 
 from maya_mcp.transport import get_client
+from maya_mcp.utils.response_guard import guard_response_size
 
 # Characters that are not allowed in patterns for security
 FORBIDDEN_PATTERN_CHARS = frozenset([";", "|", "&", "$", "`", "\n", "\r", '"', "'"])
@@ -147,6 +148,9 @@ print(json.dumps(nodes))
         result["truncated"] = True
         result["total_count"] = total_count
 
+    # Apply response size guard to prevent token budget explosion
+    result = guard_response_size(result, list_key="nodes")
+
     return result
 
 
@@ -210,9 +214,26 @@ attrs = {attrs_escaped}
 
 result = {{"node": None, "node_type": node_type, "parent": None, "attributes_set": [], "attribute_errors": {{}}}}
 
+# Mapping of primitive types to their creation functions
+# These return [transform, shape/history] instead of just the node
+PRIMITIVE_CREATORS = {{
+    "polyCube": lambda n: cmds.polyCube(name=n)[0] if n else cmds.polyCube()[0],
+    "polySphere": lambda n: cmds.polySphere(name=n)[0] if n else cmds.polySphere()[0],
+    "polyCylinder": lambda n: cmds.polyCylinder(name=n)[0] if n else cmds.polyCylinder()[0],
+    "polyCone": lambda n: cmds.polyCone(name=n)[0] if n else cmds.polyCone()[0],
+    "polyPlane": lambda n: cmds.polyPlane(name=n)[0] if n else cmds.polyPlane()[0],
+    "polyTorus": lambda n: cmds.polyTorus(name=n)[0] if n else cmds.polyTorus()[0],
+    "nurbsCircle": lambda n: cmds.circle(name=n)[0] if n else cmds.circle()[0],
+    "nurbsCurve": lambda n: cmds.curve(d=1, p=[(0,0,0), (1,0,0)], name=n) if n else cmds.curve(d=1, p=[(0,0,0), (1,0,0)]),
+    "locator": lambda n: cmds.spaceLocator(name=n)[0] if n else cmds.spaceLocator()[0],
+    "camera": lambda n: cmds.camera(name=n)[0] if n else cmds.camera()[0],
+}}
+
 try:
-    # Create the node
-    if desired_name:
+    # Create the node using appropriate method
+    if node_type in PRIMITIVE_CREATORS:
+        created = PRIMITIVE_CREATORS[node_type](desired_name)
+    elif desired_name:
         created = cmds.createNode(node_type, name=desired_name)
     else:
         created = cmds.createNode(node_type)

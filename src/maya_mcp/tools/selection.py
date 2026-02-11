@@ -9,6 +9,7 @@ import json
 from typing import Any
 
 from maya_mcp.transport import get_client
+from maya_mcp.utils.response_guard import guard_response_size
 
 # Characters that are not allowed in node names for security
 FORBIDDEN_NODE_CHARS = frozenset([";", "|", "&", "$", "`", "\n", "\r"])
@@ -72,10 +73,15 @@ print(json.dumps(selection))
     if not isinstance(selection, list):
         selection = []
 
-    return {
+    result: dict[str, Any] = {
         "selection": selection,
         "count": len(selection),
     }
+
+    # Apply response size guard for large selections
+    result = guard_response_size(result, list_key="selection")
+
+    return result
 
 
 def selection_clear() -> dict[str, Any]:
