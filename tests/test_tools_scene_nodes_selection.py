@@ -18,7 +18,7 @@ from maya_mcp.tools.nodes import (
     nodes_info,
     nodes_list,
 )
-from maya_mcp.tools.scene import scene_info, scene_redo, scene_undo
+from maya_mcp.tools.scene import scene_info, scene_new, scene_redo, scene_undo
 from maya_mcp.tools.selection import selection_clear, selection_get, selection_set
 
 
@@ -239,6 +239,173 @@ class TestSceneRedo:
         assert isinstance(result["success"], bool)
         assert isinstance(result["can_undo"], bool)
         assert isinstance(result["can_redo"], bool)
+
+
+class TestSceneNew:
+    """Tests for the scene.new tool."""
+
+    def test_scene_new_unmodified_scene(self) -> None:
+        """New scene succeeds when current scene is not modified."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "success": True,
+                "previous_file": "C:/projects/test.ma",
+                "was_modified": False,
+                "error": None,
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):
+            result = scene_new()
+
+        assert result["success"] is True
+        assert result["previous_file"] == "C:/projects/test.ma"
+        assert result["was_modified"] is False
+        assert result["error"] is None
+
+    def test_scene_new_modified_scene_no_force(self) -> None:
+        """New scene is refused when scene is modified and force=False."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "success": False,
+                "previous_file": "C:/projects/test.ma",
+                "was_modified": True,
+                "error": "Scene has unsaved changes. Use force=True to discard changes, or save first.",
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):
+            result = scene_new(force=False)
+
+        assert result["success"] is False
+        assert result["was_modified"] is True
+        assert result["error"] is not None
+        assert "unsaved changes" in result["error"]
+
+    def test_scene_new_modified_scene_with_force(self) -> None:
+        """New scene succeeds when scene is modified and force=True."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "success": True,
+                "previous_file": "C:/projects/test.ma",
+                "was_modified": True,
+                "error": None,
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):
+            result = scene_new(force=True)
+
+        assert result["success"] is True
+        assert result["was_modified"] is True
+        assert result["error"] is None
+
+    def test_scene_new_untitled_scene(self) -> None:
+        """New scene succeeds for untitled scene with no file path."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "success": True,
+                "previous_file": None,
+                "was_modified": False,
+                "error": None,
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):
+            result = scene_new()
+
+        assert result["success"] is True
+        assert result["previous_file"] is None
+        assert result["was_modified"] is False
+
+    def test_scene_new_force_passes_true_in_command(self) -> None:
+        """Force=True is correctly passed to the Maya command."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "success": True,
+                "previous_file": None,
+                "was_modified": False,
+                "error": None,
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):
+            scene_new(force=True)
+
+        call_arg = mock_client.execute.call_args[0][0]
+        assert "force = True" in call_arg
+
+    def test_scene_new_default_force_false_in_command(self) -> None:
+        """Default force=False is correctly passed to the Maya command."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "success": True,
+                "previous_file": None,
+                "was_modified": False,
+                "error": None,
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):
+            scene_new()
+
+        call_arg = mock_client.execute.call_args[0][0]
+        assert "force = False" in call_arg
+
+    def test_scene_new_never_triggers_dialog(self) -> None:
+        """Maya command always uses force=True to avoid blocking dialog."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "success": True,
+                "previous_file": None,
+                "was_modified": False,
+                "error": None,
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):
+            scene_new(force=True)
+
+        call_arg = mock_client.execute.call_args[0][0]
+        # The actual cmds.file call must always use force=True
+        assert "cmds.file(new=True, force=True)" in call_arg
+
+    def test_scene_new_result_shape(self) -> None:
+        """New scene result includes all required fields."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "success": True,
+                "previous_file": None,
+                "was_modified": False,
+                "error": None,
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):
+            result = scene_new()
+
+        assert "success" in result
+        assert "previous_file" in result
+        assert "was_modified" in result
+        assert "error" in result
+        assert isinstance(result["success"], bool)
+        assert isinstance(result["was_modified"], bool)
 
 
 class TestNodesList:

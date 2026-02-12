@@ -5,11 +5,11 @@ This module provides tools for querying and manipulating Maya scenes.
 
 from __future__ import annotations
 
-import ast
 import json
 from typing import Any
 
 from maya_mcp.transport import get_client
+from maya_mcp.utils.parsing import parse_json_response
 
 # Mapping of Maya time units to FPS values
 TIME_UNIT_TO_FPS: dict[str, float] = {
@@ -117,17 +117,7 @@ print(json.dumps(result))
     response = client.execute(command)
 
     # Parse the JSON response
-    try:
-        data = ast.literal_eval(response) if not response.startswith("{") else None
-        if data is None:
-            import json
-
-            data = json.loads(response)
-    except (ValueError, SyntaxError):
-        # Try to parse as JSON directly
-        import json
-
-        data = json.loads(response)
+    data = parse_json_response(response)
 
     # Convert time unit to FPS
     time_unit = data.get("time_unit", "film")
@@ -194,16 +184,85 @@ print(json.dumps(result))
     response = client.execute(command)
 
     # Parse the JSON response
-    try:
-        data = json.loads(response)
-    except (ValueError, json.JSONDecodeError):
-        data = ast.literal_eval(response)
+    data = parse_json_response(response)
 
     return {
         "success": data.get("success", False),
         "undone": data.get("undone"),
         "can_undo": data.get("can_undo", False),
         "can_redo": data.get("can_redo", False),
+    }
+
+
+def scene_new(force: bool = False) -> dict[str, Any]:
+    """Create a new, empty Maya scene.
+
+    Checks whether the current scene has unsaved changes before proceeding.
+    When ``force`` is False (default) and the scene has been modified, the
+    operation is rejected with an actionable error message instead of
+    discarding work.  When ``force`` is True, unsaved changes are discarded
+    and a new scene is created unconditionally.
+
+    **Important:** This tool never triggers Maya's interactive "Save changes?"
+    dialog, which would block the commandPort indefinitely.  Instead it
+    pre-checks the modification state and always passes ``force=True`` to the
+    underlying ``cmds.file(new=True, force=True)`` call.
+
+    Args:
+        force: If True, discard unsaved changes and create a new scene.
+            If False (default), refuse when the scene has unsaved changes.
+
+    Returns:
+        Dictionary with scene_new result:
+            - success: Whether the new scene was created
+            - previous_file: File path of the previous scene (or None)
+            - was_modified: Whether the previous scene had unsaved changes
+            - error: Error message if the operation was refused, or None
+
+    Raises:
+        MayaUnavailableError: If not connected to Maya.
+        MayaCommandError: If Maya command execution fails.
+
+    Example:
+        >>> result = scene_new()
+        >>> if not result['success']:
+        ...     print(result['error'])  # "Scene has unsaved changes..."
+        >>> result = scene_new(force=True)
+        >>> assert result['success']
+    """
+    client = get_client()
+
+    force_py = str(json.loads("true" if force else "false"))
+    command = f"""
+import maya.cmds as cmds
+import json
+
+force = {force_py}
+result = {{"success": False, "previous_file": None, "was_modified": False, "error": None}}
+
+scene_name = cmds.file(query=True, sceneName=True)
+result["previous_file"] = scene_name if scene_name else None
+modified = cmds.file(query=True, modified=True)
+result["was_modified"] = modified
+
+if modified and not force:
+    result["error"] = "Scene has unsaved changes. Use force=True to discard changes, or save first."
+else:
+    _ = cmds.file(new=True, force=True)
+    result["success"] = True
+
+print(json.dumps(result))
+"""
+
+    response = client.execute(command)
+
+    data = parse_json_response(response)
+
+    return {
+        "success": data.get("success", False),
+        "previous_file": data.get("previous_file"),
+        "was_modified": data.get("was_modified", False),
+        "error": data.get("error"),
     }
 
 
@@ -258,10 +317,7 @@ print(json.dumps(result))
     response = client.execute(command)
 
     # Parse the JSON response
-    try:
-        data = json.loads(response)
-    except (ValueError, json.JSONDecodeError):
-        data = ast.literal_eval(response)
+    data = parse_json_response(response)
 
     return {
         "success": data.get("success", False),

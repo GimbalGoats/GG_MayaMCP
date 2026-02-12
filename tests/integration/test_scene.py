@@ -327,3 +327,126 @@ class TestSceneRedoIntegration:
             assert result["redone"] is None
         finally:
             transport_module._client = original_client
+
+
+class TestSceneNewIntegration:
+    """Integration tests for the scene.new tool."""
+
+    def test_scene_new_unmodified(self, maya_client: CommandPortClient, clean_scene: None) -> None:
+        """scene.new succeeds on an unmodified scene."""
+        import maya_mcp.transport.commandport as transport_module
+        from maya_mcp.tools.scene import scene_new
+
+        original_client = transport_module._client
+        transport_module._client = maya_client
+
+        try:
+            result = scene_new()
+
+            assert result["success"] is True
+            assert result["was_modified"] is False
+            assert result["error"] is None
+        finally:
+            transport_module._client = original_client
+
+    def test_scene_new_modified_refused(
+        self, maya_client: CommandPortClient, clean_scene: None
+    ) -> None:
+        """scene.new refuses when scene is modified and force=False."""
+        import maya_mcp.transport.commandport as transport_module
+        from maya_mcp.tools.scene import scene_new
+
+        original_client = transport_module._client
+        transport_module._client = maya_client
+
+        try:
+            # Modify the scene
+            maya_client.execute("import maya.cmds as cmds; cmds.polyCube()")
+
+            result = scene_new(force=False)
+
+            assert result["success"] is False
+            assert result["was_modified"] is True
+            assert result["error"] is not None
+            assert "unsaved changes" in result["error"]
+        finally:
+            transport_module._client = original_client
+
+    def test_scene_new_modified_force(
+        self, maya_client: CommandPortClient, clean_scene: None
+    ) -> None:
+        """scene.new succeeds when scene is modified and force=True."""
+        import maya_mcp.transport.commandport as transport_module
+        from maya_mcp.tools.scene import scene_new
+
+        original_client = transport_module._client
+        transport_module._client = maya_client
+
+        try:
+            # Modify the scene
+            maya_client.execute("import maya.cmds as cmds; cmds.polyCube(name='forceTestCube')")
+
+            result = scene_new(force=True)
+
+            assert result["success"] is True
+            assert result["was_modified"] is True
+            assert result["error"] is None
+
+            # Verify the cube is gone (new scene)
+            exists_after = maya_client.execute(
+                "import maya.cmds as cmds; print(cmds.objExists('forceTestCube'))"
+            )
+            assert "False" in exists_after
+        finally:
+            transport_module._client = original_client
+
+    def test_scene_new_returns_required_fields(
+        self, maya_client: CommandPortClient, clean_scene: None
+    ) -> None:
+        """scene.new returns all required fields."""
+        import maya_mcp.transport.commandport as transport_module
+        from maya_mcp.tools.scene import scene_new
+
+        original_client = transport_module._client
+        transport_module._client = maya_client
+
+        try:
+            result = scene_new()
+
+            assert "success" in result
+            assert "previous_file" in result
+            assert "was_modified" in result
+            assert "error" in result
+            assert isinstance(result["success"], bool)
+            assert isinstance(result["was_modified"], bool)
+        finally:
+            transport_module._client = original_client
+
+    def test_scene_new_clears_scene(
+        self, maya_client: CommandPortClient, clean_scene: None
+    ) -> None:
+        """scene.new actually creates a fresh scene with no user objects."""
+        import maya_mcp.transport.commandport as transport_module
+        from maya_mcp.tools.scene import scene_new
+
+        original_client = transport_module._client
+        transport_module._client = maya_client
+
+        try:
+            # Create some objects
+            maya_client.execute("import maya.cmds as cmds; cmds.polyCube(name='clearTestA')")
+            maya_client.execute("import maya.cmds as cmds; cmds.polySphere(name='clearTestB')")
+
+            scene_new(force=True)
+
+            # Verify objects are gone
+            exists_a = maya_client.execute(
+                "import maya.cmds as cmds; print(cmds.objExists('clearTestA'))"
+            )
+            exists_b = maya_client.execute(
+                "import maya.cmds as cmds; print(cmds.objExists('clearTestB'))"
+            )
+            assert "False" in exists_a
+            assert "False" in exists_b
+        finally:
+            transport_module._client = original_client

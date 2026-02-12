@@ -9,6 +9,7 @@ import json
 from typing import Any
 
 from maya_mcp.transport import get_client
+from maya_mcp.utils.parsing import parse_json_response
 from maya_mcp.utils.response_guard import guard_response_size
 
 # Characters that are not allowed in node names for security
@@ -62,13 +63,7 @@ print(json.dumps(selection))
     response = client.execute(command)
 
     # Parse the JSON response
-    try:
-        selection = json.loads(response)
-    except json.JSONDecodeError:
-        # Try to handle Maya's Python list output format
-        import ast
-
-        selection = ast.literal_eval(response)
+    selection = parse_json_response(response)
 
     if not isinstance(selection, list):
         selection = []
@@ -116,10 +111,7 @@ print(json.dumps(selection))
     response = client.execute(command)
 
     # Parse the JSON response
-    try:
-        selection = json.loads(response)
-    except json.JSONDecodeError:
-        selection = []
+    selection = parse_json_response(response)
 
     if not isinstance(selection, list):
         selection = []
@@ -215,13 +207,7 @@ print(json.dumps(selection))
     response = client.execute(command)
 
     # Parse the JSON response
-    try:
-        selection = json.loads(response)
-    except json.JSONDecodeError:
-        # Try to handle Maya's Python list output format
-        import ast
-
-        selection = ast.literal_eval(response)
+    selection = parse_json_response(response)
 
     if not isinstance(selection, list):
         selection = []

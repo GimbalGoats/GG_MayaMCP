@@ -29,7 +29,7 @@ from maya_mcp.tools.attributes import attributes_get, attributes_set
 from maya_mcp.tools.connection import maya_connect, maya_disconnect
 from maya_mcp.tools.health import health_check
 from maya_mcp.tools.nodes import nodes_create, nodes_delete, nodes_info, nodes_list
-from maya_mcp.tools.scene import scene_info, scene_redo, scene_undo
+from maya_mcp.tools.scene import scene_info, scene_new, scene_redo, scene_undo
 from maya_mcp.tools.selection import selection_clear, selection_get, selection_set
 
 # Create the FastMCP server instance
@@ -42,6 +42,7 @@ Available tools:
 - maya.connect: Connect to Maya commandPort
 - maya.disconnect: Disconnect from Maya
 - scene.info: Get current scene information (file path, FPS, frame range, etc.)
+- scene.new: Create a new empty scene (checks for unsaved changes first)
 - scene.undo: Undo the last operation (critical for error recovery)
 - scene.redo: Redo the last undone operation
 - nodes.list: List nodes by type or pattern
@@ -59,6 +60,7 @@ Workflow tips:
 - Use nodes.info for a quick overview of any node before making changes
 - Use nodes.info(info_category="transform") instead of multiple attributes.get calls
 - Use nodes.info(info_category="all") to get everything about a node at once
+- Use scene.new(force=True) to discard unsaved changes, or check the error message first
 
 Before using Maya tools, ensure Maya is running with commandPort enabled:
     import maya.cmds as cmds
@@ -155,6 +157,36 @@ def tool_scene_info() -> dict[str, Any]:
     Returns file path, modification status, FPS, frame range, and up axis.
     """
     return scene_info()
+
+
+@mcp.tool(
+    name="scene.new",
+    description="Create a new empty Maya scene. "
+    "Checks for unsaved changes first and refuses by default if the scene was modified. "
+    "Use force=True to discard unsaved changes.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_scene_new(
+    force: Annotated[
+        bool,
+        "If True, discard unsaved changes. If False (default), refuse when scene has unsaved changes.",
+    ] = False,
+) -> dict[str, Any]:
+    """Create a new empty Maya scene.
+
+    Args:
+        force: If True, discard unsaved changes and create new scene.
+            If False (default), refuse when scene has unsaved changes.
+
+    Returns:
+        Dictionary with success, previous_file, was_modified, and error.
+    """
+    return scene_new(force=force)
 
 
 @mcp.tool(
