@@ -53,13 +53,20 @@ _client: CommandPortClient | None = None
 def _parse_maya_response(raw_response: str) -> str:
     """Parse Maya commandPort response to extract the actual output.
 
-    Maya's commandPort with echoOutput=True returns responses in a format like:
+    Maya's commandPort with echoOutput=True returns responses in a format like::
+
         'None\\n\\x00<actual_output>\\n\\x00\\n\\n\\x00'
 
-    This function extracts the actual output, stripping:
-        - The 'None\\n' prefix (from print() return value)
-        - Null byte delimiters (\\x00)
-        - Extra whitespace
+    Some Maya commands (e.g. ``cmds.file()``) produce their own output before
+    our ``print(json.dumps(result))`` statement.  In those cases the response
+    contains multiple non-empty parts and the JSON payload may not be the first
+    one.
+
+    Strategy:
+        1. Split by null bytes / newlines, strip whitespace, drop empty / "None".
+        2. Prefer the **last** part that looks like JSON (starts with ``{`` or ``[``),
+           because our ``print(json.dumps(...))`` is always the final statement.
+        3. Fall back to the first non-empty part for non-JSON responses.
 
     Args:
         raw_response: Raw response string from Maya commandPort.
@@ -70,6 +77,8 @@ def _parse_maya_response(raw_response: str) -> str:
     Example:
         >>> _parse_maya_response('None\\n\\x00{"test": 1}\\n\\x00\\n\\n\\x00')
         '{"test": 1}'
+        >>> _parse_maya_response('None\\n\\x00\\n\\x00{"ok": true}\\n\\x00')
+        '{"ok": true}'
     """
     if not raw_response:
         return ""
@@ -80,8 +89,16 @@ def _parse_maya_response(raw_response: str) -> str:
     # Filter out empty strings and 'None' (from print() return)
     filtered = [p.strip() for p in parts if p.strip() and p.strip() != "None"]
 
-    # Return the first non-empty part (the actual output)
-    return filtered[0] if filtered else ""
+    if not filtered:
+        return ""
+
+    # Prefer the last JSON-like part (our print(json.dumps(...)) is always last)
+    for part in reversed(filtered):
+        if part.startswith(("{", "[")):
+            return part
+
+    # Fall back to the first non-empty part for non-JSON responses
+    return filtered[0]
 
 
 def get_client() -> CommandPortClient:

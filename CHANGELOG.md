@@ -9,6 +9,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `scene.new` tool — create new empty Maya scene with `force` parameter safety gate
+  - Refuses when scene has unsaved changes (default `force=False`), preventing
+    Maya's interactive "Save changes?" dialog from blocking commandPort
+  - `force=True` discards unsaved changes without prompting
+- Shared `parse_json_response()` utility in `maya_mcp.utils.parsing`
+
+### Changed
+
+- Consolidated all 13 response-parsing blocks across 4 tool files into shared
+  `parse_json_response()` helper, eliminating 3 inconsistent patterns
+- Transport parser (`_parse_maya_response`) now prefers last JSON-like part in
+  multi-line responses, fixing a latent bug with commands that produce output
+  before the JSON result
+- Updated `tools/__init__.py` to export all 16+ tool functions (was stale, only
+  exported M0 tools)
+
+## [0.3.0] - 2025-02-02
+
+### Added
+
+- **M3-A: Maya Qt Control Panel** — dockable PySide2/PySide6 widget inside Maya
+  - Server status indicator (green/red/yellow)
+  - Start/stop button for commandPort
+  - Port configuration UI
+  - Scrollable connection log
+  - Auto-start option via `userSetup.py`
+- **M3-B2: Server instructions** — MCP `instructions` field with Maya-specific
+  LLM guidance for tool usage
+- **M3-B3: Output size guards** — response size checking with truncation and
+  actionable warnings for oversized results
+- **M3-B4: Consolidated `nodes.info`** — single tool with `info_category`
+  parameter (`summary`, `transform`, `hierarchy`, `attributes`, `shape`, `all`)
+  replacing multiple `attributes.get` / `nodes.list` call chains
+- OpenCode integration guide (`docs/usage/opencode-integration.md`)
+
+### Fixed
+
+- OpenCode MCP config and `nodes.create` for primitive types
+
+## [0.2.0] - 2025-02-01
+
+### Added
+
+- **M2: Extended Tools**
+  - `attributes.get` — get attribute values (single or batch)
+  - `attributes.set` — set attribute values (single or batch)
+  - `nodes.create` — create nodes with optional name, parent, and initial attributes
+  - `nodes.delete` — delete nodes with optional hierarchy deletion
+  - `scene.undo` — undo last operation (critical for LLM error recovery)
+  - `scene.redo` — redo last undone operation
+- MCP tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`,
+  `openWorldHint`) for AI client safety reasoning
+- Token budget limits — `nodes.list` defaults to 500 nodes with `truncated` /
+  `total_count` fields when limited
+- Integration test suite against live Maya instance
+- M2–M6 roadmap in PRD
+
+### Changed
+
+- Revised M2 roadmap to follow workflow-first design principles (Block MCP Playbook)
+- `scene.info`, `nodes.list`, `selection.get`, `selection.set` upgraded from stubs
+  to full implementations (M1 Core Tools)
+
+## [0.1.0] - 2025-01-30
+
+### Added
+
 - Initial project scaffold
 - FastMCP server with tool registration
 - Maya commandPort transport layer with:
@@ -16,27 +83,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Bounded retry with exponential backoff
   - Automatic reconnection on next call
 - Core tools:
-  - `health.check` - Connection health monitoring
-  - `maya.connect` - Manual connection establishment
-  - `maya.disconnect` - Manual connection teardown
-  - `scene.info` - Scene information retrieval (stub)
-  - `nodes.list` - Node listing by type (stub)
-  - `selection.get` - Selection query (stub)
-  - `selection.set` - Selection modification (stub)
+  - `health.check` — connection health monitoring
+  - `maya.connect` — manual connection establishment
+  - `maya.disconnect` — manual connection teardown
+  - `scene.info` — scene information retrieval (stub)
+  - `nodes.list` — node listing by type (stub)
+  - `selection.get` — selection query (stub)
+  - `selection.set` — selection modification (stub)
+  - `selection.clear` — clear selection
 - Typed error hierarchy with `MayaMCPError` base class
 - Level 1 resilience (detect unavailable, return error, recover on restart)
 - MkDocs documentation with mkdocstrings
 - Comprehensive test suite with mocked transport
+- GitLab CI pipeline (mypy, ruff, pytest)
+- Git workflow documentation with branch protection rules
 
 ### Security
 
 - Localhost-only commandPort connection by default
-- No arbitrary code execution - all operations are explicit tools
+- No arbitrary code execution — all operations are explicit tools
 - No raw Python/MEL string evaluation exposed to clients
 
-## [0.1.0] - TBD
-
-Initial release.
-
-[Unreleased]: https://github.com/your-org/maya-mcp/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/your-org/maya-mcp/releases/tag/v0.1.0
+[Unreleased]: https://gitlab.pixel-nexus.com/rigging/gg_mayamcp/-/compare/v0.3.0...feature/m4-scene-new
+[0.3.0]: https://gitlab.pixel-nexus.com/rigging/gg_mayamcp/-/compare/v0.2.0...v0.3.0
+[0.2.0]: https://gitlab.pixel-nexus.com/rigging/gg_mayamcp/-/compare/v0.1.0...v0.2.0
+[0.1.0]: https://gitlab.pixel-nexus.com/rigging/gg_mayamcp/-/releases/v0.1.0

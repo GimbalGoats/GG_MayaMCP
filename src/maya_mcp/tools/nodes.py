@@ -10,6 +10,7 @@ import json
 from typing import Any
 
 from maya_mcp.transport import get_client
+from maya_mcp.utils.parsing import parse_json_response
 from maya_mcp.utils.response_guard import guard_response_size
 
 # Characters that are not allowed in patterns for security
@@ -122,13 +123,7 @@ print(json.dumps(nodes))
     response = client.execute(command)
 
     # Parse the JSON response
-    try:
-        nodes = json.loads(response)
-    except json.JSONDecodeError:
-        # Try to handle Maya's Python list output format
-        import ast
-
-        nodes = ast.literal_eval(response)
+    nodes = parse_json_response(response)
 
     if not isinstance(nodes, list):
         nodes = []
@@ -274,12 +269,7 @@ print(json.dumps(result))
     response = client.execute(command)
 
     # Parse the JSON response
-    try:
-        parsed = json.loads(response)
-    except json.JSONDecodeError:
-        import ast
-
-        parsed = ast.literal_eval(response)
+    parsed = parse_json_response(response)
 
     # Check for creation error
     if "_create" in parsed.get("attribute_errors", {}):
@@ -489,12 +479,7 @@ def nodes_info(
     response = client.execute(command)
 
     # Parse the JSON response
-    try:
-        parsed: dict[str, Any] = json.loads(response)
-    except json.JSONDecodeError:
-        import ast
-
-        parsed = ast.literal_eval(response)
+    parsed: dict[str, Any] = parse_json_response(response)
 
     # Clean up errors field
     errors = parsed.get("errors", {})
@@ -580,12 +565,7 @@ print(json.dumps(result))
     response = client.execute(command)
 
     # Parse the JSON response
-    try:
-        parsed = json.loads(response)
-    except json.JSONDecodeError:
-        import ast
-
-        parsed = ast.literal_eval(response)
+    parsed = parse_json_response(response)
 
     deleted = parsed.get("deleted", [])
     errors = parsed.get("errors", {})

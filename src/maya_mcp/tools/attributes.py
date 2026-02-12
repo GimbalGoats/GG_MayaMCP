@@ -10,6 +10,7 @@ import json
 from typing import Any
 
 from maya_mcp.transport import get_client
+from maya_mcp.utils.parsing import parse_json_response
 
 # Characters that are not allowed in node/attribute names for security
 FORBIDDEN_CHARS = frozenset([";", "|", "&", "$", "`", "\n", "\r"])
@@ -117,12 +118,7 @@ print(json.dumps(result))
     response = client.execute(command)
 
     # Parse the JSON response
-    try:
-        parsed = json.loads(response)
-    except json.JSONDecodeError:
-        import ast
-
-        parsed = ast.literal_eval(response)
+    parsed = parse_json_response(response)
 
     values = parsed.get("values", {})
     errors = parsed.get("errors", {})
@@ -226,12 +222,7 @@ print(json.dumps(result))
     response = client.execute(command)
 
     # Parse the JSON response
-    try:
-        parsed = json.loads(response)
-    except json.JSONDecodeError:
-        import ast
-
-        parsed = ast.literal_eval(response)
+    parsed = parse_json_response(response)
 
     set_attrs = parsed.get("set", [])
     errors = parsed.get("errors", {})
