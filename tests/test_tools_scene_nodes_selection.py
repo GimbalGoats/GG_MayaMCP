@@ -11,7 +11,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from maya_mcp.tools.nodes import nodes_create, nodes_delete, nodes_list
+from maya_mcp.tools.nodes import (
+    _build_info_command,
+    nodes_create,
+    nodes_delete,
+    nodes_info,
+    nodes_list,
+)
 from maya_mcp.tools.scene import scene_info, scene_redo, scene_undo
 from maya_mcp.tools.selection import selection_clear, selection_get, selection_set
 
@@ -459,6 +465,349 @@ class TestNodesCreate:
         assert "parent" in result
         assert "attributes_set" in result
         assert "attribute_errors" in result
+
+
+class TestNodesInfo:
+    """Tests for the nodes.info tool."""
+
+    def test_nodes_info_summary(self) -> None:
+        """Info with summary category returns node type, parent, children count."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "node": "pCube1",
+                "info_category": "summary",
+                "exists": True,
+                "node_type": "transform",
+                "parent": "group1",
+                "children_count": 1,
+                "errors": {},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_info("pCube1", info_category="summary")
+
+        assert result["node"] == "pCube1"
+        assert result["info_category"] == "summary"
+        assert result["exists"] is True
+        assert result["node_type"] == "transform"
+        assert result["parent"] == "group1"
+        assert result["children_count"] == 1
+        assert result["errors"] is None
+
+    def test_nodes_info_transform(self) -> None:
+        """Info with transform category returns position, rotation, scale."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "node": "pCube1",
+                "info_category": "transform",
+                "exists": True,
+                "node_type": "transform",
+                "translateX": 10.0,
+                "translateY": 5.0,
+                "translateZ": 0.0,
+                "rotateX": 0.0,
+                "rotateY": 45.0,
+                "rotateZ": 0.0,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "scaleZ": 1.0,
+                "visibility": True,
+                "translate": [10.0, 5.0, 0.0],
+                "rotate": [0.0, 45.0, 0.0],
+                "scale": [1.0, 1.0, 1.0],
+                "errors": {},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_info("pCube1", info_category="transform")
+
+        assert result["translate"] == [10.0, 5.0, 0.0]
+        assert result["rotate"] == [0.0, 45.0, 0.0]
+        assert result["scale"] == [1.0, 1.0, 1.0]
+        assert result["visibility"] is True
+        assert result["errors"] is None
+
+    def test_nodes_info_hierarchy(self) -> None:
+        """Info with hierarchy category returns parent, children, full path."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "node": "pCube1",
+                "info_category": "hierarchy",
+                "exists": True,
+                "node_type": "transform",
+                "parent": "|group1",
+                "children": ["pCubeShape1"],
+                "full_path": "|group1|pCube1",
+                "errors": {},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_info("pCube1", info_category="hierarchy")
+
+        assert result["parent"] == "|group1"
+        assert result["children"] == ["pCubeShape1"]
+        assert result["full_path"] == "|group1|pCube1"
+        assert result["errors"] is None
+
+    def test_nodes_info_attributes(self) -> None:
+        """Info with attributes category returns keyable attributes."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "node": "pCube1",
+                "info_category": "attributes",
+                "exists": True,
+                "node_type": "transform",
+                "keyable_attributes": {
+                    "translateX": 0.0,
+                    "translateY": 0.0,
+                    "translateZ": 0.0,
+                    "visibility": True,
+                },
+                "keyable_count": 4,
+                "errors": {},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_info("pCube1", info_category="attributes")
+
+        assert result["keyable_count"] == 4
+        assert "translateX" in result["keyable_attributes"]
+        assert result["errors"] is None
+
+    def test_nodes_info_shape(self) -> None:
+        """Info with shape category returns shape nodes."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "node": "pCube1",
+                "info_category": "shape",
+                "exists": True,
+                "node_type": "transform",
+                "shapes": [{"name": "pCubeShape1", "type": "mesh", "connections_count": 3}],
+                "shape_count": 1,
+                "errors": {},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_info("pCube1", info_category="shape")
+
+        assert result["shape_count"] == 1
+        assert result["shapes"][0]["name"] == "pCubeShape1"
+        assert result["shapes"][0]["type"] == "mesh"
+        assert result["errors"] is None
+
+    def test_nodes_info_all(self) -> None:
+        """Info with 'all' category returns combined data with separate parent keys."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "node": "pCube1",
+                "info_category": "all",
+                "exists": True,
+                "node_type": "transform",
+                # summary sets parent (short name)
+                "parent": "group1",
+                "children_count": 1,
+                "translate": [0.0, 0.0, 0.0],
+                "rotate": [0.0, 0.0, 0.0],
+                "scale": [1.0, 1.0, 1.0],
+                "visibility": True,
+                # hierarchy sets parent_full_path (full DAG path) in "all" mode
+                "parent_full_path": "|group1",
+                "children": ["pCubeShape1"],
+                "full_path": "|group1|pCube1",
+                "keyable_attributes": {"translateX": 0.0},
+                "keyable_count": 1,
+                "shapes": [{"name": "pCubeShape1", "type": "mesh", "connections_count": 2}],
+                "shape_count": 1,
+                "errors": {},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_info("pCube1", info_category="all")
+
+        assert result["info_category"] == "all"
+        assert result["exists"] is True
+        # Summary fields — parent is short name
+        assert result["parent"] == "group1"
+        assert "children_count" in result
+        # Transform fields
+        assert "translate" in result
+        # Hierarchy fields — parent_full_path is full DAG path (no collision)
+        assert result["parent_full_path"] == "|group1"
+        assert "full_path" in result
+        # Attribute fields
+        assert "keyable_attributes" in result
+        # Shape fields
+        assert "shapes" in result
+        assert result["errors"] is None
+
+    def test_nodes_info_nonexistent_node(self) -> None:
+        """Info for non-existent node returns exists=False with error."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "node": "nonexistent",
+                "info_category": "summary",
+                "exists": False,
+                "errors": {"_node": "Node 'nonexistent' does not exist"},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_info("nonexistent")
+
+        assert result["exists"] is False
+        assert result["errors"] is not None
+        assert "_node" in result["errors"]
+
+    def test_nodes_info_invalid_category(self) -> None:
+        """Info rejects invalid info_category."""
+        with pytest.raises(ValueError, match="Invalid info_category"):
+            nodes_info("pCube1", info_category="invalid")
+
+    def test_nodes_info_invalid_node_name(self) -> None:
+        """Info rejects invalid node name characters."""
+        with pytest.raises(ValueError, match="Invalid characters"):
+            nodes_info("pCube1; rm -rf /")
+
+    def test_nodes_info_default_category(self) -> None:
+        """Info defaults to summary category."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "node": "pCube1",
+                "info_category": "summary",
+                "exists": True,
+                "node_type": "transform",
+                "parent": None,
+                "children_count": 0,
+                "errors": {},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_info("pCube1")
+
+        assert result["info_category"] == "summary"
+
+    def test_nodes_info_result_shape(self) -> None:
+        """Info result always includes core fields."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "node": "pCube1",
+                "info_category": "summary",
+                "exists": True,
+                "node_type": "transform",
+                "parent": None,
+                "children_count": 0,
+                "errors": {},
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.nodes.get_client", return_value=mock_client):
+            result = nodes_info("pCube1")
+
+        assert "node" in result
+        assert "info_category" in result
+        assert "exists" in result
+        assert "errors" in result
+
+
+class TestNodesInfoCommand:
+    """Tests for the generated Maya command string of nodes_info.
+
+    These tests verify the static Maya script is correctly structured
+    and includes/excludes the right conditional sections per category.
+    """
+
+    def test_command_has_top_level_try_except(self) -> None:
+        """Generated command wraps everything in top-level try/except."""
+        cmd = _build_info_command('"pCube1"', '"summary"')
+        assert "except Exception as _top_err:" in cmd
+        assert 'result["errors"]["_exception"]' in cmd
+
+    def test_command_always_prints_json(self) -> None:
+        """Generated command always ends with print(json.dumps(result))."""
+        cmd = _build_info_command('"pCube1"', '"summary"')
+        assert "print(json.dumps(result))" in cmd
+
+    def test_command_summary_includes_parent_children(self) -> None:
+        """Summary category command includes parent and children queries."""
+        cmd = _build_info_command('"pCube1"', '"summary"')
+        assert 'category in ("summary", "all")' in cmd
+        assert 'result["parent"]' in cmd
+        assert 'result["children_count"]' in cmd
+
+    def test_command_transform_includes_attributes(self) -> None:
+        """Transform category command includes translate/rotate/scale."""
+        cmd = _build_info_command('"pCube1"', '"transform"')
+        assert 'category in ("transform", "all")' in cmd
+        assert '"translateX"' in cmd
+        assert 'result["translate"]' in cmd
+        assert 'result["rotate"]' in cmd
+        assert 'result["scale"]' in cmd
+
+    def test_command_hierarchy_uses_full_path(self) -> None:
+        """Hierarchy category command uses fullPath=True for parent."""
+        cmd = _build_info_command('"pCube1"', '"hierarchy"')
+        assert 'category in ("hierarchy", "all")' in cmd
+        assert "fullPath=True" in cmd
+        assert 'result["full_path"]' in cmd
+
+    def test_command_all_mode_separates_parent_keys(self) -> None:
+        """In 'all' mode, hierarchy writes parent_full_path to avoid collision."""
+        cmd = _build_info_command('"pCube1"', '"all"')
+        assert 'result["parent_full_path"]' in cmd
+        # summary still sets result["parent"] (short name)
+        assert 'result["parent"]' in cmd
+
+    def test_command_attributes_has_truncation_limit(self) -> None:
+        """Attributes category command limits number of attributes returned."""
+        cmd = _build_info_command('"pCube1"', '"attributes"')
+        assert 'category in ("attributes", "all")' in cmd
+        assert "_truncated" in cmd
+        assert "keyable_truncated" in cmd
+        assert "keyable_total_count" in cmd
+
+    def test_command_shape_includes_connections(self) -> None:
+        """Shape category command queries shape type and connections."""
+        cmd = _build_info_command('"pCube1"', '"shape"')
+        assert 'category in ("shape", "all")' in cmd
+        assert "listRelatives(node, shapes=True)" in cmd
+        assert "connections_count" in cmd
+
+    def test_command_escapes_node_name(self) -> None:
+        """Command properly embeds escaped node name."""
+        cmd = _build_info_command('"my|node"', '"summary"')
+        assert 'node = "my|node"' in cmd
+
+    def test_command_normalizes_compound_attrs(self) -> None:
+        """Attributes command unwraps [(x,y,z)] tuples to [x,y,z]."""
+        cmd = _build_info_command('"pCube1"', '"attributes"')
+        assert "isinstance(_val, list)" in cmd
+        assert "isinstance(_val[0], tuple)" in cmd
+        assert "list(_val[0])" in cmd
 
 
 class TestNodesDelete:

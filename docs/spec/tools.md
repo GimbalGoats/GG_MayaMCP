@@ -9,7 +9,7 @@ Tools use a hierarchical naming scheme:
 - `health.*` - Health and diagnostics
 - `maya.*` - Connection management
 - `scene.*` - Scene-level operations (info, undo, redo)
-- `nodes.*` - Node operations (list, create, delete)
+- `nodes.*` - Node operations (list, create, delete, info)
 - `attributes.*` - Attribute operations (get, set)
 - `selection.*` - Selection management
 
@@ -415,6 +415,155 @@ Delete one or more nodes from the Maya scene.
 
 ---
 
+### `nodes.info`
+
+Get comprehensive information about a Maya node in a single call. Reduces tool-call chaining by consolidating what would otherwise require multiple `attributes.get` and `nodes.list` calls.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `node` | `string` | Yes | - | Node name to query |
+| `info_category` | `string` | No | `"summary"` | Category of information: `"summary"`, `"transform"`, `"hierarchy"`, `"attributes"`, `"shape"`, or `"all"` |
+
+**Output** (varies by `info_category`):
+
+**Common fields (always present)**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `node` | `string` | The queried node name |
+| `info_category` | `string` | The category requested |
+| `exists` | `boolean` | Whether the node exists |
+| `node_type` | `string` | Maya node type (if exists) |
+| `errors` | `object \| null` | Error details if any queries failed |
+
+**Category: `summary`**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `parent` | `string \| null` | Parent node name |
+| `children_count` | `integer` | Number of direct children |
+
+**Category: `transform`**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `translateX`, `translateY`, `translateZ` | `number` | Position components |
+| `rotateX`, `rotateY`, `rotateZ` | `number` | Rotation components (degrees) |
+| `scaleX`, `scaleY`, `scaleZ` | `number` | Scale components |
+| `visibility` | `boolean` | Node visibility |
+| `translate` | `[number, number, number]` | Compound position |
+| `rotate` | `[number, number, number]` | Compound rotation |
+| `scale` | `[number, number, number]` | Compound scale |
+
+**Category: `hierarchy`**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `parent` | `string \| null` | Parent full DAG path (in standalone `hierarchy` mode) |
+| `children` | `string[]` | Direct children names |
+| `full_path` | `string` | Full DAG path of the node |
+
+**Category: `attributes`**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `keyable_attributes` | `object` | Map of keyable/user-defined attribute name to value |
+| `keyable_count` | `integer` | Number of keyable attributes returned |
+| `keyable_truncated` | `boolean` | Present and `true` if attributes were truncated (max 200) |
+| `keyable_total_count` | `integer` | Total keyable attributes before truncation (only if truncated) |
+
+**Category: `shape`**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `shapes` | `object[]` | Array of shape info objects |
+| `shapes[].name` | `string` | Shape node name |
+| `shapes[].type` | `string` | Shape node type (e.g., "mesh") |
+| `shapes[].connections_count` | `integer` | Number of connections |
+| `shape_count` | `integer` | Number of shape nodes |
+
+**Category: `all`**: Returns all fields from all categories combined. Note: to avoid key collision, `parent` contains the short name (from summary) and `parent_full_path` contains the full DAG path (from hierarchy).
+
+**Example Request (summary)**:
+
+```json
+{
+  "node": "pCube1",
+  "info_category": "summary"
+}
+```
+
+**Example Response (summary)**:
+
+```json
+{
+  "node": "pCube1",
+  "info_category": "summary",
+  "exists": true,
+  "node_type": "transform",
+  "parent": "group1",
+  "children_count": 1,
+  "errors": null
+}
+```
+
+**Example Request (transform)**:
+
+```json
+{
+  "node": "pCube1",
+  "info_category": "transform"
+}
+```
+
+**Example Response (transform)**:
+
+```json
+{
+  "node": "pCube1",
+  "info_category": "transform",
+  "exists": true,
+  "node_type": "transform",
+  "translateX": 10.0,
+  "translateY": 5.0,
+  "translateZ": 0.0,
+  "rotateX": 0.0,
+  "rotateY": 45.0,
+  "rotateZ": 0.0,
+  "scaleX": 1.0,
+  "scaleY": 1.0,
+  "scaleZ": 1.0,
+  "visibility": true,
+  "translate": [10.0, 5.0, 0.0],
+  "rotate": [0.0, 45.0, 0.0],
+  "scale": [1.0, 1.0, 1.0],
+  "errors": null
+}
+```
+
+**Example Response (non-existent node)**:
+
+```json
+{
+  "node": "nonexistent",
+  "info_category": "summary",
+  "exists": false,
+  "errors": {
+    "_node": "Node 'nonexistent' does not exist"
+  }
+}
+```
+
+**Notes**:
+- Use `summary` for a quick overview before making changes
+- Use `transform` instead of multiple `attributes.get` calls for position/rotation/scale
+- Use `all` to get everything at once (response may be large for complex nodes)
+- Response size guard applies to `attributes` and `all` categories
+
+---
+
 ## Attribute Tools
 
 ### `attributes.get`
@@ -713,6 +862,7 @@ All tools include MCP annotations to help AI clients understand their behavior a
 | `nodes.list` | true | false | true |
 | `nodes.create` | false | false | false |
 | `nodes.delete` | false | false | true |
+| `nodes.info` | true | false | true |
 | `attributes.get` | true | false | true |
 | `attributes.set` | false | false | true |
 | `selection.get` | true | false | true |
