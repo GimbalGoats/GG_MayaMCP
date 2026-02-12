@@ -200,66 +200,38 @@ agents actually work. See [Block's MCP Playbook](https://engineering.block.xyz/b
 
 ---
 
-### M3: Maya UI Panel + LLM Optimization 📋
+### M3: Maya UI Panel + LLM Optimization 🚧
 
 **Goal**: Provide in-Maya control panel and optimize tools for LLM efficiency.
 
-#### M3-A: Maya Qt Panel
+#### M3-A: Maya Qt Panel ✅
 
 A dockable Qt widget inside Maya for controlling the MCP server connection.
 
-| ID | Feature | Description | Effort |
-|----|---------|-------------|--------|
-| M3.A1 | **Maya Qt Panel** | Dockable PySide2 widget in Maya for MCP control | Medium |
-| M3.A2 | **Server status indicator** | Visual indicator (green/red/yellow) showing commandPort status | Low |
-| M3.A3 | **Start/Stop button** | Toggle commandPort open/close from Maya UI | Low |
-| M3.A4 | **Port configuration** | UI to set/change commandPort port number | Low |
-| M3.A5 | **Connection log** | Scrollable log showing recent MCP requests | Medium |
-| M3.A6 | **Auto-start option** | Preference to auto-open commandPort on Maya startup | Low |
+| ID | Feature | Description | Effort | Status |
+|----|---------|-------------|--------|--------|
+| M3.A1 | **Maya Qt Panel** | Dockable PySide2/PySide6 widget in Maya for MCP control | Medium | ✅ |
+| M3.A2 | **Server status indicator** | Visual indicator (green/red/yellow) showing commandPort status | Low | ✅ |
+| M3.A3 | **Start/Stop button** | Toggle commandPort open/close from Maya UI | Low | ✅ |
+| M3.A4 | **Port configuration** | UI to set/change commandPort port number | Low | ✅ |
+| M3.A5 | **Connection log** | Scrollable log showing recent MCP requests | Medium | ✅ |
+| M3.A6 | **Auto-start option** | Preference to auto-open commandPort on Maya startup | Low | ✅ |
 
-**Architecture**:
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        Maya Process                          │
-│                                                              │
-│  ┌──────────────────────┐     ┌─────────────────────────┐   │
-│  │   Maya Qt Panel      │     │    commandPort          │   │
-│  │   (PySide2)          │────►│    (TCP :7001)          │   │
-│  │                      │     └───────────▲─────────────┘   │
-│  │  [●] Server: Running │                 │                 │
-│  │  [Start] [Stop]      │                 │                 │
-│  │  Port: [7001    ]    │                 │                 │
-│  │  ☑ Auto-start        │                 │                 │
-│  │                      │                 │                 │
-│  │  Connection Log:     │                 │                 │
-│  │  ├─ 10:30 nodes.list │                 │                 │
-│  │  └─ 10:31 attrs.get  │                 │                 │
-│  └──────────────────────┘                 │                 │
-└───────────────────────────────────────────┼─────────────────┘
-                                            │
-                              TCP localhost:7001
-                                            │
-┌───────────────────────────────────────────▼─────────────────┐
-│              Maya MCP Server (External Process)              │
-│              python -m maya_mcp.server                       │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**Files to create**:
+**Files created**:
 - `src/maya_mcp/maya_panel/` - Panel package (runs inside Maya)
 - `scripts/userSetup.py` - Example auto-start script
 - `docs/usage/maya-panel.md` - Panel documentation
 
-#### M3-B: LLM Optimization
+#### M3-B: LLM Optimization 🚧
 
 Improvements based on [Block's MCP Playbook](https://engineering.block.xyz/blog/blocks-playbook-for-designing-mcp-servers).
 
-| ID | Feature | Description | Effort |
-|----|---------|-------------|--------|
-| M3.B1 | **Markdown output option** | Add `format: "markdown" \| "json"` parameter to read tools | Low |
-| M3.B2 | **Server instructions** | MCP `instructions` field with Maya-specific LLM guidance | Low |
-| M3.B3 | **Output size guards** | Check response size; truncate with actionable warning if too large | Medium |
-| M3.B4 | **Consolidated `nodes.info`** | Single tool with `info_category` param for all node queries | Medium |
+| ID | Feature | Description | Effort | Status |
+|----|---------|-------------|--------|--------|
+| M3.B1 | **Markdown output option** | Add `format: "markdown" \| "json"` parameter to read tools | Low | 📋 |
+| M3.B2 | **Server instructions** | MCP `instructions` field with Maya-specific LLM guidance | Low | ✅ |
+| M3.B3 | **Output size guards** | Check response size; truncate with actionable warning if too large | Medium | ✅ |
+| M3.B4 | **Consolidated `nodes.info`** | Single tool with `info_category` param for all node queries | Medium | ✅ |
 
 ---
 
@@ -338,16 +310,16 @@ Document common rigging workflows to inform future tool design. **No implementat
 ## Milestone Priority
 
 ```
-M0 ✅ ─► M1 ✅ ─► M2 ✅ ─► M3 📋 ─► M4 📋 ─► M5 📋 ─► M6 💡
+M0 ✅ ─► M1 ✅ ─► M2 ✅ ─► M3 🚧 ─► M4 📋 ─► M5 📋 ─► M6 💡
                           │
-                          ├─► M3-A: Maya UI Panel (high priority)
-                          └─► M3-B: LLM Optimization (high priority)
+                          ├─► M3-A: Maya UI Panel ✅
+                          └─► M3-B: LLM Optimization 🚧 (3/4 done)
 ```
 
 | Priority | Milestone | Rationale |
 |----------|-----------|-----------|
-| 1 | M3-A (Maya UI Panel) | User-facing control, high visibility |
-| 2 | M3-B (LLM Optimization) | Efficiency improvements |
+| 1 | ~~M3-A (Maya UI Panel)~~ | ✅ Complete |
+| 2 | M3-B (LLM Optimization) | 1 remaining item: markdown output |
 | 3 | M4 (Scene Operations) | Common file workflows |
 | 4 | M5-A (Core Animation) | Essential animation tools |
 | 5 | M5-B (Rigging Patterns) | Design documentation only |

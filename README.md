@@ -238,9 +238,17 @@ fastmcp install mcp-json
 | `maya.connect` | Connect to Maya commandPort |
 | `maya.disconnect` | Close Maya connection |
 | `scene.info` | Get current scene information |
-| `nodes.list` | List nodes by type/pattern |
+| `scene.undo` | Undo last operation (LLM error recovery) |
+| `scene.redo` | Redo last undone operation |
+| `nodes.list` | List nodes by type/pattern (default limit: 500) |
+| `nodes.create` | Create node with optional name, parent, and attributes |
+| `nodes.delete` | Delete nodes with optional hierarchy |
+| `nodes.info` | Get comprehensive node info (summary, transform, hierarchy, attributes, shape, or all) |
+| `attributes.get` | Get attribute values (batch support) |
+| `attributes.set` | Set attribute values (batch support) |
 | `selection.get` | Get current selection |
-| `selection.set` | Set selection |
+| `selection.set` | Set/add/remove selection |
+| `selection.clear` | Clear selection |
 
 ---
 
@@ -363,6 +371,7 @@ maya-mcp/
 │   │   ├── connection.py
 │   │   ├── scene.py
 │   │   ├── nodes.py
+│   │   ├── attributes.py
 │   │   └── selection.py
 │   └── transport/
 │       └── commandport.py # Maya commandPort TCP client
