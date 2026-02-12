@@ -1,6 +1,7 @@
 """Node tools for Maya MCP.
 
-This module provides tools for listing, creating, and deleting Maya nodes.
+This module provides tools for listing, creating, deleting, and querying
+comprehensive information about Maya nodes.
 """
 
 from __future__ import annotations
@@ -298,6 +299,218 @@ print(json.dumps(result))
         result["attribute_errors"] = None
 
     return result
+
+
+_VALID_INFO_CATEGORIES = frozenset(
+    ["summary", "transform", "hierarchy", "attributes", "shape", "all"]
+)
+
+# Maximum number of keyable attributes to return before truncating.
+# Prevents token budget explosion for nodes with many custom attributes.
+_MAX_KEYABLE_ATTRIBUTES = 200
+
+
+def _build_info_command(node_escaped: str, category_escaped: str) -> str:
+    """Build the Maya Python command string for nodes_info.
+
+    Uses a single static script with conditional sections based on category,
+    wrapped in a top-level try/except to guarantee JSON output even if
+    unexpected exceptions occur.
+
+    Args:
+        node_escaped: JSON-escaped node name string (e.g. '"pCube1"').
+        category_escaped: JSON-escaped category string (e.g. '"summary"').
+
+    Returns:
+        Complete Python command string to execute in Maya.
+    """
+    return f"""import maya.cmds as cmds
+import json
+
+node = {node_escaped}
+category = {category_escaped}
+result = {{"node": node, "info_category": category, "exists": False, "errors": {{}}}}
+
+try:
+    if not cmds.objExists(node):
+        result["errors"]["_node"] = "Node '" + node + "' does not exist"
+    else:
+        result["exists"] = True
+        result["node_type"] = cmds.nodeType(node)
+
+        # --- summary ---
+        if category in ("summary", "all"):
+            try:
+                _parent = cmds.listRelatives(node, parent=True) or []
+                _children = cmds.listRelatives(node, children=True) or []
+                result["parent"] = _parent[0] if _parent else None
+                result["children_count"] = len(_children)
+            except Exception as _e:
+                result["errors"]["summary"] = str(_e)
+
+        # --- transform ---
+        if category in ("transform", "all"):
+            try:
+                for _attr in ["translateX", "translateY", "translateZ",
+                               "rotateX", "rotateY", "rotateZ",
+                               "scaleX", "scaleY", "scaleZ", "visibility"]:
+                    if cmds.attributeQuery(_attr, node=node, exists=True):
+                        result[_attr] = cmds.getAttr(node + "." + _attr)
+                if cmds.attributeQuery("translate", node=node, exists=True):
+                    _t = cmds.getAttr(node + ".translate")[0]
+                    result["translate"] = list(_t)
+                if cmds.attributeQuery("rotate", node=node, exists=True):
+                    _r = cmds.getAttr(node + ".rotate")[0]
+                    result["rotate"] = list(_r)
+                if cmds.attributeQuery("scale", node=node, exists=True):
+                    _s = cmds.getAttr(node + ".scale")[0]
+                    result["scale"] = list(_s)
+            except Exception as _e:
+                result["errors"]["transform"] = str(_e)
+
+        # --- hierarchy ---
+        if category in ("hierarchy", "all"):
+            try:
+                _hp = cmds.listRelatives(node, parent=True, fullPath=True) or []
+                _hc = cmds.listRelatives(node, children=True) or []
+                _full_path = cmds.ls(node, long=True) or [node]
+                if category == "all":
+                    result["parent_full_path"] = _hp[0] if _hp else None
+                else:
+                    result["parent"] = _hp[0] if _hp else None
+                result["children"] = _hc
+                result["full_path"] = _full_path[0]
+            except Exception as _e:
+                result["errors"]["hierarchy"] = str(_e)
+
+        # --- attributes ---
+        if category in ("attributes", "all"):
+            try:
+                _keyable = cmds.listAttr(node, keyable=True) or []
+                _user_defined = cmds.listAttr(node, userDefined=True) or []
+                _all_attrs = list(dict.fromkeys(_keyable + _user_defined))
+                _total_attr_count = len(_all_attrs)
+                _truncated = False
+                if _total_attr_count > {_MAX_KEYABLE_ATTRIBUTES}:
+                    _all_attrs = _all_attrs[:{_MAX_KEYABLE_ATTRIBUTES}]
+                    _truncated = True
+                _attr_values = {{}}
+                _attr_errors = {{}}
+                for _a in _all_attrs:
+                    try:
+                        _val = cmds.getAttr(node + "." + _a)
+                        if isinstance(_val, list) and len(_val) == 1 and isinstance(_val[0], tuple):
+                            _val = list(_val[0])
+                        _attr_values[_a] = _val
+                    except Exception as _ae:
+                        _attr_errors[_a] = str(_ae)
+                result["keyable_attributes"] = _attr_values
+                result["keyable_count"] = len(_attr_values)
+                if _truncated:
+                    result["keyable_truncated"] = True
+                    result["keyable_total_count"] = _total_attr_count
+                if _attr_errors:
+                    result["errors"]["attributes"] = _attr_errors
+            except Exception as _e:
+                result["errors"]["attributes"] = str(_e)
+
+        # --- shape ---
+        if category in ("shape", "all"):
+            try:
+                _shapes = cmds.listRelatives(node, shapes=True) or []
+                _shape_info = []
+                for _s in _shapes:
+                    _s_type = cmds.nodeType(_s)
+                    _conns = cmds.listConnections(_s) or []
+                    _shape_info.append({{"name": _s, "type": _s_type, "connections_count": len(_conns)}})
+                result["shapes"] = _shape_info
+                result["shape_count"] = len(_shape_info)
+            except Exception as _e:
+                result["errors"]["shape"] = str(_e)
+
+except Exception as _top_err:
+    result["errors"]["_exception"] = str(_top_err)
+
+print(json.dumps(result))
+"""
+
+
+def nodes_info(
+    node: str,
+    info_category: str = "summary",
+) -> dict[str, Any]:
+    """Get comprehensive information about a Maya node in a single call.
+
+    Consolidates what would otherwise require multiple attributes.get and
+    nodes.list calls into one tool invocation, reducing LLM tool-call chaining.
+
+    Args:
+        node: Name of the node to query.
+        info_category: Category of information to retrieve:
+            - "summary" (default): node type, parent, children count, exists
+            - "transform": translate, rotate, scale, visibility
+            - "hierarchy": parent (full path), children list, full path
+            - "attributes": all keyable attributes with current values
+            - "shape": shape node(s) under transform, shape type, connections
+            - "all": everything combined (parent = short name from summary,
+              parent_full_path = full DAG path from hierarchy)
+
+    Returns:
+        Dictionary with node information. Contents depend on info_category:
+            - node: The queried node name
+            - info_category: The category requested
+            - exists: Whether the node exists
+            - (category-specific fields)
+            - errors: Error details if any queries failed, or None
+
+    Raises:
+        MayaUnavailableError: If not connected to Maya.
+        MayaCommandError: If Maya command execution fails.
+        ValueError: If node name or info_category is invalid.
+
+    Example:
+        >>> result = nodes_info("pCube1", info_category="transform")
+        >>> print(f"Position: {result['translate']}")
+    """
+    # Input validation
+    _validate_node_name(node)
+    if info_category not in _VALID_INFO_CATEGORIES:
+        raise ValueError(
+            f"Invalid info_category: {info_category!r}. "
+            f"Must be one of: {', '.join(sorted(_VALID_INFO_CATEGORIES))}"
+        )
+
+    client = get_client()
+
+    node_escaped = json.dumps(node)
+    category_escaped = json.dumps(info_category)
+
+    command = _build_info_command(node_escaped, category_escaped)
+    response = client.execute(command)
+
+    # Parse the JSON response
+    try:
+        parsed: dict[str, Any] = json.loads(response)
+    except json.JSONDecodeError:
+        import ast
+
+        parsed = ast.literal_eval(response)
+
+    # Clean up errors field
+    errors = parsed.get("errors", {})
+    if not errors:
+        parsed["errors"] = None
+
+    # Apply response size guard for categories that may produce large output.
+    # The guard truncates list fields; for keyable_attributes (a dict), truncation
+    # is handled in Maya code via _MAX_KEYABLE_ATTRIBUTES. The guard here catches
+    # any remaining oversized list fields (e.g. children, shapes).
+    if info_category in ("attributes", "all", "hierarchy", "shape"):
+        for key in ("children", "shapes"):
+            if key in parsed:
+                parsed = guard_response_size(parsed, list_key=key)
+
+    return parsed
 
 
 def nodes_delete(

@@ -28,7 +28,7 @@ from mcp.types import ToolAnnotations
 from maya_mcp.tools.attributes import attributes_get, attributes_set
 from maya_mcp.tools.connection import maya_connect, maya_disconnect
 from maya_mcp.tools.health import health_check
-from maya_mcp.tools.nodes import nodes_create, nodes_delete, nodes_list
+from maya_mcp.tools.nodes import nodes_create, nodes_delete, nodes_info, nodes_list
 from maya_mcp.tools.scene import scene_info, scene_redo, scene_undo
 from maya_mcp.tools.selection import selection_clear, selection_get, selection_set
 
@@ -47,11 +47,18 @@ Available tools:
 - nodes.list: List nodes by type or pattern
 - nodes.create: Create a new node with optional name, parent, and attributes
 - nodes.delete: Delete one or more nodes (with optional hierarchy deletion)
+- nodes.info: Get comprehensive node information in one call (summary, transform,
+  hierarchy, attributes, shape, or all) - use this instead of multiple attribute queries
 - attributes.get: Get attribute values from a node (batch supported)
 - attributes.set: Set attribute values on a node (batch supported)
 - selection.get: Get current selection
 - selection.set: Set selection (replace, add, or deselect)
 - selection.clear: Clear the selection (deselect all)
+
+Workflow tips:
+- Use nodes.info for a quick overview of any node before making changes
+- Use nodes.info(info_category="transform") instead of multiple attributes.get calls
+- Use nodes.info(info_category="all") to get everything about a node at once
 
 Before using Maya tools, ensure Maya is running with commandPort enabled:
     import maya.cmds as cmds
@@ -285,6 +292,43 @@ def tool_nodes_delete(
         Dictionary with deleted list, count, and errors (if any nodes failed).
     """
     return nodes_delete(nodes=nodes, hierarchy=hierarchy)
+
+
+@mcp.tool(
+    name="nodes.info",
+    description="Get comprehensive information about a Maya node in a single call. "
+    "Use info_category to choose: summary (default), transform, hierarchy, "
+    "attributes, shape, or all. Reduces tool-call chaining.",
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_nodes_info(
+    node: Annotated[str, "Node name to query"],
+    info_category: Annotated[
+        Literal["summary", "transform", "hierarchy", "attributes", "shape", "all"],
+        "Category of information to retrieve",
+    ] = "summary",
+) -> dict[str, Any]:
+    """Get comprehensive information about a Maya node.
+
+    Args:
+        node: Name of the node to query.
+        info_category: What information to return. Options:
+            summary - node type, parent, children count
+            transform - translate, rotate, scale, visibility
+            hierarchy - parent, children list, full path
+            attributes - all keyable/user-defined attributes with values
+            shape - shape nodes, types, connection counts
+            all - everything combined
+
+    Returns:
+        Dictionary with node information based on info_category.
+    """
+    return nodes_info(node=node, info_category=info_category)
 
 
 # Register attribute tools
