@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from maya_mcp.errors import ValidationError
 from maya_mcp.transport import get_client
 from maya_mcp.utils.parsing import parse_json_response
 
@@ -64,6 +65,9 @@ TIME_UNIT_TO_FPS: dict[str, float] = {
     "44100fps": 44100.0,
     "48000fps": 48000.0,
 }
+
+ALLOWED_SCENE_EXTENSIONS: tuple[str, ...] = (".ma", ".mb")
+FORBIDDEN_PATH_CHARACTERS: str = ";|&$`"
 
 
 def scene_info() -> dict[str, Any]:
@@ -260,6 +264,144 @@ print(json.dumps(result))
 
     return {
         "success": data.get("success", False),
+        "previous_file": data.get("previous_file"),
+        "was_modified": data.get("was_modified", False),
+        "error": data.get("error"),
+    }
+
+
+def scene_open(file_path: str, force: bool = False) -> dict[str, Any]:
+    """Open a Maya scene file.
+
+    Loads the specified scene file into Maya.  Checks whether the current scene
+    has unsaved changes before proceeding.  When ``force`` is False (default)
+    and the scene has been modified, the operation is rejected with an
+    actionable error message.  When ``force`` is True, unsaved changes are
+    discarded and the file is opened unconditionally.
+
+    **Important:** This tool never triggers Maya's interactive "Save changes?"
+    dialog, which would block the commandPort indefinitely.  Instead it
+    pre-checks the modification state and always passes ``force=True`` to the
+    underlying ``cmds.file(path, open=True, force=True)`` call.
+
+    The file path is validated before being sent to Maya:
+
+    - Must not be empty
+    - Must not contain shell metacharacters (``;|&$``` etc.)
+    - Must end with a supported Maya file extension (``.ma``, ``.mb``)
+    - The file must exist on disk (verified inside Maya)
+
+    Args:
+        file_path: Absolute or relative path to the Maya scene file to open.
+            Supported extensions: ``.ma`` (Maya ASCII), ``.mb`` (Maya Binary).
+        force: If True, discard unsaved changes and open the file.
+            If False (default), refuse when the current scene has unsaved
+            changes.
+
+    Returns:
+        Dictionary with scene_open result:
+            - success: Whether the file was opened
+            - file_path: The opened file path (as reported by Maya), or None
+            - previous_file: File path of the previous scene, or None
+            - was_modified: Whether the previous scene had unsaved changes
+            - error: Error message if the operation was refused, or None
+
+    Raises:
+        ValidationError: If the file path is invalid or contains dangerous
+            characters.
+        MayaUnavailableError: If not connected to Maya.
+        MayaCommandError: If Maya command execution fails.
+
+    Example:
+        >>> result = scene_open("/path/to/scene.ma")
+        >>> if not result['success']:
+        ...     print(result['error'])  # "Scene has unsaved changes..."
+        >>> result = scene_open("/path/to/scene.ma", force=True)
+        >>> assert result['success']
+    """
+    # --- Server-side validation (before sending anything to Maya) ---
+    normalized_file_path = file_path.strip()
+
+    if not normalized_file_path:
+        raise ValidationError(
+            message="File path must not be empty.",
+            field_name="file_path",
+            value="",
+            constraint="non-empty string",
+        )
+
+    # Reject shell metacharacters (security)
+    for ch in FORBIDDEN_PATH_CHARACTERS:
+        if ch in normalized_file_path:
+            raise ValidationError(
+                message=f"File path contains forbidden character: {ch!r}",
+                field_name="file_path",
+                value=normalized_file_path,
+                constraint="no shell metacharacters",
+            )
+
+    # Reject control characters to prevent command-string injection/newline breaks
+    if any(ord(ch) < 32 for ch in normalized_file_path):
+        raise ValidationError(
+            message="File path contains forbidden control characters.",
+            field_name="file_path",
+            value=normalized_file_path,
+            constraint="printable path string",
+        )
+
+    # Validate file extension
+    lower_path = normalized_file_path.lower()
+    if not lower_path.endswith(ALLOWED_SCENE_EXTENSIONS):
+        raise ValidationError(
+            message=(f"Unsupported file extension. Allowed: {', '.join(ALLOWED_SCENE_EXTENSIONS)}"),
+            field_name="file_path",
+            value=normalized_file_path,
+            constraint="supported Maya file extension",
+        )
+
+    client = get_client()
+
+    # Normalize slashes for Maya and embed safely via JSON string literal
+    safe_path = normalized_file_path.replace("\\", "/")
+    path_literal = json.dumps(safe_path)
+
+    force_py = str(json.loads("true" if force else "false"))
+    command = f"""
+import maya.cmds as cmds
+import json
+import os
+
+force = {force_py}
+file_path = {path_literal}
+
+result = {{"success": False, "file_path": None, "previous_file": None, "was_modified": False, "error": None}}
+
+# Capture previous scene info
+scene_name = cmds.file(query=True, sceneName=True)
+result["previous_file"] = scene_name if scene_name else None
+modified = cmds.file(query=True, modified=True)
+result["was_modified"] = modified
+
+# Check unsaved changes
+if modified and not force:
+    result["error"] = "Scene has unsaved changes. Use force=True to discard changes, or save first."
+elif not os.path.isfile(file_path):
+    result["error"] = "File not found: " + file_path
+else:
+    _ = cmds.file(file_path, open=True, force=True)
+    result["success"] = True
+    result["file_path"] = cmds.file(query=True, sceneName=True) or None
+
+print(json.dumps(result))
+"""
+
+    response = client.execute(command)
+
+    data = parse_json_response(response)
+
+    return {
+        "success": data.get("success", False),
+        "file_path": data.get("file_path"),
         "previous_file": data.get("previous_file"),
         "was_modified": data.get("was_modified", False),
         "error": data.get("error"),

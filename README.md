@@ -239,6 +239,7 @@ fastmcp install mcp-json
 | `maya.disconnect` | Close Maya connection |
 | `scene.info` | Get current scene information |
 | `scene.new` | Create new scene (with unsaved changes safety check) |
+| `scene.open` | Open scene file (with path validation and unsaved changes safety check) |
 | `scene.undo` | Undo last operation (LLM error recovery) |
 | `scene.redo` | Redo last undone operation |
 | `nodes.list` | List nodes by type/pattern (default limit: 500) |

@@ -8,7 +8,7 @@ Tools use a hierarchical naming scheme:
 
 - `health.*` - Health and diagnostics
 - `maya.*` - Connection management
-- `scene.*` - Scene-level operations (info, undo, redo)
+- `scene.*` - Scene-level operations (info, new, open, undo, redo)
 - `nodes.*` - Node operations (list, create, delete, info)
 - `attributes.*` - Attribute operations (get, set)
 - `selection.*` - Selection management
@@ -299,6 +299,83 @@ Redo the last undone operation in Maya.
   "can_redo": false
 }
 ```
+
+---
+
+### `scene.open`
+
+Open a Maya scene file.
+
+Checks whether the current scene has unsaved changes before proceeding. When `force` is `false` (default) and the scene has been modified, the operation is refused with an actionable error message. When `force` is `true`, unsaved changes are discarded.
+
+**Important:** This tool never triggers Maya's interactive "Save changes?" dialog, which would block the commandPort indefinitely.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `file_path` | `string` | Yes | - | Path to the scene file to open |
+| `force` | `boolean` | No | `false` | If true, discard unsaved changes. If false, refuse when scene is modified. |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | `boolean` | Whether the scene was opened |
+| `file_path` | `string \| null` | Path of the opened scene file |
+| `previous_file` | `string \| null` | File path of the previous scene |
+| `was_modified` | `boolean` | Whether the previous scene had unsaved changes |
+| `error` | `string \| null` | Error message if refused, or null |
+
+**Example Request**:
+
+```json
+{
+  "file_path": "C:/projects/myScene.ma",
+  "force": false
+}
+```
+
+**Example Response (Success)**:
+
+```json
+{
+  "success": true,
+  "file_path": "C:/projects/myScene.ma",
+  "previous_file": "C:/projects/oldScene.ma",
+  "was_modified": false,
+  "error": null
+}
+```
+
+**Example Response (Refused — Unsaved Changes)**:
+
+```json
+{
+  "success": false,
+  "file_path": null,
+  "previous_file": "C:/projects/oldScene.ma",
+  "was_modified": true,
+  "error": "Scene has unsaved changes. Use force=True to discard changes, or save first."
+}
+```
+
+**Example Response (Forced — Discards Changes)**:
+
+```json
+{
+  "success": true,
+  "file_path": "C:/projects/myScene.ma",
+  "previous_file": "C:/projects/oldScene.ma",
+  "was_modified": true,
+  "error": null
+}
+```
+
+**Security**:
+- File paths are validated for shell metacharacters and control characters
+- Only supported scene extensions are accepted (`.ma`, `.mb`, `.obj`, `.fbx`, `.abc`, `.usd`, `.usda`, `.usdc`, `.usdz`)
+- File existence is verified before sending to Maya
 
 ---
 
@@ -916,6 +993,7 @@ All tools include MCP annotations to help AI clients understand their behavior a
 | `maya.disconnect` | false | false | true |
 | `scene.info` | true | false | true |
 | `scene.new` | false | false | true |
+| `scene.open` | false | false | false |
 | `scene.undo` | false | false | false |
 | `scene.redo` | false | false | false |
 | `nodes.list` | true | false | true |

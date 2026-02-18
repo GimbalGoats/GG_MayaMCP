@@ -235,21 +235,21 @@ Improvements based on [Block's MCP Playbook](https://engineering.block.xyz/blog/
 
 ---
 
-### M4: Scene Operations 📋
+### M4: Scene Operations 🚧
 
 **Goal**: File and scene management workflows.
 
-| ID | Feature | Description | Effort |
-|----|---------|-------------|--------|
-| M4.1 | `scene.new` | Create new scene (with save prompt option) | Low |
-| M4.2 | `scene.open` | Open scene file (path validated) | Medium |
-| M4.3 | `scene.save` | Save current scene | Low |
-| M4.4 | `scene.save_as` | Save scene to new path | Low |
-| M4.5 | `scene.import` | Import file into current scene | Medium |
-| M4.6 | `scene.export` | Export selection to file | Medium |
-| M4.7 | `nodes.rename` | Rename nodes (batch support) | Low |
-| M4.8 | `nodes.parent` | Reparent nodes in hierarchy | Low |
-| M4.9 | `nodes.duplicate` | Duplicate nodes with hierarchy | Medium |
+| ID | Feature | Description | Effort | Status |
+|----|---------|-------------|--------|--------|
+| M4.1 | `scene.new` | Create new scene (with save prompt option) | Low | ✅ |
+| M4.2 | `scene.open` | Open scene file (path validated) | Medium | ✅ |
+| M4.3 | `scene.save` | Save current scene | Low | 📋 |
+| M4.4 | `scene.save_as` | Save scene to new path | Low | 📋 |
+| M4.5 | `scene.import` | Import file into current scene | Medium | 📋 |
+| M4.6 | `scene.export` | Export selection to file | Medium | 📋 |
+| M4.7 | `nodes.rename` | Rename nodes (batch support) | Low | 📋 |
+| M4.8 | `nodes.parent` | Reparent nodes in hierarchy | Low | 📋 |
+| M4.9 | `nodes.duplicate` | Duplicate nodes with hierarchy | Medium | 📋 |
 
 **Security considerations**:
 - All file paths must be validated
@@ -310,17 +310,18 @@ Document common rigging workflows to inform future tool design. **No implementat
 ## Milestone Priority
 
 ```
-M0 ✅ ─► M1 ✅ ─► M2 ✅ ─► M3 🚧 ─► M4 📋 ─► M5 📋 ─► M6 💡
-                          │
-                          ├─► M3-A: Maya UI Panel ✅
-                          └─► M3-B: LLM Optimization 🚧 (3/4 done)
+M0 ✅ ─► M1 ✅ ─► M2 ✅ ─► M3 🚧 ─► M4 🚧 ─► M5 📋 ─► M6 💡
+                          │            │
+                          ├─► M3-A ✅  ├─► M4.1: scene.new ✅
+                          └─► M3-B 🚧  └─► M4.2–M4.9: 📋
+                              (3/4)
 ```
 
 | Priority | Milestone | Rationale |
 |----------|-----------|-----------|
 | 1 | ~~M3-A (Maya UI Panel)~~ | ✅ Complete |
 | 2 | M3-B (LLM Optimization) | 1 remaining item: markdown output |
-| 3 | M4 (Scene Operations) | Common file workflows |
+| 3 | M4 (Scene Operations) | 1/9 done (`scene.new`); 8 remaining |
 | 4 | M5-A (Core Animation) | Essential animation tools |
 | 5 | M5-B (Rigging Patterns) | Design documentation only |
 | 6 | M6 (Production Hardening) | Nice to have |
