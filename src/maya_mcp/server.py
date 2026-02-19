@@ -29,7 +29,7 @@ from maya_mcp.tools.attributes import attributes_get, attributes_set
 from maya_mcp.tools.connection import maya_connect, maya_disconnect
 from maya_mcp.tools.health import health_check
 from maya_mcp.tools.nodes import nodes_create, nodes_delete, nodes_info, nodes_list
-from maya_mcp.tools.scene import scene_info, scene_new, scene_redo, scene_undo
+from maya_mcp.tools.scene import scene_info, scene_new, scene_open, scene_redo, scene_undo
 from maya_mcp.tools.selection import selection_clear, selection_get, selection_set
 
 # Create the FastMCP server instance
@@ -43,6 +43,7 @@ Available tools:
 - maya.disconnect: Disconnect from Maya
 - scene.info: Get current scene information (file path, FPS, frame range, etc.)
 - scene.new: Create a new empty scene (checks for unsaved changes first)
+- scene.open: Open a scene file (validates path and checks for unsaved changes)
 - scene.undo: Undo the last operation (critical for error recovery)
 - scene.redo: Redo the last undone operation
 - nodes.list: List nodes by type or pattern
@@ -187,6 +188,42 @@ def tool_scene_new(
         Dictionary with success, previous_file, was_modified, and error.
     """
     return scene_new(force=force)
+
+
+@mcp.tool(
+    name="scene.open",
+    description="Open a Maya scene file. "
+    "Validates the file path and checks for unsaved changes before proceeding. "
+    "Use force=True to discard unsaved changes. "
+    "Supported formats: .ma (Maya ASCII), .mb (Maya Binary).",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_scene_open(
+    file_path: Annotated[
+        str,
+        "Path to the Maya scene file to open (.ma or .mb)",
+    ],
+    force: Annotated[
+        bool,
+        "If True, discard unsaved changes. If False (default), refuse when scene has unsaved changes.",
+    ] = False,
+) -> dict[str, Any]:
+    """Open a Maya scene file.
+
+    Args:
+        file_path: Path to the scene file (.ma or .mb).
+        force: If True, discard unsaved changes and open the file.
+            If False (default), refuse when scene has unsaved changes.
+
+    Returns:
+        Dictionary with success, file_path, previous_file, was_modified, and error.
+    """
+    return scene_open(file_path=file_path, force=force)
 
 
 @mcp.tool(

@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from maya_mcp.errors import ValidationError
 from maya_mcp.tools.nodes import (
     _build_info_command,
     nodes_create,
@@ -18,7 +19,7 @@ from maya_mcp.tools.nodes import (
     nodes_info,
     nodes_list,
 )
-from maya_mcp.tools.scene import scene_info, scene_new, scene_redo, scene_undo
+from maya_mcp.tools.scene import scene_info, scene_new, scene_open, scene_redo, scene_undo
 from maya_mcp.tools.selection import selection_clear, selection_get, selection_set
 
 
@@ -406,6 +407,129 @@ class TestSceneNew:
         assert "error" in result
         assert isinstance(result["success"], bool)
         assert isinstance(result["was_modified"], bool)
+
+
+class TestSceneOpen:
+    """Tests for the scene.open tool."""
+
+    def test_scene_open_success_result_shape(self) -> None:
+        """Open scene returns all required fields."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "success": True,
+                "file_path": "C:/projects/target.ma",
+                "previous_file": "C:/projects/previous.ma",
+                "was_modified": False,
+                "error": None,
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):
+            result = scene_open(file_path="C:/projects/target.ma")
+
+        assert result["success"] is True
+        assert result["file_path"] == "C:/projects/target.ma"
+        assert result["previous_file"] == "C:/projects/previous.ma"
+        assert result["was_modified"] is False
+        assert result["error"] is None
+
+    def test_scene_open_default_force_false_in_command(self) -> None:
+        """Default force=False is correctly passed to Maya command."""
+        mock_client = MagicMock()
+        mock_client.execute.return_value = json.dumps(
+            {
+                "success": True,
+                "file_path": "C:/projects/target.ma",
+                "previous_file": None,
+                "was_modified": False,
+                "error": None,
+            }
+        )
+
+        with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):
+            scene_open(file_path="C:/projects/target.ma")
+
+        call_arg = mock_client.execute.call_args[0][0]
+        assert "force = False" in call_arg
+
+    def test_scene_open_force_true_in_command(self) -> None:
+        """Force=True is correctly passed to Maya command."""
+        mock_client = MagicMock()
+        mock_client.execute.return_value = json.dumps(
+            {
+                "success": True,
+                "file_path": "C:/projects/target.ma",
+                "previous_file": None,
+                "was_modified": True,
+                "error": None,
+            }
+        )
+
+        with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):
+            scene_open(file_path="C:/projects/target.ma", force=True)
+
+        call_arg = mock_client.execute.call_args[0][0]
+        assert "force = True" in call_arg
+
+    def test_scene_open_never_triggers_dialog(self) -> None:
+        """Maya command always uses force=True on cmds.file(open=True)."""
+        mock_client = MagicMock()
+        mock_client.execute.return_value = json.dumps(
+            {
+                "success": True,
+                "file_path": "C:/projects/target.ma",
+                "previous_file": None,
+                "was_modified": False,
+                "error": None,
+            }
+        )
+
+        with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):
+            scene_open(file_path="C:/projects/target.ma")
+
+        call_arg = mock_client.execute.call_args[0][0]
+        assert "cmds.file(file_path, open=True, force=True)" in call_arg
+
+    def test_scene_open_rejects_empty_path(self) -> None:
+        """Open scene rejects empty file path."""
+        with pytest.raises(ValidationError, match="must not be empty"):
+            scene_open(file_path="")
+
+    def test_scene_open_rejects_unsupported_extension(self) -> None:
+        """Open scene rejects non-Maya file extensions."""
+        with pytest.raises(ValidationError, match="Unsupported file extension"):
+            scene_open(file_path="C:/projects/scene.fbx")
+
+    def test_scene_open_rejects_dangerous_characters(self) -> None:
+        """Open scene rejects shell metacharacters in file path."""
+        with pytest.raises(ValidationError, match="forbidden character"):
+            scene_open(file_path="C:/projects/scene.ma; rm -rf /")
+
+    def test_scene_open_rejects_control_characters(self) -> None:
+        """Open scene rejects control characters in file path."""
+        with pytest.raises(ValidationError, match="control characters"):
+            scene_open(file_path="C:/projects/scene\nname.ma")
+
+    def test_scene_open_embeds_path_safely_with_json_literal(self) -> None:
+        """Generated command embeds path as JSON string literal."""
+        mock_client = MagicMock()
+        mock_client.execute.return_value = json.dumps(
+            {
+                "success": True,
+                "file_path": "C:/projects/quote'path.ma",
+                "previous_file": None,
+                "was_modified": False,
+                "error": None,
+            }
+        )
+
+        with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):
+            scene_open(file_path="C:\\projects\\quote'path.ma")
+
+        call_arg = mock_client.execute.call_args[0][0]
+        assert 'file_path = "C:/projects/quote\'path.ma"' in call_arg
 
 
 class TestNodesList:

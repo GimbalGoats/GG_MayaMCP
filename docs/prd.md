@@ -235,21 +235,21 @@ Improvements based on [Block's MCP Playbook](https://engineering.block.xyz/blog/
 
 ---
 
-### M4: Scene Operations 📋
+### M4: Scene Operations 🚧
 
 **Goal**: File and scene management workflows.
 
-| ID | Feature | Description | Effort |
-|----|---------|-------------|--------|
-| M4.1 | `scene.new` | Create new scene (with save prompt option) | Low |
-| M4.2 | `scene.open` | Open scene file (path validated) | Medium |
-| M4.3 | `scene.save` | Save current scene | Low |
-| M4.4 | `scene.save_as` | Save scene to new path | Low |
-| M4.5 | `scene.import` | Import file into current scene | Medium |
-| M4.6 | `scene.export` | Export selection to file | Medium |
-| M4.7 | `nodes.rename` | Rename nodes (batch support) | Low |
-| M4.8 | `nodes.parent` | Reparent nodes in hierarchy | Low |
-| M4.9 | `nodes.duplicate` | Duplicate nodes with hierarchy | Medium |
+| ID | Feature | Description | Effort | Status |
+|----|---------|-------------|--------|--------|
+| M4.1 | `scene.new` | Create new scene (with save prompt option) | Low | ✅ |
+| M4.2 | `scene.open` | Open scene file (path validated) | Medium | ✅ |
+| M4.3 | `scene.save` | Save current scene | Low | 📋 |
+| M4.4 | `scene.save_as` | Save scene to new path | Low | 📋 |
+| M4.5 | `scene.import` | Import file into current scene | Medium | 📋 |
+| M4.6 | `scene.export` | Export selection to file | Medium | 📋 |
+| M4.7 | `nodes.rename` | Rename nodes (batch support) | Low | 📋 |
+| M4.8 | `nodes.parent` | Reparent nodes in hierarchy | Low | 📋 |
+| M4.9 | `nodes.duplicate` | Duplicate nodes with hierarchy | Medium | 📋 |
 
 **Security considerations**:
 - All file paths must be validated
@@ -285,6 +285,8 @@ Document common rigging workflows to inform future tool design. **No implementat
 | **Blend Shapes** | `nodes.create` (blendShape), `attributes.set` | Connect blend shape targets |
 | **Skin Binding** | `skin.bind`, `skin.weights.get/set` | Bind mesh to skeleton, adjust weights |
 
+**Cross-reference**: M8 (Skinning) and M9 (Deformers & Blend Shapes) implement the tools documented in these patterns.
+
 **Deliverable**: `docs/spec/rigging-patterns.md` documenting:
 - What tools would be needed for each pattern
 - Example LLM prompts
@@ -307,23 +309,153 @@ Document common rigging workflows to inform future tool design. **No implementat
 
 ---
 
+### M7: Node Graph & Connections 📋
+
+**Goal**: Expose node graph wiring — the most common operation in Maya pipeline scripts.
+
+**Namespace**: `connections.*`
+
+| ID | Feature | Description | Effort |
+|----|---------|-------------|--------|
+| M7.1 | `connections.list` | List connections on a node with direction/type filters | Low |
+| M7.2 | `connections.get` | Get connection details for specific plugs | Low |
+| M7.3 | `connections.connect` | Connect two attributes | Low |
+| M7.4 | `connections.disconnect` | Disconnect attributes with safe disconnect-before-reconnect pattern | Low |
+| M7.5 | `connections.history` | List construction/deformation history on a node | Medium |
+
+**Design note**: `connections.disconnect` implements the disconnect-before-reconnect safety pattern common in production rigs.
+
+---
+
+### M8: Skinning 📋
+
+**Goal**: Skin binding and weight management for character rigging workflows.
+
+**Namespace**: `skin.*`
+
+| ID | Feature | Description | Effort |
+|----|---------|-------------|--------|
+| M8.1 | `skin.bind` | Bind mesh to skeleton with influence options | Medium |
+| M8.2 | `skin.unbind` | Detach skin cluster from mesh | Low |
+| M8.3 | `skin.influences` | List influences on a skin cluster | Low |
+| M8.4 | `skin.weights.get` | Get skin weights with offset/limit pagination | High |
+| M8.5 | `skin.weights.set` | Set skin weights with normalization | High |
+| M8.6 | `skin.copy_weights` | Copy weights between meshes with association options | Medium |
+
+**Token budget**: Skin weight data can reach 4–15MB for production meshes (100K vertices × ~4 influences). `skin.weights.get` MUST use offset/limit pagination and return summaries by default. The 50KB response guard applies.
+
+---
+
+### M9: Deformers & Blend Shapes 📋
+
+**Goal**: Deformer management and blend shape workflows for modeling and rigging.
+
+**Namespace**: `deformers.*`
+
+| ID | Feature | Description | Effort |
+|----|---------|-------------|--------|
+| M9.1 | `deformers.list` | List deformers on a node with deformation order | Low |
+| M9.2 | `deformers.create` | Create deformer (cluster, lattice, nonLinear, wire, deltaMush, wrap) | Medium |
+| M9.3 | `deformers.reorder` | Change deformation order on a node | Low |
+| M9.4 | `blendshape.create` | Create blend shape deformer with initial targets | Medium |
+| M9.5 | `blendshape.targets` | List, add, or remove blend shape targets | Medium |
+| M9.6 | `blendshape.weights` | Get or set blend shape target weights | Low |
+
+**Cross-reference**: Implements the Blend Shapes rigging pattern from M5-B.
+
+---
+
+### M10: Constraints 📋
+
+**Goal**: Constraint creation and management for rigging and animation workflows.
+
+**Namespace**: `constraints.*`
+
+| ID | Feature | Description | Effort |
+|----|---------|-------------|--------|
+| M10.1 | `constraints.create` | Create constraint (parent, point, orient, aim, scale, poleVector) | Medium |
+| M10.2 | `constraints.list` | List constraints on a node with type filter | Low |
+| M10.3 | `constraints.delete` | Delete constraints from a node | Low |
+| M10.4 | `constraints.weights` | Get or set constraint target weights | Low |
+
+**Design note**: Supports the common 'snap then delete constraint' pattern used in rig positioning workflows.
+
+---
+
+### M11: Mesh Operations & Component Selection 📋
+
+**Goal**: Mesh queries, topology analysis, and component-level selection for targeted editing.
+
+#### M11-A: Mesh Queries
+
+**Namespace**: `mesh.*`
+
+| ID | Feature | Description | Effort |
+|----|---------|-------------|--------|
+| M11.A1 | `mesh.info` | Get mesh statistics: vertex/face/edge counts, bounding box, UV status | Low |
+| M11.A2 | `mesh.vertices` | Query vertex positions with offset/limit pagination | Medium |
+| M11.A3 | `mesh.evaluate` | Topology analysis: non-manifold edges, lamina faces, holes, border edges | Medium |
+
+**Token budget**: Vertex position data uses offset/limit pagination. `mesh.info` returns summary statistics by default.
+
+#### M11-B: Component Selection
+
+**Namespace**: extends `selection.*`
+
+| ID | Feature | Description | Effort |
+|----|---------|-------------|--------|
+| M11.B1 | `selection.set_components` | Select vertices, edges, or faces by index ranges or criteria | Medium |
+| M11.B2 | `selection.get_components` | Get selected components with type and indices | Low |
+| M11.B3 | `selection.convert_components` | Convert selection between vertex/edge/face | Low |
+
+**Security**: Component syntax uses `[`, `]`, `:`, and `.` characters (e.g., `pCube1.vtx[0:10]`). Input validation must be updated to allow these characters in component specifications while still blocking shell metacharacters.
+
+---
+
+### M12: Materials & Shading 📋
+
+**Goal**: Basic material creation and assignment for shading workflows.
+
+**Namespace**: `materials.*`
+
+| ID | Feature | Description | Effort |
+|----|---------|-------------|--------|
+| M12.1 | `materials.list` | List materials in the scene with optional type filter | Low |
+| M12.2 | `materials.get` | Get material attributes and assigned objects | Low |
+| M12.3 | `materials.assign` | Assign material to objects or faces | Medium |
+| M12.4 | `materials.create` | Create material with shading group (lambert, blinn, phong, aiStandardSurface) | Medium |
+
+**Workflow-first**: `materials.create` consolidates 4 internal Maya steps (createNode material → createNode shadingGroup → connectAttr outColor → connectAttr dagSetMembers) into a single tool call.
+
+---
+
 ## Milestone Priority
 
 ```
-M0 ✅ ─► M1 ✅ ─► M2 ✅ ─► M3 🚧 ─► M4 📋 ─► M5 📋 ─► M6 💡
-                          │
-                          ├─► M3-A: Maya UI Panel ✅
-                          └─► M3-B: LLM Optimization 🚧 (3/4 done)
+M0 ✅ ─► M1 ✅ ─► M2 ✅ ─► M3 🚧 ─► M4 🚧 ─► M5 📋 ─► M6 💡
+                          │            │
+                          ├─► M3-A ✅  ├─► M4.1: scene.new ✅
+                          └─► M3-B 🚧  └─► M4.2–M4.9: 📋
+                              (3/4)
+
+After M5:
+M5 📋 ─► M7 📋 ─► M8 📋 ─► M9 📋 ─► M10 📋 ─► M11 📋 ─► M12 📋
 ```
 
 | Priority | Milestone | Rationale |
 |----------|-----------|-----------|
 | 1 | ~~M3-A (Maya UI Panel)~~ | ✅ Complete |
 | 2 | M3-B (LLM Optimization) | 1 remaining item: markdown output |
-| 3 | M4 (Scene Operations) | Common file workflows |
+| 3 | M4 (Scene Operations) | 1/9 done (`scene.new`); 8 remaining |
 | 4 | M5-A (Core Animation) | Essential animation tools |
 | 5 | M5-B (Rigging Patterns) | Design documentation only |
 | 6 | M6 (Production Hardening) | Nice to have |
+| 7 | M7 (Node Graph & Connections) | Highest-frequency pipeline operation; glue for all other workflows |
+| 8 | M8 (Skinning) | Core rigging workflow; implements M5-B Skin Binding pattern |
+| 9 | M9 (Deformers & Blend Shapes) | Essential for modeling and rigging; implements M5-B Blend Shapes pattern |
+| 10 | M10 (Constraints) | Core rigging and animation workflow |
+| 11 | M11 (Mesh Operations & Component Selection) | Targeted editing and QA workflows |
+| 12 | M12 (Materials & Shading) | Basic shading; lower priority than geometry workflows |
 
 ---
 
@@ -366,6 +498,15 @@ Don't mix read-only and write operations in one tool.
 | ❌ Mixed | ✅ Separated |
 |----------|-------------|
 | `selection.manage(action, nodes)` | `selection.get()` + `selection.set()` + `selection.clear()` |
+
+### 5. Large Data: Summary + Pagination
+
+Return summary data by default; paginate large datasets on request. Large responses (>50KB) consume LLM tokens without adding value.
+
+| ❌ Naive | ✅ Summary + Paginate |
+|---------|----------------------|
+| Return all 100K vertex positions | Return vertex count + bounding box; paginate on request |
+| Return all skin weights (4–15MB) | Return influence summary; paginate per-vertex weights |
 
 ---
 
