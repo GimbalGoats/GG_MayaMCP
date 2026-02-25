@@ -605,7 +605,7 @@ def nodes_rename(mapping: dict[str, str]) -> dict[str, Any]:
     """
     if not mapping:
         raise ValueError("mapping cannot be empty")
-    
+
     # Input validation
     for old_name, new_name in mapping.items():
         _validate_node_name(old_name)
@@ -627,7 +627,8 @@ for old_name, new_name in mapping.items():
     if not cmds.objExists(old_name):
         result["errors"][old_name] = "Node '" + old_name + "' does not exist"
         continue
-        
+
+
     try:
         # cmds.rename returns the new name (which might handle collisions)
         actual_name = cmds.rename(old_name, new_name)
@@ -635,6 +636,8 @@ for old_name, new_name in mapping.items():
     except Exception as e:
         result["errors"][old_name] = str(e)
 
+# Only return the JSON string, do not print it (which goes to script editor log)
+# The last expression is returned by commandPort
 print(json.dumps(result))
 """
 
@@ -650,6 +653,7 @@ print(json.dumps(result))
     }
 
     return result
+
 
 def nodes_parent(
     nodes: list[str],
@@ -676,7 +680,7 @@ def nodes_parent(
     """
     if not nodes:
         raise ValueError("nodes list cannot be empty")
-    
+
     for node in nodes:
         _validate_node_name(node)
     if parent is not None:
@@ -707,13 +711,15 @@ else:
             if not cmds.objExists(node):
                 result["errors"][node] = f"Node '{{node}}' does not exist"
                 continue
-            
+
+
             # Perform parenting
             if parent_node:
                 res = cmds.parent(node, parent_node, relative=relative_flag)
             else:
                 res = cmds.parent(node, world=True, relative=relative_flag)
-            
+
+
             # cmds.parent returns list of new names (in case of instance/rename)
             # We usually just want the node name we operated on, but let's record what Maya returned
             if res:
@@ -721,10 +727,13 @@ else:
             else:
                 # Should not happen on success, but fallback
                 result["parented"].append(node)
-                
+
+
         except Exception as e:
             result["errors"][node] = str(e)
 
+# Only return the JSON string, do not print it (which goes to script editor log)
+# The last expression is returned by commandPort
 print(json.dumps(result))
 """
 
@@ -737,7 +746,7 @@ print(json.dumps(result))
     # Check for global parent error
     if "_parent" in errors:
         # If parent invalid, fail the whole call or just report?
-        # The loop won't run if we put the check outside. 
+        # The loop won't run if we put the check outside.
         # My script logic puts it outside loop.
         pass
 
@@ -775,7 +784,7 @@ def nodes_duplicate(
         raise ValueError("nodes list cannot be empty")
     if name and len(nodes) > 1:
         raise ValueError("Cannot specify name when duplicating multiple nodes")
-    
+
     for node in nodes:
         _validate_node_name(node)
     if name:
@@ -806,7 +815,8 @@ for node in nodes:
         if not cmds.objExists(node):
             result["errors"][node] = f"Node '{{node}}' does not exist"
             continue
-            
+
+
         # Build args
         kwargs = {{
             "inputConnections": ic_flag,
@@ -815,14 +825,17 @@ for node in nodes:
         }}
         if desired_name:
             kwargs["name"] = desired_name
-            
+
+
         dup = cmds.duplicate(node, **kwargs)
         if dup:
             result["duplicated"][node] = dup[0]
-            
+
+
     except Exception as e:
         result["errors"][node] = str(e)
 
+# Return JSON string as the last expression
 print(json.dumps(result))
 """
 

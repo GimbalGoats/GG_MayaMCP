@@ -28,16 +28,15 @@ from mcp.types import ToolAnnotations
 from maya_mcp.tools.attributes import attributes_get, attributes_set
 from maya_mcp.tools.connection import maya_connect, maya_disconnect
 from maya_mcp.tools.health import health_check
+from maya_mcp.tools.nodes import (
+    nodes_create,
     nodes_delete,
     nodes_duplicate,
     nodes_info,
     nodes_list,
     nodes_parent,
     nodes_rename,
-    nodes_list,
-    nodes_rename,
 )
-
 from maya_mcp.tools.scene import scene_info, scene_new, scene_open, scene_redo, scene_undo
 from maya_mcp.tools.selection import selection_clear, selection_get, selection_set
 
@@ -371,6 +370,7 @@ def tool_nodes_delete(
     """
     return nodes_delete(nodes=nodes, hierarchy=hierarchy)
 
+
 @mcp.tool(
     name="nodes.rename",
     description="Rename one or more nodes in the Maya scene.",
@@ -393,6 +393,7 @@ def tool_nodes_rename(
         Dictionary with renamed list and errors (if any nodes failed).
     """
     return nodes_rename(mapping=mapping)
+
 
 @mcp.tool(
     name="nodes.parent",
@@ -434,7 +435,9 @@ def tool_nodes_parent(
 )
 def tool_nodes_duplicate(
     nodes: Annotated[list[str], "Nodes to duplicate"],
-    name: Annotated[str | None, "Name for the new node (only valid when duplicating single node)"] = None,
+    name: Annotated[
+        str | None, "Name for the new node (only valid when duplicating single node)"
+    ] = None,
     input_connections: Annotated[bool, "Duplicate input connections"] = False,
     upstream_nodes: Annotated[bool, "Duplicate upstream nodes"] = False,
     parent_only: Annotated[bool, "Duplicate only the specified node, not its children"] = False,
@@ -458,8 +461,6 @@ def tool_nodes_duplicate(
         upstream_nodes=upstream_nodes,
         parent_only=parent_only,
     )
-
-
 
 
 @mcp.tool(
