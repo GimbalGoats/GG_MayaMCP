@@ -305,7 +305,21 @@ class CommandPortClient:
             # Set command timeout
             self._socket.settimeout(self.config.command_timeout)
 
-            # Send command
+            # Wrap multi-line commands in exec() to ensure they run as a single block
+            # This prevents "unexpected EOF" errors for complex logic sent via commandPort
+            command = command.strip()
+            if "\n" in command and not command.startswith("exec("):
+                # Flatten the command into a single line string literal with escaped newlines
+                # This ensures Maya receives it as a complete statement
+                safe_command = (
+                    command.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+                )
+                command = f'exec("{safe_command}")'
+
+            # Maya commandPort requires a newline to execute the command
+            if not command.endswith("\n"):
+                command += "\n"
+
             command_bytes = command.encode("utf-8")
             self._socket.sendall(command_bytes)
 

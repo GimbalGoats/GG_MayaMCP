@@ -37,7 +37,15 @@ from maya_mcp.tools.nodes import (
     nodes_parent,
     nodes_rename,
 )
-from maya_mcp.tools.scene import scene_info, scene_new, scene_open, scene_redo, scene_undo
+from maya_mcp.tools.scene import (
+    scene_info,
+    scene_new,
+    scene_open,
+    scene_redo,
+    scene_save,
+    scene_save_as,
+    scene_undo,
+)
 from maya_mcp.tools.selection import selection_clear, selection_get, selection_set
 
 # Create the FastMCP server instance
@@ -52,6 +60,8 @@ Available tools:
 - scene.info: Get current scene information (file path, FPS, frame range, etc.)
 - scene.new: Create a new empty scene (checks for unsaved changes first)
 - scene.open: Open a scene file (validates path and checks for unsaved changes)
+- scene.save: Save the current scene (fails if untitled)
+- scene.save_as: Save scene to a new path (.ma or .mb)
 - scene.undo: Undo the last operation (critical for error recovery)
 - scene.redo: Redo the last undone operation
 - nodes.list: List nodes by type or pattern
@@ -199,6 +209,54 @@ def tool_scene_new(
         Dictionary with success, previous_file, was_modified, and error.
     """
     return scene_new(force=force)
+
+
+@mcp.tool(
+    name="scene.save",
+    description="Save the current scene. "
+    "Saves to the current file path. Fails if the scene is untitled.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_scene_save() -> dict[str, Any]:
+    """Save the current Maya scene.
+
+    Returns:
+        Dictionary with success, file_path, and error.
+    """
+    return scene_save()
+
+
+@mcp.tool(
+    name="scene.save_as",
+    description="Save the scene to a new file path. "
+    "Validates the path and saves as Maya ASCII or Binary based on extension.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_scene_save_as(
+    file_path: Annotated[
+        str,
+        "Absolute or relative path to save the scene to (.ma or .mb)",
+    ],
+) -> dict[str, Any]:
+    """Save the scene to a new file path.
+
+    Args:
+        file_path: Path to save the scene to.
+
+    Returns:
+        Dictionary with success, file_path, and error.
+    """
+    return scene_save_as(file_path=file_path)
 
 
 @mcp.tool(
