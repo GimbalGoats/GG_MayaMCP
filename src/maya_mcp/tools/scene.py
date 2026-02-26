@@ -11,6 +11,7 @@ from typing import Any
 from maya_mcp.errors import ValidationError
 from maya_mcp.transport import get_client
 from maya_mcp.utils.parsing import parse_json_response
+from maya_mcp.utils.response_guard import guard_response_size
 
 # Mapping of Maya time units to FPS values
 TIME_UNIT_TO_FPS: dict[str, float] = {
@@ -67,6 +68,27 @@ TIME_UNIT_TO_FPS: dict[str, float] = {
 }
 
 ALLOWED_SCENE_EXTENSIONS: tuple[str, ...] = (".ma", ".mb")
+ALLOWED_IMPORT_EXTENSIONS: tuple[str, ...] = (
+    ".ma",
+    ".mb",
+    ".obj",
+    ".fbx",
+    ".abc",
+    ".usd",
+    ".usda",
+    ".usdc",
+    ".usdz",
+)
+ALLOWED_EXPORT_EXTENSIONS: tuple[str, ...] = (
+    ".ma",
+    ".mb",
+    ".obj",
+    ".fbx",
+    ".abc",
+    ".usd",
+    ".usda",
+    ".usdc",
+)
 FORBIDDEN_PATH_CHARACTERS: str = ";|&$`"
 
 
@@ -631,5 +653,311 @@ print(json.dumps(result))
     return {
         "success": data.get("success", False),
         "file_path": data.get("file_path"),
+        "error": data.get("error"),
+    }
+
+
+def _validate_file_path(file_path: str, allowed_extensions: tuple[str, ...]) -> str:
+    """Validate a file path for security and extension.
+
+    Args:
+        file_path: The file path to validate.
+        allowed_extensions: Tuple of allowed file extensions (lowercase, with dot).
+
+    Returns:
+        The normalized file path.
+
+    Raises:
+        ValidationError: If the file path is invalid.
+    """
+    normalized_file_path = file_path.strip()
+
+    if not normalized_file_path:
+        raise ValidationError(
+            message="File path must not be empty.",
+            field_name="file_path",
+            value="",
+            constraint="non-empty string",
+        )
+
+    for ch in FORBIDDEN_PATH_CHARACTERS:
+        if ch in normalized_file_path:
+            raise ValidationError(
+                message=f"File path contains forbidden character: {ch!r}",
+                field_name="file_path",
+                value=normalized_file_path,
+                constraint="no shell metacharacters",
+            )
+
+    if any(ord(ch) < 32 for ch in normalized_file_path):
+        raise ValidationError(
+            message="File path contains forbidden control characters.",
+            field_name="file_path",
+            value=normalized_file_path,
+            constraint="printable path string",
+        )
+
+    lower_path = normalized_file_path.lower()
+    if not lower_path.endswith(allowed_extensions):
+        raise ValidationError(
+            message=f"Unsupported file extension. Allowed: {', '.join(allowed_extensions)}",
+            field_name="file_path",
+            value=normalized_file_path,
+            constraint="supported file extension",
+        )
+
+    return normalized_file_path
+
+
+def scene_import(
+    file_path: str,
+    namespace: str | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
+    """Import a file into the current Maya scene.
+
+    Imports geometry, animation, or other scene data from an external file.
+    Supports multiple formats including Maya scenes, OBJ, FBX, Alembic, and USD.
+
+    The file path is validated before being sent to Maya:
+    - Must not be empty
+    - Must not contain shell metacharacters (``;|&$``` etc.)
+    - Must end with a supported extension
+    - The file must exist on disk (verified inside Maya)
+
+    **Token Protection**: Returns only top-level parent transforms of imported
+    nodes, not all descendants. This prevents token budget explosion when
+    importing complex assets.
+
+    Args:
+        file_path: Absolute or relative path to the file to import.
+            Supported extensions: ``.ma``, ``.mb``, ``.obj``, ``.fbx``, ``.abc``,
+            ``.usd``, ``.usda``, ``.usdc``, ``.usdz``.
+        namespace: Namespace behavior:
+            - ``None`` (default): Import without namespace
+            - ``""`` (empty string): Auto-generate namespace from filename
+            - ``"myNs"``: Use specified namespace
+        force: If True, replace existing namespace contents. If False (default),
+            merge with existing namespace.
+
+    Returns:
+        Dictionary with import result:
+            - success: Whether the file was imported
+            - file_path: The imported file path
+            - nodes: List of top-level parent transforms created by import
+            - count: Number of top-level nodes returned
+            - error: Error message if the operation failed, or None
+
+    Raises:
+        ValidationError: If the file path is invalid or contains dangerous
+            characters.
+        MayaUnavailableError: If not connected to Maya.
+        MayaCommandError: If Maya command execution fails.
+
+    Example:
+        >>> result = scene_import("/assets/character.fbx", namespace="char")
+        >>> if result['success']:
+        ...     print(f"Imported {result['count']} top-level nodes")
+    """
+    normalized_file_path = _validate_file_path(file_path, ALLOWED_IMPORT_EXTENSIONS)
+
+    client = get_client()
+
+    safe_path = normalized_file_path.replace("\\", "/")
+    path_literal = json.dumps(safe_path)
+
+    namespace_literal = "None" if namespace is None else json.dumps(namespace)
+    force_py = str(json.loads("true" if force else "false"))
+
+    command = f"""
+import maya.cmds as cmds
+import json
+import os
+
+file_path = {path_literal}
+namespace = {namespace_literal}
+force = {force_py}
+
+result = {{"success": False, "file_path": None, "nodes": [], "count": 0, "error": None}}
+
+if not os.path.isfile(file_path):
+    result["error"] = "File not found: " + file_path
+    print(json.dumps(result))
+else:
+    try:
+        before_nodes = set(cmds.ls(long=True, transforms=True) or [])
+
+        import_kwargs = {{"i": True, "returnNewNodes": True}}
+
+        if namespace is None:
+            import_kwargs["namespace"] = ":"
+        elif namespace == "":
+            pass
+        else:
+            import_kwargs["namespace"] = namespace
+            if force:
+                import_kwargs["ra"] = True
+
+        new_nodes = cmds.file(file_path, **import_kwargs) or []
+
+        after_nodes = set(cmds.ls(long=True, transforms=True) or [])
+        created_transforms = after_nodes - before_nodes
+
+        top_level = []
+        for node in created_transforms:
+            parent = cmds.listRelatives(node, parent=True, fullPath=True)
+            if not parent or parent[0] not in created_transforms:
+                short_name = node.split("|")[-1]
+                top_level.append(short_name)
+
+        result["success"] = True
+        result["file_path"] = file_path
+        result["nodes"] = top_level
+        result["count"] = len(top_level)
+
+    except Exception as e:
+        result["error"] = str(e)
+
+    print(json.dumps(result))
+"""
+
+    response = client.execute(command)
+    data = parse_json_response(response)
+
+    result = {
+        "success": data.get("success", False),
+        "file_path": data.get("file_path"),
+        "nodes": data.get("nodes", []),
+        "count": data.get("count", 0),
+        "error": data.get("error"),
+    }
+
+    result = guard_response_size(result, list_key="nodes")
+
+    return result
+
+
+def scene_export(
+    file_path: str,
+    export_mode: str = "selected",
+    animation: bool = False,
+) -> dict[str, Any]:
+    """Export scene content to a file.
+
+    Exports the current selection or the entire scene to an external file format.
+    Supports multiple formats including Maya scenes, OBJ, FBX, Alembic, and USD.
+
+    The file path is validated before being sent to Maya:
+    - Must not be empty
+    - Must not contain shell metacharacters (``;|&$``` etc.)
+    - Must end with a supported extension
+
+    Args:
+        file_path: Absolute or relative path for the exported file.
+            Supported extensions: ``.ma``, ``.mb``, ``.obj``, ``.fbx``, ``.abc``,
+            ``.usd``, ``.usda``, ``.usdc``.
+        export_mode: What to export:
+            - ``"selected"`` (default): Export currently selected nodes
+            - ``"all"``: Export entire scene
+        animation: If True, include animation data in export (FBX only).
+            If False (default), export static geometry only.
+
+    Returns:
+        Dictionary with export result:
+            - success: Whether the file was exported
+            - file_path: The exported file path
+            - nodes_exported: Number of nodes exported (approximate)
+            - error: Error message if the operation failed, or None
+
+    Raises:
+        ValidationError: If the file path is invalid or contains dangerous
+            characters, or if export_mode is invalid.
+        MayaUnavailableError: If not connected to Maya.
+        MayaCommandError: If Maya command execution fails.
+
+    Example:
+        >>> result = scene_export("/output/asset.fbx", animation=True)
+        >>> if result['success']:
+        ...     print(f"Exported to: {result['file_path']}")
+    """
+    if export_mode not in ("selected", "all"):
+        raise ValidationError(
+            message=f"Invalid export_mode: {export_mode!r}. Must be 'selected' or 'all'.",
+            field_name="export_mode",
+            value=export_mode,
+            constraint="'selected' or 'all'",
+        )
+
+    normalized_file_path = _validate_file_path(file_path, ALLOWED_EXPORT_EXTENSIONS)
+
+    client = get_client()
+
+    safe_path = normalized_file_path.replace("\\", "/")
+    path_literal = json.dumps(safe_path)
+
+    animation_py = str(json.loads("true" if animation else "false"))
+
+    command = f"""
+import maya.cmds as cmds
+import json
+import os
+
+file_path = {path_literal}
+export_mode = {json.dumps(export_mode)}
+animation = {animation_py}
+
+result = {{"success": False, "file_path": None, "nodes_exported": 0, "error": None}}
+
+try:
+    ext = os.path.splitext(file_path)[1].lower()
+
+    export_all = (export_mode == "all")
+    export_selected = (export_mode == "selected")
+
+    if export_selected:
+        selection = cmds.ls(selection=True, long=True) or []
+        if not selection:
+            result["error"] = "Nothing selected. Select nodes to export, or use export_mode='all'."
+        else:
+            result["nodes_exported"] = len(selection)
+
+    if result["error"] is None:
+        export_kwargs = {{}}
+
+        if ext == ".ma":
+            export_kwargs["type"] = "mayaAscii"
+        elif ext == ".mb":
+            export_kwargs["type"] = "mayaBinary"
+        elif ext == ".obj":
+            export_kwargs["type"] = "OBJexport"
+        elif ext == ".fbx":
+            if animation:
+                cmds.bakeResults(simulation=True)
+        elif ext == ".abc":
+            export_kwargs["type"] = "Alembic"
+        elif ext in (".usd", ".usda", ".usdc"):
+            export_kwargs["type"] = "USD Export"
+
+        if export_all:
+            exported = cmds.file(file_path, exportAll=True, force=True, **export_kwargs)
+        else:
+            exported = cmds.file(file_path, exportSelected=True, force=True, **export_kwargs)
+
+        result["success"] = True
+        result["file_path"] = file_path
+
+except Exception as e:
+    result["error"] = str(e)
+
+print(json.dumps(result))
+"""
+
+    response = client.execute(command)
+    data = parse_json_response(response)
+
+    return {
+        "success": data.get("success", False),
+        "file_path": data.get("file_path"),
+        "nodes_exported": data.get("nodes_exported", 0),
         "error": data.get("error"),
     }

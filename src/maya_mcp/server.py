@@ -38,6 +38,8 @@ from maya_mcp.tools.nodes import (
     nodes_rename,
 )
 from maya_mcp.tools.scene import (
+    scene_export,
+    scene_import,
     scene_info,
     scene_new,
     scene_open,
@@ -62,6 +64,8 @@ Available tools:
 - scene.open: Open a scene file (validates path and checks for unsaved changes)
 - scene.save: Save the current scene (fails if untitled)
 - scene.save_as: Save scene to a new path (.ma or .mb)
+- scene.import: Import a file into the current scene (.ma, .mb, .obj, .fbx, .abc, .usd)
+- scene.export: Export selection or entire scene to a file
 - scene.undo: Undo the last operation (critical for error recovery)
 - scene.redo: Redo the last undone operation
 - nodes.list: List nodes by type or pattern
@@ -83,6 +87,8 @@ Workflow tips:
 - Use nodes.info(info_category="transform") instead of multiple attributes.get calls
 - Use nodes.info(info_category="all") to get everything about a node at once
 - Use scene.new(force=True) to discard unsaved changes, or check the error message first
+- Use scene.import with namespace to organize imported assets
+- Use scene.export(export_mode="all") to export the entire scene
 
 Before using Maya tools, ensure Maya is running with commandPort enabled:
     import maya.cmds as cmds
@@ -331,6 +337,88 @@ def tool_scene_redo() -> dict[str, Any]:
     of further undo/redo operations.
     """
     return scene_redo()
+
+
+@mcp.tool(
+    name="scene.import",
+    description="Import a file into the current Maya scene. "
+    "Supports multiple formats (.ma, .mb, .obj, .fbx, .abc, .usd, .usda, .usdc, .usdz). "
+    "Returns only top-level parent transforms to protect token budget.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_scene_import(
+    file_path: Annotated[
+        str,
+        "Path to the file to import (.ma, .mb, .obj, .fbx, .abc, .usd, .usda, .usdc, .usdz)",
+    ],
+    namespace: Annotated[
+        str | None,
+        "Namespace behavior: None = no namespace, '' = auto-generate, 'name' = use specified",
+    ] = None,
+    force: Annotated[
+        bool,
+        "If True, replace existing namespace contents. If False (default), merge.",
+    ] = False,
+) -> dict[str, Any]:
+    """Import a file into the current Maya scene.
+
+    Args:
+        file_path: Path to the file to import.
+        namespace: Namespace behavior:
+            - None (default): Import without namespace
+            - "": Auto-generate namespace from filename
+            - "myNs": Use specified namespace
+        force: If True, replace existing namespace contents.
+
+    Returns:
+        Dictionary with success, file_path, nodes (top-level parents),
+        count, and error.
+    """
+    return scene_import(file_path=file_path, namespace=namespace, force=force)
+
+
+@mcp.tool(
+    name="scene.export",
+    description="Export scene content to a file. "
+    "Export selected nodes or entire scene. "
+    "Supports multiple formats (.ma, .mb, .obj, .fbx, .abc, .usd, .usda, .usdc).",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_scene_export(
+    file_path: Annotated[
+        str,
+        "Path for the exported file (.ma, .mb, .obj, .fbx, .abc, .usd, .usda, .usdc)",
+    ],
+    export_mode: Annotated[
+        Literal["selected", "all"],
+        "What to export: 'selected' (default) or 'all'",
+    ] = "selected",
+    animation: Annotated[
+        bool,
+        "If True, include animation data (FBX only). If False (default), export static.",
+    ] = False,
+) -> dict[str, Any]:
+    """Export scene content to a file.
+
+    Args:
+        file_path: Path for the exported file.
+        export_mode: 'selected' to export selection, 'all' for entire scene.
+        animation: Include animation data (FBX only).
+
+    Returns:
+        Dictionary with success, file_path, nodes_exported, and error.
+    """
+    return scene_export(file_path=file_path, export_mode=export_mode, animation=animation)
 
 
 # Register node tools

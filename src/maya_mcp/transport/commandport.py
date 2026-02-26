@@ -57,6 +57,10 @@ def _parse_maya_response(raw_response: str) -> str:
 
         'None\\n\\x00<actual_output>\\n\\x00\\n\\n\\x00'
 
+    With echoOutput=True, Maya may echo the output twice, resulting in::
+
+        '{"success": true}\\n{"success": true}'
+
     Some Maya commands (e.g. ``cmds.file()``) produce their own output before
     our ``print(json.dumps(result))`` statement.  In those cases the response
     contains multiple non-empty parts and the JSON payload may not be the first
@@ -64,9 +68,11 @@ def _parse_maya_response(raw_response: str) -> str:
 
     Strategy:
         1. Split by null bytes / newlines, strip whitespace, drop empty / "None".
-        2. Prefer the **last** part that looks like JSON (starts with ``{`` or ``[``),
-           because our ``print(json.dumps(...))`` is always the final statement.
-        3. Fall back to the first non-empty part for non-JSON responses.
+        2. Find all JSON-like parts (start with ``{`` or ``[``).
+        3. If multiple identical JSON parts exist (echoOutput duplication), return one.
+        4. Prefer the **last** unique JSON part, because our ``print(json.dumps(...))``
+           is always the final statement.
+        5. Fall back to the first non-empty part for non-JSON responses.
 
     Args:
         raw_response: Raw response string from Maya commandPort.
@@ -79,6 +85,8 @@ def _parse_maya_response(raw_response: str) -> str:
         '{"test": 1}'
         >>> _parse_maya_response('None\\n\\x00\\n\\x00{"ok": true}\\n\\x00')
         '{"ok": true}'
+        >>> _parse_maya_response('{"success": true}\\n{"success": true}')
+        '{"success": true}'
     """
     if not raw_response:
         return ""
@@ -92,10 +100,17 @@ def _parse_maya_response(raw_response: str) -> str:
     if not filtered:
         return ""
 
-    # Prefer the last JSON-like part (our print(json.dumps(...)) is always last)
-    for part in reversed(filtered):
-        if part.startswith(("{", "[")):
-            return part
+    # Find all JSON-like parts
+    json_parts = [p for p in filtered if p.startswith(("{", "["))]
+
+    if json_parts:
+        # Deduplicate: if all JSON parts are identical, return just one
+        # This handles echoOutput duplication
+        unique_json = list(dict.fromkeys(json_parts))  # Preserve order, remove dups
+        if len(unique_json) == 1:
+            return unique_json[0]
+        # If different, return the last one (our print is always last)
+        return unique_json[-1]
 
     # Fall back to the first non-empty part for non-JSON responses
     return filtered[0]
@@ -305,16 +320,8 @@ class CommandPortClient:
             # Set command timeout
             self._socket.settimeout(self.config.command_timeout)
 
-            # Wrap multi-line commands in exec() to ensure they run as a single block
-            # This prevents "unexpected EOF" errors for complex logic sent via commandPort
+            # Prepare command
             command = command.strip()
-            if "\n" in command and not command.startswith("exec("):
-                # Flatten the command into a single line string literal with escaped newlines
-                # This ensures Maya receives it as a complete statement
-                safe_command = (
-                    command.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
-                )
-                command = f'exec("{safe_command}")'
 
             # Maya commandPort requires a newline to execute the command
             if not command.endswith("\n"):
@@ -323,15 +330,16 @@ class CommandPortClient:
             command_bytes = command.encode("utf-8")
             self._socket.sendall(command_bytes)
 
-            # Small delay to allow Maya to process
-            time.sleep(0.05)
+            # Wait for Maya to process and respond
+            # Maya's commandPort can be slow to respond, especially for file operations
+            time.sleep(0.2)
 
             # Receive response
             response_parts: list[bytes] = []
             while True:
                 try:
-                    # Use a short timeout for subsequent reads
-                    self._socket.settimeout(0.1)
+                    # Use a longer timeout for reading - Maya can be slow
+                    self._socket.settimeout(1.0)
                     chunk = self._socket.recv(BUFFER_SIZE)
                     if not chunk:
                         break
