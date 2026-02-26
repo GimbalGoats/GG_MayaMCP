@@ -44,8 +44,25 @@ def _validate_plug_name(plug: str) -> None:
     """
     if not plug or not isinstance(plug, str):
         raise ValueError(f"Invalid plug name: {plug}")
+    if "." not in plug:
+        raise ValueError(f"Invalid plug format: '{plug}'. Expected 'node.attribute'")
     if any(c in plug for c in FORBIDDEN_CHARS):
         raise ValueError(f"Invalid characters in plug name: {plug}")
+
+
+def _validate_attribute_name(attr: str) -> None:
+    """Validate an attribute name for security.
+
+    Args:
+        attr: The attribute name to validate.
+
+    Raises:
+        ValueError: If the attribute name is invalid or contains forbidden characters.
+    """
+    if not attr or not isinstance(attr, str):
+        raise ValueError(f"Invalid attribute name: {attr}")
+    if any(c in attr for c in FORBIDDEN_CHARS):
+        raise ValueError(f"Invalid characters in attribute name: {attr}")
 
 
 def connections_list(
@@ -224,7 +241,7 @@ def connections_get(
     _validate_node_name(node)
     if attributes:
         for attr in attributes:
-            _validate_plug_name(attr)
+            _validate_attribute_name(attr)
 
     client = get_client()
 
@@ -624,47 +641,33 @@ result = {{"node": node, "history": [], "errors": {{}}}}
 if not cmds.objExists(node):
     result["errors"]["_node"] = f"Node '{{node}}' does not exist"
 else:
-    visited = set()
     all_history = []
 
-    def traverse(current_node, current_depth, trav_direction):
-        if current_depth > max_depth:
-            return
-        if current_node in visited:
-            return
+    # Get upstream (input) history
+    if direction in ("input", "both"):
+        upstream = cmds.listHistory(node, future=False, levels=max_depth, pruneDagObjects=True) or []
+        for i, hist_node in enumerate(upstream):
+            if hist_node != node:
+                all_history.append({{
+                    "name": hist_node,
+                    "type": cmds.nodeType(hist_node),
+                    "depth": i + 1,
+                    "direction": "input"
+                }})
 
-        visited.add(current_node)
+    # Get downstream (output) history
+    if direction in ("output", "both"):
+        downstream = cmds.listHistory(node, future=True, levels=max_depth, pruneDagObjects=True) or []
+        for i, hist_node in enumerate(downstream):
+            if hist_node != node:
+                all_history.append({{
+                    "name": hist_node,
+                    "type": cmds.nodeType(hist_node),
+                    "depth": i + 1,
+                    "direction": "output"
+                }})
 
-        # Get connections based on direction
-        if trav_direction in ("input", "both"):
-            upstream = cmds.listHistory(current_node, future=False, pruneDagObjects=True) or []
-            for up_node in upstream:
-                if up_node not in visited:
-                    node_type = cmds.nodeType(up_node)
-                    all_history.append({{
-                        "name": up_node,
-                        "type": node_type,
-                        "depth": current_depth,
-                        "direction": "input"
-                    }})
-                    traverse(up_node, current_depth + 1, trav_direction)
-
-        if trav_direction in ("output", "both"):
-            downstream = cmds.listHistory(current_node, future=True, pruneDagObjects=True) or []
-            for down_node in downstream:
-                if down_node not in visited:
-                    node_type = cmds.nodeType(down_node)
-                    all_history.append({{
-                        "name": down_node,
-                        "type": node_type,
-                        "depth": current_depth,
-                        "direction": "output"
-                    }})
-                    traverse(down_node, current_depth + 1, trav_direction)
-
-    traverse(node, 1, direction)
-
-    # Sort by depth, then by name for consistent ordering
+    # Sort by depth, then by name
     all_history.sort(key=lambda x: (x["depth"], x["name"]))
 
     total_count = len(all_history)
