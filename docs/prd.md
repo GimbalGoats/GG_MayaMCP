@@ -429,6 +429,61 @@ Document common rigging workflows to inform future tool design. **No implementat
 
 ---
 
+### M13: Custom Script Execution 📋
+
+**Goal**: Enable AI clients to discover and execute user-provided Python scripts inside Maya, with a three-tier trust model balancing usability and security.
+
+**Design Principle**: Scripts are the escape hatch for workflows that don't have dedicated tools yet. Rather than blocking all code execution (too restrictive) or allowing arbitrary code (too dangerous), Maya MCP uses a layered trust model where each tier requires explicit opt-in.
+
+#### Three-Tier Trust Model
+
+| Tier | Tool | Risk Level | Config Required | Description |
+|------|------|------------|-----------------|-------------|
+| 1 | `script.list` | Read-only | `MAYA_MCP_SCRIPT_DIRS` | Catalog available scripts from allowlisted directories |
+| 2 | `script.execute` | Medium | `MAYA_MCP_SCRIPT_DIRS` | Execute pre-approved `.py` files from allowlisted directories |
+| 3 | `script.run` | High | `MAYA_MCP_ENABLE_RAW_EXECUTION=true` | Execute raw Python code (opt-in, disabled by default) |
+
+#### Tools
+
+**Namespace**: `script.*`
+
+| ID | Feature | Description | Effort |
+|----|---------|-------------|--------|
+| M13.1 | `script.list` | List `.py` scripts recursively from `MAYA_MCP_SCRIPT_DIRS` directories. Returns name + path. Server-side only (no Maya needed). | Low |
+| M13.2 | `script.execute` | Execute a script file inside Maya. Path validated against allowlisted dirs. Supports passing arguments via `__args__` dict. Returns success/output/error. | Medium |
+| M13.3 | `script.run` | Execute raw Python code inside Maya. Disabled by default. Code validated for size limits. Returns success/output/error. | Medium |
+
+#### Configuration (env vars only — no config files)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MAYA_MCP_SCRIPT_DIRS` | `""` (empty) | Semicolon-separated list of absolute directory paths to scan for scripts |
+| `MAYA_MCP_ENABLE_RAW_EXECUTION` | `false` | Set to `true` or `1` to enable `script.run` |
+| `MAYA_MCP_SCRIPT_TIMEOUT` | `60.0` | Timeout in seconds for script execution |
+
+#### Security Requirements
+
+- All script file paths validated against allowlisted directories (no traversal, no symlink escape)
+- Forbidden shell metacharacters (`;|&$\``) rejected in paths
+- Windows device names (`CON`, `NUL`, `COM1`, etc.) rejected
+- UNC paths and alternate data streams rejected
+- Script file size capped (1 MB max)
+- Raw code size capped (100 KB max)
+- `script.run` disabled by default — explicit opt-in via env var
+- No command blocklists/allowlists for raw code — the config flag IS the guardrail
+- Stdout captured and returned; errors surfaced as structured data
+- Output subject to existing 50KB response size guard
+
+#### Implementation Notes
+
+- `ScriptConfig` dataclass loaded from env vars (frozen, validated)
+- Script validation utilities in `utils/script_validation.py`
+- Tool functions in `tools/scripts.py` following existing tool patterns
+- Tools registered in `server.py` with proper MCP annotations
+- All code must pass `mypy --strict`, `ruff`, and have full test coverage with mocked transport
+
+---
+
 ## Milestone Priority
 
 ```
@@ -439,7 +494,7 @@ M0 ✅ ─► M1 ✅ ─► M2 ✅ ─► M3 🚧 ─► M4 🚧 ─► M5 📋 
                               (3/4)
 
 After M5:
-M5 📋 ─► M7 📋 ─► M8 📋 ─► M9 📋 ─► M10 📋 ─► M11 📋 ─► M12 📋
+M5 📋 ─► M7 📋 ─► M8 📋 ─► M9 📋 ─► M10 📋 ─► M11 📋 ─► M12 📋 ─► M13 📋
 ```
 
 | Priority | Milestone | Rationale |
@@ -456,6 +511,7 @@ M5 📋 ─► M7 📋 ─► M8 📋 ─► M9 📋 ─► M10 📋 ─► M11 
 | 10 | M10 (Constraints) | Core rigging and animation workflow |
 | 11 | M11 (Mesh Operations & Component Selection) | Targeted editing and QA workflows |
 | 12 | M12 (Materials & Shading) | Basic shading; lower priority than geometry workflows |
+| 13 | M13 (Custom Script Execution) | Escape hatch for workflows without dedicated tools; three-tier trust model |
 
 ---
 

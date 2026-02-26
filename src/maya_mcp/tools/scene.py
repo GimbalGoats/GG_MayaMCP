@@ -467,3 +467,169 @@ print(json.dumps(result))
         "can_undo": data.get("can_undo", False),
         "can_redo": data.get("can_redo", False),
     }
+
+
+def scene_save() -> dict[str, Any]:
+    """Save the current Maya scene.
+
+    Saves the currently open scene file. If the scene is untitled (never saved),
+    the operation is rejected with an error instructing to use ``scene.save_as``.
+
+    Returns:
+        Dictionary with save result:
+            - success: Whether the scene was saved
+            - file_path: The saved file path (or None if failed)
+            - error: Error message if the operation failed, or None
+
+    Raises:
+        MayaUnavailableError: If not connected to Maya.
+        MayaCommandError: If Maya command execution fails.
+
+    Example:
+        >>> result = scene_save()
+        >>> if result['success']:
+        ...     print(f"Saved: {result['file_path']}")
+    """
+    client = get_client()
+
+    command = """
+import maya.cmds as cmds
+import json
+
+result = {"success": False, "file_path": None, "error": None}
+
+scene_name = cmds.file(query=True, sceneName=True)
+
+if not scene_name:
+    result["error"] = "Scene is untitled. Use scene.save_as to save for the first time."
+else:
+    try:
+        # Save the file
+        new_name = cmds.file(save=True)
+        result["success"] = True
+        result["file_path"] = new_name
+    except Exception as e:
+        result["error"] = str(e)
+
+print(json.dumps(result))
+"""
+
+    response = client.execute(command)
+
+    data = parse_json_response(response)
+
+    return {
+        "success": data.get("success", False),
+        "file_path": data.get("file_path"),
+        "error": data.get("error"),
+    }
+
+
+def scene_save_as(file_path: str) -> dict[str, Any]:
+    """Save the current scene to a new file path.
+
+    Renames the current scene and saves it to the specified path.
+    If the file extension is ``.ma``, it saves as Maya ASCII.
+    If the file extension is ``.mb``, it saves as Maya Binary.
+
+    The file path is validated before being sent to Maya:
+    - Must not be empty
+    - Must not contain shell metacharacters
+    - Must end with a supported Maya file extension (``.ma``, ``.mb``)
+
+    Args:
+        file_path: Absolute or relative path to save the scene to.
+
+    Returns:
+        Dictionary with save result:
+            - success: Whether the scene was saved
+            - file_path: The new file path (or None if failed)
+            - error: Error message if the operation failed, or None
+
+    Raises:
+        ValidationError: If the file path is invalid.
+        MayaUnavailableError: If not connected to Maya.
+        MayaCommandError: If Maya command execution fails.
+
+    Example:
+        >>> result = scene_save_as("/path/to/new_scene.ma")
+        >>> if result['success']:
+        ...     print(f"Saved as: {result['file_path']}")
+    """
+    # --- Server-side validation ---
+    normalized_file_path = file_path.strip()
+
+    if not normalized_file_path:
+        raise ValidationError(
+            message="File path must not be empty.",
+            field_name="file_path",
+            value="",
+            constraint="non-empty string",
+        )
+
+    # Reject shell metacharacters (security)
+    for ch in FORBIDDEN_PATH_CHARACTERS:
+        if ch in normalized_file_path:
+            raise ValidationError(
+                message=f"File path contains forbidden character: {ch!r}",
+                field_name="file_path",
+                value=normalized_file_path,
+                constraint="no shell metacharacters",
+            )
+
+    # Reject control characters
+    if any(ord(ch) < 32 for ch in normalized_file_path):
+        raise ValidationError(
+            message="File path contains forbidden control characters.",
+            field_name="file_path",
+            value=normalized_file_path,
+            constraint="printable path string",
+        )
+
+    # Validate file extension
+    lower_path = normalized_file_path.lower()
+    if not lower_path.endswith(ALLOWED_SCENE_EXTENSIONS):
+        raise ValidationError(
+            message=(f"Unsupported file extension. Allowed: {', '.join(ALLOWED_SCENE_EXTENSIONS)}"),
+            field_name="file_path",
+            value=normalized_file_path,
+            constraint="supported Maya file extension",
+        )
+
+    client = get_client()
+
+    # Normalize slashes and embed safely
+    safe_path = normalized_file_path.replace("\\", "/")
+    path_literal = json.dumps(safe_path)
+
+    command = f"""
+import maya.cmds as cmds
+import json
+
+file_path = {path_literal}
+result = {{"success": False, "file_path": None, "error": None}}
+
+# Determine file type based on extension
+file_type = "mayaAscii" if file_path.lower().endswith(".ma") else "mayaBinary"
+
+try:
+    # Rename and save
+    cmds.file(rename=file_path)
+    new_name = cmds.file(save=True, type=file_type)
+    result["success"] = True
+    result["file_path"] = new_name
+except Exception as e:
+    result["error"] = str(e)
+
+print(json.dumps(result))
+"""
+
+    response = client.execute(command)
+
+    data = parse_json_response(response)
+
+    return {
+        "success": data.get("success", False),
+        "file_path": data.get("file_path"),
+        "error": data.get("error"),
+    }

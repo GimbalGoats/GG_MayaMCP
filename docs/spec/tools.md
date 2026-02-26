@@ -379,6 +379,88 @@ Checks whether the current scene has unsaved changes before proceeding. When `fo
 
 ---
 
+### `scene.save`
+
+Save the current Maya scene.
+
+Saves the currently open scene file. If the scene is untitled (never saved), the operation is rejected with an error instructing to use `scene.save_as`.
+
+**Input**: None
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | `boolean` | Whether the scene was saved |
+| `file_path` | `string \| null` | The saved file path (or None if failed) |
+| `error` | `string \| null` | Error message if the operation failed, or null |
+
+**Example Response (Success)**:
+
+```json
+{
+  "success": true,
+  "file_path": "C:/projects/myScene.ma",
+  "error": null
+}
+```
+
+**Example Response (Untitled Error)**:
+
+```json
+{
+  "success": false,
+  "file_path": null,
+  "error": "Scene is untitled. Use scene.save_as to save for the first time."
+}
+```
+
+---
+
+### `scene.save_as`
+
+Save the current scene to a new file path.
+
+Renames the current scene and saves it to the specified path. The file type (Maya ASCII or Maya Binary) is inferred from the file extension (`.ma` or `.mb`).
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `file_path` | `string` | Yes | - | Absolute or relative path to save the scene to. Supported extensions: `.ma`, `.mb`. |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | `boolean` | Whether the scene was saved |
+| `file_path` | `string \| null` | The new file path (or None if failed) |
+| `error` | `string \| null` | Error message if the operation failed, or null |
+
+**Example Request**:
+
+```json
+{
+  "file_path": "C:/projects/newScene.ma"
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "success": true,
+  "file_path": "C:/projects/newScene.ma",
+  "error": null
+}
+```
+
+**Security**:
+- File paths are validated for shell metacharacters and control characters
+- Only supported scene extensions are accepted (`.ma`, `.mb`)
+
+---
+
 ## Node Tools
 
 ### `nodes.list`
@@ -1143,6 +1225,8 @@ All tools include MCP annotations to help AI clients understand their behavior a
 | `scene.info` | true | false | true |
 | `scene.new` | false | false | true |
 | `scene.open` | false | false | false |
+| `scene.save` | false | false | false |
+| `scene.save_as` | false | false | false |
 | `scene.undo` | false | false | false |
 | `scene.redo` | false | false | false |
 | `nodes.list` | true | false | true |
