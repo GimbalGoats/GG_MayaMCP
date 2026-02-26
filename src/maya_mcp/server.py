@@ -27,6 +27,13 @@ from mcp.types import ToolAnnotations
 
 from maya_mcp.tools.attributes import attributes_get, attributes_set
 from maya_mcp.tools.connection import maya_connect, maya_disconnect
+from maya_mcp.tools.connections import (
+    connections_connect,
+    connections_disconnect,
+    connections_get,
+    connections_history,
+    connections_list,
+)
 from maya_mcp.tools.health import health_check
 from maya_mcp.tools.nodes import (
     nodes_create,
@@ -78,6 +85,11 @@ Available tools:
   hierarchy, attributes, shape, or all) - use this instead of multiple attribute queries
 - attributes.get: Get attribute values from a node (batch supported)
 - attributes.set: Set attribute values on a node (batch supported)
+- connections.list: List connections on a node with direction/type filters
+- connections.get: Get detailed connection info for specific attributes
+- connections.connect: Connect two attributes (with optional force disconnect)
+- connections.disconnect: Disconnect attributes (specific or all incoming/outgoing)
+- connections.history: List construction/deformation history on a node
 - selection.get: Get current selection
 - selection.set: Set selection (replace, add, or deselect)
 - selection.clear: Clear the selection (deselect all)
@@ -86,6 +98,8 @@ Workflow tips:
 - Use nodes.info for a quick overview of any node before making changes
 - Use nodes.info(info_category="transform") instead of multiple attributes.get calls
 - Use nodes.info(info_category="all") to get everything about a node at once
+- Use connections.history(direction="input") to find upstream deformers
+- Use connections.connect(force=True) for safe disconnect-before-reconnect pattern
 - Use scene.new(force=True) to discard unsaved changes, or check the error message first
 - Use scene.import with namespace to organize imported assets
 - Use scene.export(export_mode="all") to export the entire scene
@@ -704,6 +718,184 @@ def tool_attributes_set(
         and errors (if any attributes failed).
     """
     return attributes_set(node=node, attributes=attributes)
+
+
+# Register connection tools
+@mcp.tool(
+    name="connections.list",
+    description="List connections on a Maya node with direction and type filters. "
+    "Returns max 500 connections by default to limit response size.",
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_connections_list(
+    node: Annotated[str, "Node name to query connections for"],
+    direction: Annotated[
+        Literal["incoming", "outgoing", "both"],
+        "Filter by direction: incoming, outgoing, or both",
+    ] = "both",
+    connections_type: Annotated[
+        str | None,
+        "Filter by connection type (e.g., 'animCurve', 'shader')",
+    ] = None,
+    limit: Annotated[
+        int | None,
+        "Max connections to return (default 500, use 0 for unlimited)",
+    ] = 500,
+) -> dict[str, Any]:
+    """List connections on a Maya node.
+
+    Args:
+        node: Node name to query.
+        direction: Filter by connection direction.
+        connections_type: Filter by connection type.
+        limit: Max connections to return.
+
+    Returns:
+        Dictionary with connections list, count, and truncation info.
+    """
+    return connections_list(
+        node=node,
+        direction=direction,
+        connections_type=connections_type,
+        limit=limit,
+    )
+
+
+@mcp.tool(
+    name="connections.get",
+    description="Get detailed connection information for specific attributes on a node.",
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_connections_get(
+    node: Annotated[str, "Node name to query"],
+    attributes: Annotated[
+        list[str] | None,
+        "Attribute names to check for connections (None = all connectable attrs)",
+    ] = None,
+) -> dict[str, Any]:
+    """Get connection details for specific attributes.
+
+    Args:
+        node: Node name to query.
+        attributes: List of attribute names to check, or None for all.
+
+    Returns:
+        Dictionary with attribute connection details.
+    """
+    return connections_get(node=node, attributes=attributes)
+
+
+@mcp.tool(
+    name="connections.connect",
+    description="Connect two attributes in Maya. "
+    "Use force=True to disconnect existing connections first.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_connections_connect(
+    source: Annotated[str, "Source plug in 'node.attribute' format"],
+    destination: Annotated[str, "Destination plug in 'node.attribute' format"],
+    force: Annotated[
+        bool,
+        "If True, disconnect existing connections to destination first",
+    ] = False,
+) -> dict[str, Any]:
+    """Connect two attributes.
+
+    Args:
+        source: Source plug (node.attribute).
+        destination: Destination plug (node.attribute).
+        force: Disconnect existing connections first.
+
+    Returns:
+        Dictionary with connection result and any disconnected plugs.
+    """
+    return connections_connect(source=source, destination=destination, force=force)
+
+
+@mcp.tool(
+    name="connections.disconnect",
+    description="Disconnect attributes in Maya. "
+    "Can disconnect a specific connection, all outgoing from a source, "
+    "or all incoming to a destination.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_connections_disconnect(
+    source: Annotated[
+        str | None,
+        "Source plug to disconnect from (None = use destination only)",
+    ] = None,
+    destination: Annotated[
+        str | None,
+        "Destination plug to disconnect from (None = use source only)",
+    ] = None,
+) -> dict[str, Any]:
+    """Disconnect attributes.
+
+    Args:
+        source: Source plug (optional).
+        destination: Destination plug (optional).
+
+    Returns:
+        Dictionary with disconnected connections list.
+    """
+    return connections_disconnect(source=source, destination=destination)
+
+
+@mcp.tool(
+    name="connections.history",
+    description="List construction/deformation history on a node. "
+    "Traverses upstream (input) or downstream (output) dependency graph.",
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_connections_history(
+    node: Annotated[str, "Node name to query history for"],
+    direction: Annotated[
+        Literal["input", "output", "both"],
+        "Direction to traverse: input (upstream), output (downstream), or both",
+    ] = "input",
+    depth: Annotated[int, "Maximum depth to traverse (default 10, max 50)"] = 10,
+    limit: Annotated[
+        int | None,
+        "Max history nodes to return (default 500)",
+    ] = 500,
+) -> dict[str, Any]:
+    """List construction/deformation history.
+
+    Args:
+        node: Node name to query.
+        direction: Direction to traverse.
+        depth: Maximum traversal depth.
+        limit: Max history nodes to return.
+
+    Returns:
+        Dictionary with history nodes list.
+    """
+    return connections_history(node=node, direction=direction, depth=depth, limit=limit)
 
 
 # Register selection tools

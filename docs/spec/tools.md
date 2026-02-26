@@ -1077,6 +1077,338 @@ Set one or more attribute values on a node.
 
 ---
 
+## Connection Tools
+
+### `connections.list`
+
+List connections on a Maya node with direction and type filters.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `node` | `string` | Yes | - | Node name to query connections for |
+| `direction` | `string` | No | `"both"` | Filter by direction: `"incoming"`, `"outgoing"`, or `"both"` |
+| `connections_type` | `string` | No | `null` | Filter by connection type (e.g., `"animCurve"`, `"shader"`) |
+| `limit` | `integer` | No | `500` | Max connections to return. Use 0 for unlimited. |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `node` | `string` | The queried node name |
+| `connections` | `array` | List of connection info objects |
+| `connections[].source` | `string` | Source plug (node.attribute) |
+| `connections[].source_node` | `string` | Source node name |
+| `connections[].source_type` | `string` | Source node type |
+| `connections[].destination` | `string` | Destination plug (node.attribute) |
+| `connections[].destination_node` | `string` | Destination node name |
+| `connections[].destination_type` | `string` | Destination node type |
+| `connections[].direction` | `string` | `"incoming"` or `"outgoing"` |
+| `count` | `integer` | Number of connections returned |
+| `truncated` | `boolean` | True if results were truncated (only if limit hit) |
+| `total_count` | `integer` | Total connections before limit (only if truncated) |
+
+**Example Request**:
+
+```json
+{
+  "node": "pCube1",
+  "direction": "incoming"
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "node": "pCube1",
+  "connections": [
+    {
+      "source": "polyCube1.output",
+      "source_node": "polyCube1",
+      "source_type": "polyCube",
+      "destination": "pCubeShape1.inMesh",
+      "destination_node": "pCubeShape1",
+      "destination_type": "mesh",
+      "direction": "incoming"
+    }
+  ],
+  "count": 1,
+  "errors": null
+}
+```
+
+---
+
+### `connections.get`
+
+Get detailed connection information for specific attributes on a node.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `node` | `string` | Yes | - | Node name to query |
+| `attributes` | `string[]` | No | `null` | Attribute names to check. If null, checks all connectable attributes. |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `node` | `string` | The queried node name |
+| `attributes` | `object` | Map of attribute name to connection info |
+| `attributes[].attribute` | `string` | Attribute name |
+| `attributes[].connected` | `boolean` | Whether the attribute has connections |
+| `attributes[].connections` | `array` | List of connection details |
+| `attributes[].locked` | `boolean` | Whether the attribute is locked |
+| `attributes[].type` | `string` | Attribute type |
+| `count` | `integer` | Number of attributes with connections |
+| `errors` | `object \| null` | Map of attribute to error message |
+
+**Example Request**:
+
+```json
+{
+  "node": "pCube1",
+  "attributes": ["translateX", "visibility"]
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "node": "pCube1",
+  "attributes": {
+    "translateX": {
+      "attribute": "translateX",
+      "connected": true,
+      "connections": [
+        {
+          "source": "animCurveTL1.output",
+          "source_node": "animCurveTL1",
+          "source_type": "animCurveTL",
+          "destination": "pCube1.translateX",
+          "direction": "incoming"
+        }
+      ],
+      "locked": false,
+      "type": "double"
+    },
+    "visibility": {
+      "attribute": "visibility",
+      "connected": false,
+      "connections": [],
+      "locked": false,
+      "type": "bool"
+    }
+  },
+  "count": 1,
+  "errors": null
+}
+```
+
+---
+
+### `connections.connect`
+
+Connect two attributes in Maya. Implements the disconnect-before-reconnect safety pattern.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `source` | `string` | Yes | - | Source plug in `"node.attribute"` format |
+| `destination` | `string` | Yes | - | Destination plug in `"node.attribute"` format |
+| `force` | `boolean` | No | `false` | If true, disconnect existing connections to destination first |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `connected` | `boolean` | Whether the connection was created |
+| `source` | `string` | The source plug |
+| `destination` | `string` | The destination plug |
+| `disconnected` | `string[]` | Plugs that were disconnected (if force=true) |
+| `error` | `string \| null` | Error message if failed |
+
+**Example Request**:
+
+```json
+{
+  "source": "ramp1.outColor",
+  "destination": "lambert1.color",
+  "force": true
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "connected": true,
+  "source": "ramp1.outColor",
+  "destination": "lambert1.color",
+  "disconnected": ["checker1.outColor"],
+  "error": null
+}
+```
+
+**Example Response (Already Connected)**:
+
+```json
+{
+  "connected": false,
+  "source": "ramp1.outColor",
+  "destination": "lambert1.color",
+  "disconnected": [],
+  "error": "Destination 'lambert1.color' is already connected to 'checker1.outColor'. Use force=True to replace."
+}
+```
+
+---
+
+### `connections.disconnect`
+
+Disconnect attributes in Maya. Can disconnect a specific connection, all outgoing from a source, or all incoming to a destination.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `source` | `string` | No | `null` | Source plug. If null, uses destination only. |
+| `destination` | `string` | No | `null` | Destination plug. If null, uses source only. |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `disconnected` | `array` | List of disconnected connection objects |
+| `disconnected[].source` | `string` | Source plug that was disconnected |
+| `disconnected[].destination` | `string` | Destination plug that was disconnected |
+| `count` | `integer` | Number of connections disconnected |
+| `error` | `string \| null` | Error message if failed |
+
+**Example Request (Specific Connection)**:
+
+```json
+{
+  "source": "ramp1.outColor",
+  "destination": "lambert1.color"
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "disconnected": [
+    {
+      "source": "ramp1.outColor",
+      "destination": "lambert1.color"
+    }
+  ],
+  "count": 1,
+  "error": null
+}
+```
+
+**Example Request (All Incoming)**:
+
+```json
+{
+  "destination": "pCube1.translateX"
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "disconnected": [
+    {
+      "source": "animCurveTL1.output",
+      "destination": "pCube1.translateX"
+    }
+  ],
+  "count": 1,
+  "error": null
+}
+```
+
+---
+
+### `connections.history`
+
+List construction/deformation history on a node. Traverses upstream (input) or downstream (output) dependency graph.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `node` | `string` | Yes | - | Node name to query history for |
+| `direction` | `string` | No | `"input"` | Direction: `"input"` (upstream), `"output"` (downstream), or `"both"` |
+| `depth` | `integer` | No | `10` | Maximum traversal depth (max 50) |
+| `limit` | `integer` | No | `500` | Max history nodes to return. Use 0 for unlimited. |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `node` | `string` | The queried node name |
+| `history` | `array` | List of history node info objects |
+| `history[].name` | `string` | History node name |
+| `history[].type` | `string` | History node type |
+| `history[].depth` | `integer` | Depth from the queried node |
+| `history[].direction` | `string` | `"input"` or `"output"` |
+| `count` | `integer` | Number of history nodes returned |
+| `truncated` | `boolean` | True if results were truncated |
+| `total_count` | `integer` | Total history nodes before limit |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "node": "pCubeShape1",
+  "direction": "input",
+  "depth": 5
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "node": "pCubeShape1",
+  "history": [
+    {
+      "name": "polyCube1",
+      "type": "polyCube",
+      "depth": 1,
+      "direction": "input"
+    },
+    {
+      "name": "polyExtrudeFace1",
+      "type": "polyExtrudeFace",
+      "depth": 2,
+      "direction": "input"
+    },
+    {
+      "name": "tweak1",
+      "type": "tweak",
+      "depth": 3,
+      "direction": "input"
+    }
+  ],
+  "count": 3,
+  "errors": null
+}
+```
+
+---
+
 ## Selection Tools
 
 ### `selection.get`
@@ -1238,6 +1570,11 @@ All tools include MCP annotations to help AI clients understand their behavior a
 | `nodes.info` | true | false | true |
 | `attributes.get` | true | false | true |
 | `attributes.set` | false | false | true |
+| `connections.list` | true | false | true |
+| `connections.get` | true | false | true |
+| `connections.connect` | false | false | true |
+| `connections.disconnect` | false | false | true |
+| `connections.history` | true | false | true |
 | `selection.get` | true | false | true |
 | `selection.set` | false | false | false |
 | `selection.clear` | false | false | true |
@@ -1253,6 +1590,8 @@ Large Maya scenes can contain thousands of nodes. To prevent token budget explos
 | Tool | Default Limit | Configurable |
 |------|---------------|--------------|
 | `nodes.list` | 500 nodes | Yes (`limit` param) |
+| `connections.list` | 500 connections | Yes (`limit` param) |
+| `connections.history` | 500 history nodes | Yes (`limit` param) |
 
 ### Handling Truncated Results
 

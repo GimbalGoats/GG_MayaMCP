@@ -309,19 +309,19 @@ Document common rigging workflows to inform future tool design. **No implementat
 
 ---
 
-### M7: Node Graph & Connections 📋
+### M7: Node Graph & Connections ✅
 
 **Goal**: Expose node graph wiring — the most common operation in Maya pipeline scripts.
 
 **Namespace**: `connections.*`
 
-| ID | Feature | Description | Effort |
-|----|---------|-------------|--------|
-| M7.1 | `connections.list` | List connections on a node with direction/type filters | Low |
-| M7.2 | `connections.get` | Get connection details for specific plugs | Low |
-| M7.3 | `connections.connect` | Connect two attributes | Low |
-| M7.4 | `connections.disconnect` | Disconnect attributes with safe disconnect-before-reconnect pattern | Low |
-| M7.5 | `connections.history` | List construction/deformation history on a node | Medium |
+| ID | Feature | Description | Effort | Status |
+|----|---------|-------------|--------|--------|
+| M7.1 | `connections.list` | List connections on a node with direction/type filters | Low | ✅ |
+| M7.2 | `connections.get` | Get connection details for specific plugs | Low | ✅ |
+| M7.3 | `connections.connect` | Connect two attributes | Low | ✅ |
+| M7.4 | `connections.disconnect` | Disconnect attributes with safe disconnect-before-reconnect pattern | Low | ✅ |
+| M7.5 | `connections.history` | List construction/deformation history on a node | Medium | ✅ |
 
 **Design note**: `connections.disconnect` implements the disconnect-before-reconnect safety pattern common in production rigs.
 
@@ -493,8 +493,10 @@ M0 ✅ ─► M1 ✅ ─► M2 ✅ ─► M3 🚧 ─► M4 🚧 ─► M5 📋 
                           └─► M3-B 🚧  └─► M4.2–M4.9: 📋
                               (3/4)
 
+M7 ✅ (Node Graph & Connections)
+
 After M5:
-M5 📋 ─► M7 📋 ─► M8 📋 ─► M9 📋 ─► M10 📋 ─► M11 📋 ─► M12 📋 ─► M13 📋
+M5 📋 ─► M8 📋 ─► M9 📋 ─► M10 📋 ─► M11 📋 ─► M12 📋 ─► M13 📋
 ```
 
 | Priority | Milestone | Rationale |
@@ -502,10 +504,10 @@ M5 📋 ─► M7 📋 ─► M8 📋 ─► M9 📋 ─► M10 📋 ─► M11 
 | 1 | ~~M3-A (Maya UI Panel)~~ | ✅ Complete |
 | 2 | M3-B (LLM Optimization) | 1 remaining item: markdown output |
 | 3 | M4 (Scene Operations) | 1/9 done (`scene.new`); 8 remaining |
-| 4 | M5-A (Core Animation) | Essential animation tools |
-| 5 | M5-B (Rigging Patterns) | Design documentation only |
-| 6 | M6 (Production Hardening) | Nice to have |
-| 7 | M7 (Node Graph & Connections) | Highest-frequency pipeline operation; glue for all other workflows |
+| 4 | ~~M7 (Node Graph & Connections)~~ | ✅ Complete |
+| 5 | M5-A (Core Animation) | Essential animation tools |
+| 6 | M5-B (Rigging Patterns) | Design documentation only |
+| 7 | M6 (Production Hardening) | Nice to have |
 | 8 | M8 (Skinning) | Core rigging workflow; implements M5-B Skin Binding pattern |
 | 9 | M9 (Deformers & Blend Shapes) | Essential for modeling and rigging; implements M5-B Blend Shapes pattern |
 | 10 | M10 (Constraints) | Core rigging and animation workflow |
