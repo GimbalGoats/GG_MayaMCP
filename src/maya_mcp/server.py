@@ -28,7 +28,15 @@ from mcp.types import ToolAnnotations
 from maya_mcp.tools.attributes import attributes_get, attributes_set
 from maya_mcp.tools.connection import maya_connect, maya_disconnect
 from maya_mcp.tools.health import health_check
-from maya_mcp.tools.nodes import nodes_create, nodes_delete, nodes_info, nodes_list
+from maya_mcp.tools.nodes import (
+    nodes_create,
+    nodes_delete,
+    nodes_duplicate,
+    nodes_info,
+    nodes_list,
+    nodes_parent,
+    nodes_rename,
+)
 from maya_mcp.tools.scene import scene_info, scene_new, scene_open, scene_redo, scene_undo
 from maya_mcp.tools.selection import selection_clear, selection_get, selection_set
 
@@ -361,6 +369,98 @@ def tool_nodes_delete(
         Dictionary with deleted list, count, and errors (if any nodes failed).
     """
     return nodes_delete(nodes=nodes, hierarchy=hierarchy)
+
+
+@mcp.tool(
+    name="nodes.rename",
+    description="Rename one or more nodes in the Maya scene.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_nodes_rename(
+    mapping: Annotated[dict[str, str], "Map of current node name to new name"],
+) -> dict[str, Any]:
+    """Rename Maya nodes.
+
+    Args:
+        mapping: Dictionary mapping current node names to new names.
+
+    Returns:
+        Dictionary with renamed list and errors (if any nodes failed).
+    """
+    return nodes_rename(mapping=mapping)
+
+
+@mcp.tool(
+    name="nodes.parent",
+    description="Reparent one or more nodes in the Maya hierarchy.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_nodes_parent(
+    nodes: Annotated[list[str], "Nodes to reparent"],
+    parent: Annotated[str | None, "New parent node. If None, unparent (parent to world)."] = None,
+    relative: Annotated[bool, "Preserve existing local transformations"] = False,
+) -> dict[str, Any]:
+    """Reparent Maya nodes.
+
+    Args:
+        nodes: List of nodes to reparent.
+        parent: New parent node. If None, unparent.
+        relative: Preserve local transformations.
+
+    Returns:
+        Dictionary with parented list and errors.
+    """
+    return nodes_parent(nodes=nodes, parent=parent, relative=relative)
+
+
+@mcp.tool(
+    name="nodes.duplicate",
+    description="Duplicate one or more nodes.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_nodes_duplicate(
+    nodes: Annotated[list[str], "Nodes to duplicate"],
+    name: Annotated[
+        str | None, "Name for the new node (only valid when duplicating single node)"
+    ] = None,
+    input_connections: Annotated[bool, "Duplicate input connections"] = False,
+    upstream_nodes: Annotated[bool, "Duplicate upstream nodes"] = False,
+    parent_only: Annotated[bool, "Duplicate only the specified node, not its children"] = False,
+) -> dict[str, Any]:
+    """Duplicate Maya nodes.
+
+    Args:
+        nodes: List of nodes to duplicate.
+        name: Name for new node (single only).
+        input_connections: Duplicate input connections.
+        upstream_nodes: Duplicate upstream nodes.
+        parent_only: Duplicate only the node.
+
+    Returns:
+        Dictionary with duplicated map and errors.
+    """
+    return nodes_duplicate(
+        nodes=nodes,
+        name=name,
+        input_connections=input_connections,
+        upstream_nodes=upstream_nodes,
+        parent_only=parent_only,
+    )
 
 
 @mcp.tool(

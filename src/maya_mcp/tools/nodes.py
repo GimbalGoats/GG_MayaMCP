@@ -581,3 +581,273 @@ print(json.dumps(result))
         result["errors"] = None
 
     return result
+
+
+def nodes_rename(mapping: dict[str, str]) -> dict[str, Any]:
+    """Rename one or more nodes in the Maya scene.
+
+    Args:
+        mapping: Dictionary mapping current node names to new names.
+
+    Returns:
+        Dictionary with rename result:
+            - renamed: Map of original name to actual new name
+            - errors: Map of original name to error message, or None
+
+    Raises:
+        MayaUnavailableError: If not connected to Maya.
+        MayaCommandError: If Maya command execution fails.
+        ValueError: If node names contain invalid characters.
+
+    Example:
+        >>> result = nodes_rename({"pCube1": "myCube"})
+        >>> print(f"Renamed to: {result['renamed']['pCube1']}")
+    """
+    if not mapping:
+        raise ValueError("mapping cannot be empty")
+
+    # Input validation
+    for old_name, new_name in mapping.items():
+        _validate_node_name(old_name)
+        _validate_node_name(new_name)
+
+    client = get_client()
+
+    # Escape mapping for Maya script
+    mapping_json = json.dumps(mapping)
+
+    command = f"""
+import maya.cmds as cmds
+import json
+
+mapping = {mapping_json}
+result = {{"renamed": {{}}, "errors": {{}}}}
+
+for old_name, new_name in mapping.items():
+    if not cmds.objExists(old_name):
+        result["errors"][old_name] = "Node '" + old_name + "' does not exist"
+        continue
+
+
+    try:
+        # cmds.rename returns the new name (which might handle collisions)
+        actual_name = cmds.rename(old_name, new_name)
+        result["renamed"][old_name] = actual_name
+    except Exception as e:
+        result["errors"][old_name] = str(e)
+
+# Only return the JSON string, do not print it (which goes to script editor log)
+# The last expression is returned by commandPort
+print(json.dumps(result))
+"""
+
+    response = client.execute(command)
+    parsed = parse_json_response(response)
+
+    renamed = parsed.get("renamed", {})
+    errors = parsed.get("errors", {})
+
+    result: dict[str, Any] = {
+        "renamed": renamed,
+        "errors": errors if errors else None,
+    }
+
+    return result
+
+
+def nodes_parent(
+    nodes: list[str],
+    parent: str | None = None,
+    relative: bool = False,
+) -> dict[str, Any]:
+    """Reparent one or more nodes in the Maya hierarchy.
+
+    Args:
+        nodes: List of nodes to reparent.
+        parent: New parent node. If None, unparent (parent to world).
+        relative: Preserve existing local transformations.
+
+    Returns:
+        Dictionary with reparent result:
+            - parented: List of nodes successfully reparented
+            - count: Number of nodes reparented
+            - errors: Map of node name to error message, or None
+
+    Raises:
+        MayaUnavailableError: If not connected to Maya.
+        MayaCommandError: If Maya command execution fails.
+        ValueError: If node names contain invalid characters.
+    """
+    if not nodes:
+        raise ValueError("nodes list cannot be empty")
+
+    for node in nodes:
+        _validate_node_name(node)
+    if parent is not None:
+        _validate_node_name(parent)
+
+    client = get_client()
+
+    nodes_json = json.dumps(nodes)
+    parent_json = json.dumps(parent) if parent else "None"
+    relative_str = "True" if relative else "False"
+
+    command = f"""
+import maya.cmds as cmds
+import json
+
+nodes = {nodes_json}
+parent_node = {parent_json}
+relative_flag = {relative_str}
+
+result = {{"parented": [], "errors": {{}}}}
+
+# Validate parent exists if specified
+if parent_node and not cmds.objExists(parent_node):
+    result["errors"]["_parent"] = f"Parent node '{{parent_node}}' does not exist"
+else:
+    for node in nodes:
+        try:
+            if not cmds.objExists(node):
+                result["errors"][node] = f"Node '{{node}}' does not exist"
+                continue
+
+
+            # Perform parenting
+            if parent_node:
+                res = cmds.parent(node, parent_node, relative=relative_flag)
+            else:
+                res = cmds.parent(node, world=True, relative=relative_flag)
+
+
+            # cmds.parent returns list of new names (in case of instance/rename)
+            # We usually just want the node name we operated on, but let's record what Maya returned
+            if res:
+                result["parented"].extend(res)
+            else:
+                # Should not happen on success, but fallback
+                result["parented"].append(node)
+
+
+        except Exception as e:
+            result["errors"][node] = str(e)
+
+# Only return the JSON string, do not print it (which goes to script editor log)
+# The last expression is returned by commandPort
+print(json.dumps(result))
+"""
+
+    response = client.execute(command)
+    parsed = parse_json_response(response)
+
+    parented = parsed.get("parented", [])
+    errors = parsed.get("errors", {})
+
+    # Check for global parent error
+    if "_parent" in errors:
+        # If parent invalid, fail the whole call or just report?
+        # The loop won't run if we put the check outside.
+        # My script logic puts it outside loop.
+        pass
+
+    result: dict[str, Any] = {
+        "parented": parented,
+        "count": len(parented),
+        "errors": errors if errors else None,
+    }
+    return result
+
+
+def nodes_duplicate(
+    nodes: list[str],
+    name: str | None = None,
+    input_connections: bool = False,
+    upstream_nodes: bool = False,
+    parent_only: bool = False,
+) -> dict[str, Any]:
+    """Duplicate one or more nodes.
+
+    Args:
+        nodes: List of nodes to duplicate.
+        name: Name for the new node (only valid when duplicating single node).
+        input_connections: Duplicate input connections.
+        upstream_nodes: Duplicate upstream nodes.
+        parent_only: Duplicate only the specified node, not its children.
+
+    Returns:
+        Dictionary with duplication result:
+            - duplicated: Map of original name to new name
+            - count: Number of nodes duplicated
+            - errors: Map of original name to error message, or None
+    """
+    if not nodes:
+        raise ValueError("nodes list cannot be empty")
+    if name and len(nodes) > 1:
+        raise ValueError("Cannot specify name when duplicating multiple nodes")
+
+    for node in nodes:
+        _validate_node_name(node)
+    if name:
+        _validate_node_name(name)
+
+    client = get_client()
+
+    nodes_json = json.dumps(nodes)
+    name_json = json.dumps(name) if name else "None"
+    ic_str = "True" if input_connections else "False"
+    un_str = "True" if upstream_nodes else "False"
+    po_str = "True" if parent_only else "False"
+
+    command = f"""
+import maya.cmds as cmds
+import json
+
+nodes = {nodes_json}
+desired_name = {name_json}
+ic_flag = {ic_str}
+un_flag = {un_str}
+po_flag = {po_str}
+
+result = {{"duplicated": {{}}, "errors": {{}}}}
+
+for node in nodes:
+    try:
+        if not cmds.objExists(node):
+            result["errors"][node] = f"Node '{{node}}' does not exist"
+            continue
+
+
+        # Build args
+        kwargs = {{
+            "inputConnections": ic_flag,
+            "upstreamNodes": un_flag,
+            "parentOnly": po_flag,
+        }}
+        if desired_name:
+            kwargs["name"] = desired_name
+
+
+        dup = cmds.duplicate(node, **kwargs)
+        if dup:
+            result["duplicated"][node] = dup[0]
+
+
+    except Exception as e:
+        result["errors"][node] = str(e)
+
+# Return JSON string as the last expression
+print(json.dumps(result))
+"""
+
+    response = client.execute(command)
+    parsed = parse_json_response(response)
+
+    duplicated = parsed.get("duplicated", {})
+    errors = parsed.get("errors", {})
+
+    result: dict[str, Any] = {
+        "duplicated": duplicated,
+        "count": len(duplicated),
+        "errors": errors if errors else None,
+    }
+    return result

@@ -699,6 +699,155 @@ Get comprehensive information about a Maya node in a single call. Reduces tool-c
 
 ---
 
+### `nodes.rename`
+
+Rename one or more nodes in the Maya scene.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `mapping` | `object` | Yes | - | Map of current node name to new name |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `renamed` | `object` | Map of original name to actual new name |
+| `errors` | `object \| null` | Map of original name to error message (for failures) |
+
+**Example Request**:
+
+```json
+{
+  "mapping": {
+    "pCube1": "myCube",
+    "pSphere1": "mySphere"
+  }
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "renamed": {
+    "pCube1": "myCube",
+    "pSphere1": "mySphere1"
+  },
+  "errors": null
+}
+```
+
+**Example Response (Partial Failure)**:
+
+```json
+{
+  "renamed": {
+    "pCube1": "myCube"
+  },
+  "errors": {
+    "pSphere1": "Node 'pSphere1' does not exist"
+  }
+}
+```
+
+---
+### `nodes.parent`
+
+Reparent one or more nodes in the Maya hierarchy.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `nodes` | `string[]` | Yes | - | Nodes to reparent |
+| `parent` | `string \| null` | No | `null` | New parent node. If null, unparent (parent to world). |
+| `relative` | `boolean` | No | `false` | Preserve existing local transformations |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `parented` | `string[]` | Nodes successfully reparented |
+| `count` | `integer` | Number of nodes reparented |
+| `errors` | `object \| null` | Map of node name to error message |
+
+**Example Request (Parent to group)**:
+
+```json
+{
+  "nodes": ["pCube1", "pSphere1"],
+  "parent": "group1"
+}
+```
+
+**Example Request (Unparent)**:
+
+```json
+{
+  "nodes": ["pCube1"],
+  "parent": null
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "parented": ["pCube1", "pSphere1"],
+  "count": 2,
+  "errors": null
+}
+```
+
+---
+
+### `nodes.duplicate`
+
+Duplicate one or more nodes.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `nodes` | `string[]` | Yes | - | Nodes to duplicate |
+| `name` | `string` | No | `null` | Name for the new node (only valid when duplicating single node) |
+| `input_connections` | `boolean` | No | `false` | Duplicate input connections |
+| `upstream_nodes` | `boolean` | No | `false` | Duplicate upstream nodes |
+| `parent_only` | `boolean` | No | `false` | Duplicate only the specified node, not its children |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `duplicated` | `object` | Map of original name to new name |
+| `count` | `integer` | Number of nodes duplicated |
+| `errors` | `object \| null` | Map of original name to error message |
+
+**Example Request**:
+
+```json
+{
+  "nodes": ["pCube1"],
+  "input_connections": false
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "duplicated": {
+    "pCube1": "pCube2"
+  },
+  "count": 1,
+  "errors": null
+}
+```
+
+---
+
 ## Attribute Tools
 
 ### `attributes.get`
@@ -999,6 +1148,9 @@ All tools include MCP annotations to help AI clients understand their behavior a
 | `nodes.list` | true | false | true |
 | `nodes.create` | false | false | false |
 | `nodes.delete` | false | false | true |
+| `nodes.rename` | false | false | true |
+| `nodes.parent` | false | false | true |
+| `nodes.duplicate` | false | false | false |
 | `nodes.info` | true | false | true |
 | `attributes.get` | true | false | true |
 | `attributes.set` | false | false | true |

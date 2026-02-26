@@ -247,7 +247,9 @@ Improvements based on [Block's MCP Playbook](https://engineering.block.xyz/blog/
 | M4.4 | `scene.save_as` | Save scene to new path | Low | 📋 |
 | M4.5 | `scene.import` | Import file into current scene | Medium | 📋 |
 | M4.6 | `scene.export` | Export selection to file | Medium | 📋 |
-| M4.7 | `nodes.rename` | Rename nodes (batch support) | Low | 📋 |
+| M4.7 | `nodes.rename` | Rename nodes (batch support) | Low | ✅ |
+| M4.8 | `nodes.parent` | Reparent nodes in hierarchy | Low | ✅ |
+| M4.9 | `nodes.duplicate` | Duplicate nodes with hierarchy | Medium | ✅ |
 | M4.8 | `nodes.parent` | Reparent nodes in hierarchy | Low | 📋 |
 | M4.9 | `nodes.duplicate` | Duplicate nodes with hierarchy | Medium | 📋 |
 
