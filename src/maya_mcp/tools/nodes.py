@@ -743,13 +743,6 @@ print(json.dumps(result))
     parented = parsed.get("parented", [])
     errors = parsed.get("errors", {})
 
-    # Check for global parent error
-    if "_parent" in errors:
-        # If parent invalid, fail the whole call or just report?
-        # The loop won't run if we put the check outside.
-        # My script logic puts it outside loop.
-        pass
-
     result: dict[str, Any] = {
         "parented": parented,
         "count": len(parented),

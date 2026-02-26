@@ -57,6 +57,9 @@ Available tools:
 - nodes.list: List nodes by type or pattern
 - nodes.create: Create a new node with optional name, parent, and attributes
 - nodes.delete: Delete one or more nodes (with optional hierarchy deletion)
+- nodes.rename: Rename one or more nodes (batch supported)
+- nodes.parent: Reparent nodes in hierarchy (or unparent to world)
+- nodes.duplicate: Duplicate nodes with optional hierarchy and connections
 - nodes.info: Get comprehensive node information in one call (summary, transform,
   hierarchy, attributes, shape, or all) - use this instead of multiple attribute queries
 - attributes.get: Get attribute values from a node (batch supported)

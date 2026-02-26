@@ -250,8 +250,6 @@ Improvements based on [Block's MCP Playbook](https://engineering.block.xyz/blog/
 | M4.7 | `nodes.rename` | Rename nodes (batch support) | Low | ✅ |
 | M4.8 | `nodes.parent` | Reparent nodes in hierarchy | Low | ✅ |
 | M4.9 | `nodes.duplicate` | Duplicate nodes with hierarchy | Medium | ✅ |
-| M4.8 | `nodes.parent` | Reparent nodes in hierarchy | Low | 📋 |
-| M4.9 | `nodes.duplicate` | Duplicate nodes with hierarchy | Medium | 📋 |
 
 **Security considerations**:
 - All file paths must be validated
