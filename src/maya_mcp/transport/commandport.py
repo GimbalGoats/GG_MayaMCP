@@ -44,7 +44,7 @@ from maya_mcp.types import (
 )
 
 # Buffer size for socket receive
-BUFFER_SIZE = 4096
+BUFFER_SIZE = 65536
 
 # Module-level client instance for singleton pattern
 _client: CommandPortClient | None = None
@@ -231,6 +231,7 @@ class CommandPortClient:
         for attempt in range(self.config.max_retries):
             try:
                 self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
                 self._socket.settimeout(self.config.connect_timeout)
                 self._socket.connect((self.config.host, self.config.port))
 
@@ -330,23 +331,29 @@ class CommandPortClient:
             command_bytes = command.encode("utf-8")
             self._socket.sendall(command_bytes)
 
-            # Wait for Maya to process and respond
-            # Maya's commandPort can be slow to respond, especially for file operations
-            time.sleep(0.2)
-
-            # Receive response
+            # Receive response — use command_timeout for the first chunk (Maya
+            # may take a while to process) and a short follow-up timeout for
+            # subsequent chunks once data starts flowing.
             response_parts: list[bytes] = []
-            while True:
-                try:
-                    # Use a longer timeout for reading - Maya can be slow
-                    self._socket.settimeout(1.0)
-                    chunk = self._socket.recv(BUFFER_SIZE)
-                    if not chunk:
-                        break
-                    response_parts.append(chunk)
-                except TimeoutError:
-                    # No more data available
-                    break
+            self._socket.settimeout(self.config.command_timeout)
+            try:
+                first_chunk = self._socket.recv(BUFFER_SIZE)
+                if first_chunk:
+                    response_parts.append(first_chunk)
+                    # Data started flowing — switch to a short timeout to
+                    # collect any remaining fragments without a long wait.
+                    self._socket.settimeout(0.05)
+                    while True:
+                        try:
+                            chunk = self._socket.recv(BUFFER_SIZE)
+                            if not chunk:
+                                break
+                            response_parts.append(chunk)
+                        except TimeoutError:
+                            break
+            except TimeoutError:
+                # No response at all within command_timeout
+                pass
 
             raw_response = b"".join(response_parts).decode("utf-8").strip()
 
