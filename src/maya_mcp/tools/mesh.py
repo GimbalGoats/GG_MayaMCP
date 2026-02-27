@@ -396,8 +396,8 @@ try:
                     # Store current selection
                     orig_sel = cmds.ls(selection=True, flatten=True) or []
 
-                    # Select faces with holes using polySelectConstraint
-                    cmds.select(shape, replace=True)
+                    # Select all faces then filter with polySelectConstraint
+                    cmds.select(shape + ".f[*]", replace=True)
                     cmds.polySelectConstraint(mode=3, type=8, holes=1)
                     holed_faces = cmds.ls(selection=True, flatten=True) or []
 
@@ -424,35 +424,25 @@ try:
                 except Exception as e:
                     result["errors"]["holes"] = str(e)
 
-            # Border edges (using polySelectConstraint)
+            # Border edges (edges with only one adjacent face)
             if "border" in checks:
                 try:
-                    # Store current selection
-                    orig_sel = cmds.ls(selection=True, flatten=True) or []
-
-                    # Select border edges using polySelectConstraint
-                    cmds.select(shape, replace=True)
-                    cmds.polySelectConstraint(mode=3, type=0x8000, where=1)
-                    border_edges = cmds.ls(selection=True, flatten=True) or []
-
-                    # Reset constraint and restore selection
-                    cmds.polySelectConstraint(where=0)
-                    cmds.polySelectConstraint(disable=True)
-                    if orig_sel:
-                        cmds.select(orig_sel, replace=True)
-                    else:
-                        cmds.select(clear=True)
-
-                    # Filter to only include edges from this shape
+                    edge_to_face = cmds.polyInfo(shape, edgeToFace=True) or []
                     edge_list = []
-                    for edge in border_edges:
-                        if shape in edge and ".e[" in edge:
-                            edge_list.append(edge)
-                            if limit and limit > 0 and len(edge_list) >= limit:
-                                break
+                    for i, line in enumerate(edge_to_face):
+                        # Format: "EDGE  0:  0  1\\n" (interior) or "EDGE  0:  0\\n" (border)
+                        parts = line.split(":")
+                        if len(parts) == 2:
+                            faces = parts[1].strip().split()
+                            if len(faces) == 1:
+                                edge_list.append(shape + ".e[" + str(i) + "]")
+                                if limit and limit > 0 and len(edge_list) >= limit:
+                                    break
 
                     result["border_edges"] = edge_list
                     result["border_count"] = len(edge_list)
+                    if len(edge_list) > 0:
+                        result["is_clean"] = False
                 except Exception as e:
                     result["errors"]["border"] = str(e)
 
