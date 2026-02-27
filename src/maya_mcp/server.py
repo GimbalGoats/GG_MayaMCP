@@ -36,6 +36,23 @@ from maya_mcp.tools.connections import (
 )
 from maya_mcp.tools.health import health_check
 from maya_mcp.tools.mesh import mesh_evaluate, mesh_info, mesh_vertices
+from maya_mcp.tools.modeling import (
+    modeling_bevel,
+    modeling_boolean,
+    modeling_bridge,
+    modeling_center_pivot,
+    modeling_combine,
+    modeling_create_polygon_primitive,
+    modeling_delete_faces,
+    modeling_delete_history,
+    modeling_extrude_faces,
+    modeling_freeze_transforms,
+    modeling_insert_edge_loop,
+    modeling_merge_vertices,
+    modeling_move_components,
+    modeling_separate,
+    modeling_set_pivot,
+)
 from maya_mcp.tools.nodes import (
     nodes_create,
     nodes_delete,
@@ -63,6 +80,11 @@ from maya_mcp.tools.selection import (
     selection_get_components,
     selection_set,
     selection_set_components,
+)
+from maya_mcp.tools.shading import (
+    shading_assign_material,
+    shading_create_material,
+    shading_set_material_color,
 )
 from maya_mcp.tools.skin import (
     skin_bind,
@@ -115,6 +137,24 @@ Available tools:
 - selection.set_components: Select mesh components (vertices, edges, faces)
 - selection.get_components: Get selected components grouped by type
 - selection.convert_components: Convert selection between vertex/edge/face
+- modeling.create_polygon_primitive: Create polygon primitives (cube, sphere, cylinder, cone, torus, plane)
+- modeling.extrude_faces: Extrude polygon faces with translation and offset options
+- modeling.boolean: Boolean operations (union, difference, intersection) on two meshes
+- modeling.combine: Combine multiple meshes into one
+- modeling.separate: Separate a combined mesh into individual meshes
+- modeling.merge_vertices: Merge vertices within a distance threshold
+- modeling.bevel: Bevel edges or vertices with offset and segments
+- modeling.bridge: Bridge between edge loops
+- modeling.insert_edge_loop: Insert edge loop at an edge using polySplitRing
+- modeling.delete_faces: Delete polygon faces from a mesh
+- modeling.move_components: Move vertices, edges, or faces (relative or absolute)
+- modeling.freeze_transforms: Freeze (reset) transforms to identity
+- modeling.delete_history: Delete construction history from nodes
+- modeling.center_pivot: Center pivot point on nodes
+- modeling.set_pivot: Set pivot point to an explicit position
+- shading.create_material: Create a material (lambert, blinn, phong, standardSurface) with shading group
+- shading.assign_material: Assign a material to meshes or face components
+- shading.set_material_color: Set a color attribute on a material
 - skin.bind: Bind mesh to skeleton with influence options
 - skin.unbind: Detach skin cluster from mesh
 - skin.influences: List influences on a skin cluster
@@ -133,6 +173,12 @@ Workflow tips:
 - Use scene.export(export_mode="all") to export the entire scene
 - Use mesh.evaluate() to check mesh topology before rigging or exporting
 - Use selection.set_components() for precise vertex/edge/face selection
+- Use modeling.create_polygon_primitive() to create geometry, then extrude/bevel/bridge to edit
+- Use modeling.freeze_transforms() and modeling.delete_history() to clean up before export
+- Use modeling.merge_vertices() after modeling.combine() to weld shared borders
+- Use modeling.boolean() for CSG-style geometry creation (union/difference/intersection)
+- Use shading.create_material() then shading.assign_material() to apply materials to meshes
+- Use shading.assign_material() with face components for per-face material assignment
 - Use skin.bind() to bind a mesh to joints, then skin.weights.get() to inspect
 - Use skin.weights.get() with offset/limit for large meshes (weights data is dense)
 - Use skin.copy_weights() to transfer weights between similar meshes
@@ -1177,6 +1223,590 @@ def tool_selection_convert_components(
         Dictionary with converted selection list and count.
     """
     return selection_convert_components(to_type=to_type, nodes=nodes)
+
+
+# Register modeling tools
+@mcp.tool(
+    name="modeling.create_polygon_primitive",
+    description="Create a polygon primitive (cube, sphere, cylinder, cone, torus, plane) "
+    "with configurable dimensions, subdivisions, and axis.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_modeling_create_polygon_primitive(
+    primitive_type: Annotated[
+        Literal["cube", "sphere", "cylinder", "cone", "torus", "plane"],
+        "Type of primitive to create",
+    ],
+    name: Annotated[str | None, "Optional name for the transform node"] = None,
+    width: Annotated[float, "Width (cube/plane)"] = 1.0,
+    height: Annotated[float, "Height (cube/cylinder/cone/plane)"] = 1.0,
+    depth: Annotated[float, "Depth (cube)"] = 1.0,
+    radius: Annotated[float, "Radius (sphere/cylinder/cone/torus)"] = 0.5,
+    subdivisions_width: Annotated[int | None, "Width subdivisions"] = None,
+    subdivisions_height: Annotated[int | None, "Height subdivisions"] = None,
+    subdivisions_depth: Annotated[int | None, "Depth subdivisions"] = None,
+    subdivisions_axis: Annotated[int | None, "Axis subdivisions (sphere/cylinder/cone/torus)"] = None,
+    axis: Annotated[Literal["x", "y", "z"], "Up axis for the primitive"] = "y",
+) -> dict[str, Any]:
+    """Create a polygon primitive.
+
+    Args:
+        primitive_type: Type of primitive to create.
+        name: Optional name for the transform node.
+        width: Width of the primitive.
+        height: Height of the primitive.
+        depth: Depth of the primitive.
+        radius: Radius of the primitive.
+        subdivisions_width: Width subdivisions.
+        subdivisions_height: Height subdivisions.
+        subdivisions_depth: Depth subdivisions.
+        subdivisions_axis: Axis subdivisions.
+        axis: Up axis.
+
+    Returns:
+        Dictionary with transform, shape, constructor, primitive_type,
+        vertex_count, face_count, and errors.
+    """
+    return modeling_create_polygon_primitive(
+        primitive_type=primitive_type,
+        name=name,
+        width=width,
+        height=height,
+        depth=depth,
+        radius=radius,
+        subdivisions_width=subdivisions_width,
+        subdivisions_height=subdivisions_height,
+        subdivisions_depth=subdivisions_depth,
+        subdivisions_axis=subdivisions_axis,
+        axis=axis,
+    )
+
+
+@mcp.tool(
+    name="modeling.extrude_faces",
+    description="Extrude polygon faces with local translation, offset, and division options.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_modeling_extrude_faces(
+    faces: Annotated[list[str], "Face components to extrude (e.g., ['pCube1.f[0]', 'pCube1.f[2]'])"],
+    local_translate_z: Annotated[float | None, "Local Z translation (extrusion thickness)"] = None,
+    local_translate_x: Annotated[float | None, "Local X translation"] = None,
+    local_translate_y: Annotated[float | None, "Local Y translation"] = None,
+    offset: Annotated[float | None, "Offset amount for the extrusion"] = None,
+    divisions: Annotated[int, "Number of extrusion divisions"] = 1,
+    keep_faces_together: Annotated[bool, "Keep faces together during extrusion"] = True,
+) -> dict[str, Any]:
+    """Extrude polygon faces.
+
+    Args:
+        faces: Face component strings to extrude.
+        local_translate_z: Local Z translation.
+        local_translate_x: Local X translation.
+        local_translate_y: Local Y translation.
+        offset: Offset amount.
+        divisions: Number of divisions.
+        keep_faces_together: Keep faces together.
+
+    Returns:
+        Dictionary with node, faces_extruded, new_face_count, and errors.
+    """
+    return modeling_extrude_faces(
+        faces=faces,
+        local_translate_z=local_translate_z,
+        local_translate_x=local_translate_x,
+        local_translate_y=local_translate_y,
+        offset=offset,
+        divisions=divisions,
+        keep_faces_together=keep_faces_together,
+    )
+
+
+@mcp.tool(
+    name="modeling.boolean",
+    description="Perform a boolean operation (union, difference, intersection) on two meshes.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_modeling_boolean(
+    mesh_a: Annotated[str, "First mesh (base)"],
+    mesh_b: Annotated[str, "Second mesh (operand)"],
+    operation: Annotated[
+        Literal["union", "difference", "intersection"],
+        "Boolean operation type",
+    ] = "union",
+) -> dict[str, Any]:
+    """Perform a boolean operation on two meshes.
+
+    Args:
+        mesh_a: First mesh.
+        mesh_b: Second mesh.
+        operation: Boolean operation type.
+
+    Returns:
+        Dictionary with result_mesh, operation, vertex_count, face_count, and errors.
+    """
+    return modeling_boolean(mesh_a=mesh_a, mesh_b=mesh_b, operation=operation)
+
+
+@mcp.tool(
+    name="modeling.combine",
+    description="Combine multiple meshes into a single mesh.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_modeling_combine(
+    meshes: Annotated[list[str], "List of mesh names to combine (minimum 2)"],
+    name: Annotated[str | None, "Optional name for the combined mesh"] = None,
+) -> dict[str, Any]:
+    """Combine multiple meshes into one.
+
+    Args:
+        meshes: List of mesh names to combine.
+        name: Optional name for the result.
+
+    Returns:
+        Dictionary with result_mesh, source_meshes, vertex_count, face_count, and errors.
+    """
+    return modeling_combine(meshes=meshes, name=name)
+
+
+@mcp.tool(
+    name="modeling.separate",
+    description="Separate a combined mesh into individual meshes.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_modeling_separate(
+    mesh: Annotated[str, "Name of the mesh to separate"],
+) -> dict[str, Any]:
+    """Separate a combined mesh into individual meshes.
+
+    Args:
+        mesh: Name of the mesh to separate.
+
+    Returns:
+        Dictionary with source_mesh, result_meshes, count, and errors.
+    """
+    return modeling_separate(mesh=mesh)
+
+
+@mcp.tool(
+    name="modeling.merge_vertices",
+    description="Merge vertices on a mesh within a distance threshold.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_modeling_merge_vertices(
+    mesh: Annotated[str, "Name of the mesh"],
+    threshold: Annotated[float, "Distance threshold for merging (default 0.001)"] = 0.001,
+    vertices: Annotated[
+        list[str] | None,
+        "Optional specific vertex components to merge (None = all vertices)",
+    ] = None,
+) -> dict[str, Any]:
+    """Merge vertices within a distance threshold.
+
+    Args:
+        mesh: Name of the mesh.
+        threshold: Distance threshold.
+        vertices: Optional specific vertices.
+
+    Returns:
+        Dictionary with mesh, vertices_merged, vertex_count_before,
+        vertex_count_after, and errors.
+    """
+    return modeling_merge_vertices(mesh=mesh, threshold=threshold, vertices=vertices)
+
+
+@mcp.tool(
+    name="modeling.bevel",
+    description="Bevel edges or vertices with offset, segments, and fraction options.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_modeling_bevel(
+    components: Annotated[list[str], "Edge or vertex components to bevel (e.g., ['pCube1.e[0:3]'])"],
+    offset: Annotated[float, "Bevel offset distance (default 0.5)"] = 0.5,
+    segments: Annotated[int, "Number of bevel segments (default 1)"] = 1,
+    fraction: Annotated[float, "Bevel fraction (default 0.5)"] = 0.5,
+) -> dict[str, Any]:
+    """Bevel edges or vertices.
+
+    Args:
+        components: Edge or vertex components to bevel.
+        offset: Bevel offset distance.
+        segments: Number of segments.
+        fraction: Bevel fraction.
+
+    Returns:
+        Dictionary with node, components_beveled, new_vertex_count,
+        new_face_count, and errors.
+    """
+    return modeling_bevel(
+        components=components, offset=offset, segments=segments, fraction=fraction
+    )
+
+
+@mcp.tool(
+    name="modeling.bridge",
+    description="Bridge between edge loops to create connecting faces.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_modeling_bridge(
+    edge_loops: Annotated[list[str], "Edge components for the edge loops to bridge"],
+    divisions: Annotated[int, "Number of divisions in the bridge (default 0)"] = 0,
+    twist: Annotated[int, "Twist amount (default 0)"] = 0,
+    taper: Annotated[float, "Taper amount (default 1.0)"] = 1.0,
+) -> dict[str, Any]:
+    """Bridge between edge loops.
+
+    Args:
+        edge_loops: Edge components to bridge.
+        divisions: Number of divisions.
+        twist: Twist amount.
+        taper: Taper amount.
+
+    Returns:
+        Dictionary with node, new_face_count, and errors.
+    """
+    return modeling_bridge(
+        edge_loops=edge_loops, divisions=divisions, twist=twist, taper=taper
+    )
+
+
+@mcp.tool(
+    name="modeling.insert_edge_loop",
+    description="Insert an edge loop at the specified edge using polySplitRing.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_modeling_insert_edge_loop(
+    edge: Annotated[str, "Single edge component (e.g., 'pCube1.e[4]')"],
+    divisions: Annotated[int, "Number of edge loops to insert (default 1)"] = 1,
+    weight: Annotated[float, "Position weight along the edge (0-1, default 0.5)"] = 0.5,
+) -> dict[str, Any]:
+    """Insert an edge loop.
+
+    Args:
+        edge: Single edge component.
+        divisions: Number of edge loops.
+        weight: Position weight.
+
+    Returns:
+        Dictionary with node, edge, new_edge_count, new_vertex_count, and errors.
+    """
+    return modeling_insert_edge_loop(edge=edge, divisions=divisions, weight=weight)
+
+
+@mcp.tool(
+    name="modeling.delete_faces",
+    description="Delete polygon faces from a mesh.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_modeling_delete_faces(
+    faces: Annotated[list[str], "Face components to delete (e.g., ['pCube1.f[0]', 'pCube1.f[3]'])"],
+) -> dict[str, Any]:
+    """Delete polygon faces.
+
+    Args:
+        faces: Face component strings to delete.
+
+    Returns:
+        Dictionary with faces_deleted, mesh, remaining_face_count, and errors.
+    """
+    return modeling_delete_faces(faces=faces)
+
+
+@mcp.tool(
+    name="modeling.move_components",
+    description="Move mesh components (vertices, edges, faces) by relative translation or to an absolute position.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_modeling_move_components(
+    components: Annotated[list[str], "Component strings to move (e.g., ['pCube1.vtx[0:3]'])"],
+    translate: Annotated[
+        list[float] | None,
+        "Relative [x, y, z] translation (mutually exclusive with absolute)",
+    ] = None,
+    absolute: Annotated[
+        list[float] | None,
+        "Absolute [x, y, z] position (mutually exclusive with translate)",
+    ] = None,
+    world_space: Annotated[bool, "Use world space coordinates (default True)"] = True,
+) -> dict[str, Any]:
+    """Move mesh components.
+
+    Exactly one of translate or absolute must be provided.
+
+    Args:
+        components: Component strings to move.
+        translate: Relative translation.
+        absolute: Absolute position.
+        world_space: Use world space.
+
+    Returns:
+        Dictionary with components_moved, translate/absolute, world_space, and errors.
+    """
+    return modeling_move_components(
+        components=components,
+        translate=translate,
+        absolute=absolute,
+        world_space=world_space,
+    )
+
+
+@mcp.tool(
+    name="modeling.freeze_transforms",
+    description="Freeze (reset) transforms on nodes, applying current values as identity.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_modeling_freeze_transforms(
+    nodes: Annotated[list[str], "Node names to freeze transforms on"],
+    translate: Annotated[bool, "Freeze translation (default True)"] = True,
+    rotate: Annotated[bool, "Freeze rotation (default True)"] = True,
+    scale: Annotated[bool, "Freeze scale (default True)"] = True,
+) -> dict[str, Any]:
+    """Freeze transforms on nodes.
+
+    Args:
+        nodes: Node names to freeze.
+        translate: Freeze translation.
+        rotate: Freeze rotation.
+        scale: Freeze scale.
+
+    Returns:
+        Dictionary with frozen list, count, and errors.
+    """
+    return modeling_freeze_transforms(
+        nodes=nodes, translate=translate, rotate=rotate, scale=scale
+    )
+
+
+@mcp.tool(
+    name="modeling.delete_history",
+    description="Delete construction history from nodes or the entire scene.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_modeling_delete_history(
+    nodes: Annotated[list[str] | None, "Node names to delete history from"] = None,
+    all_nodes: Annotated[bool, "If True, delete history from all nodes in the scene"] = False,
+) -> dict[str, Any]:
+    """Delete construction history.
+
+    Args:
+        nodes: Node names to clean, or None if all_nodes is True.
+        all_nodes: Delete history from all scene nodes.
+
+    Returns:
+        Dictionary with cleaned list, count, and errors.
+    """
+    return modeling_delete_history(nodes=nodes, all_nodes=all_nodes)
+
+
+@mcp.tool(
+    name="modeling.center_pivot",
+    description="Center the pivot point on nodes.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_modeling_center_pivot(
+    nodes: Annotated[list[str], "Node names to center pivots on"],
+) -> dict[str, Any]:
+    """Center pivot on nodes.
+
+    Args:
+        nodes: Node names to center pivots on.
+
+    Returns:
+        Dictionary with centered list, count, pivot_positions, and errors.
+    """
+    return modeling_center_pivot(nodes=nodes)
+
+
+@mcp.tool(
+    name="modeling.set_pivot",
+    description="Set the pivot point of a node to an explicit position.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_modeling_set_pivot(
+    node: Annotated[str, "Node name to set pivot on"],
+    position: Annotated[list[float], "[x, y, z] position for the pivot"],
+    world_space: Annotated[bool, "Position is in world space (default True)"] = True,
+) -> dict[str, Any]:
+    """Set the pivot point of a node.
+
+    Args:
+        node: Node name.
+        position: [x, y, z] position.
+        world_space: Use world space.
+
+    Returns:
+        Dictionary with node, pivot, world_space, and errors.
+    """
+    return modeling_set_pivot(node=node, position=position, world_space=world_space)
+
+
+# Register shading tools
+@mcp.tool(
+    name="shading.create_material",
+    description="Create a material (lambert, blinn, phong, standardSurface) "
+    "with an associated shading group and optional color.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_shading_create_material(
+    material_type: Annotated[
+        Literal["lambert", "blinn", "phong", "standardSurface"],
+        "Type of material shader to create",
+    ] = "lambert",
+    name: Annotated[str | None, "Optional name for the material node"] = None,
+    color: Annotated[list[float] | None, "Optional [r, g, b] color (0-1 range)"] = None,
+) -> dict[str, Any]:
+    """Create a new material with shading group.
+
+    Args:
+        material_type: Type of material shader.
+        name: Optional name.
+        color: Optional [r, g, b] color.
+
+    Returns:
+        Dictionary with material, shading_group, material_type, and errors.
+    """
+    return shading_create_material(
+        material_type=material_type, name=name, color=color
+    )
+
+
+@mcp.tool(
+    name="shading.assign_material",
+    description="Assign a material to meshes or face components. "
+    "Resolves the shading group from the material automatically.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_shading_assign_material(
+    targets: Annotated[list[str], "Meshes or face components to assign the material to"],
+    material: Annotated[str, "Name of the material (or shading group) to assign"],
+) -> dict[str, Any]:
+    """Assign a material to targets.
+
+    Args:
+        targets: Meshes or face components.
+        material: Material or shading group name.
+
+    Returns:
+        Dictionary with assigned list, material, shading_group, and errors.
+    """
+    return shading_assign_material(targets=targets, material=material)
+
+
+@mcp.tool(
+    name="shading.set_material_color",
+    description="Set a color attribute on a material (e.g., color, baseColor, transparency).",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_shading_set_material_color(
+    material: Annotated[str, "Name of the material node"],
+    color: Annotated[list[float], "[r, g, b] color values (0-1 range)"],
+    attribute: Annotated[
+        str,
+        "Color attribute name (e.g., 'color', 'baseColor', 'transparency', 'incandescence')",
+    ] = "color",
+) -> dict[str, Any]:
+    """Set a color attribute on a material.
+
+    Args:
+        material: Material node name.
+        color: [r, g, b] color values.
+        attribute: Color attribute name.
+
+    Returns:
+        Dictionary with material, attribute, color, and errors.
+    """
+    return shading_set_material_color(
+        material=material, color=color, attribute=attribute
+    )
 
 
 # Register skin tools

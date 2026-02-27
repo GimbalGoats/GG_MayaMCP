@@ -13,9 +13,31 @@ from maya_mcp.tools.connections import (
     connections_list,
 )
 from maya_mcp.tools.health import health_check
+from maya_mcp.tools.modeling import (
+    modeling_bevel,
+    modeling_boolean,
+    modeling_bridge,
+    modeling_center_pivot,
+    modeling_combine,
+    modeling_create_polygon_primitive,
+    modeling_delete_faces,
+    modeling_delete_history,
+    modeling_extrude_faces,
+    modeling_freeze_transforms,
+    modeling_insert_edge_loop,
+    modeling_merge_vertices,
+    modeling_move_components,
+    modeling_separate,
+    modeling_set_pivot,
+)
 from maya_mcp.tools.nodes import nodes_create, nodes_delete, nodes_info, nodes_list
 from maya_mcp.tools.scene import scene_info, scene_new, scene_redo, scene_undo
 from maya_mcp.tools.selection import selection_clear, selection_get, selection_set
+from maya_mcp.tools.shading import (
+    shading_assign_material,
+    shading_create_material,
+    shading_set_material_color,
+)
 
 __all__ = [
     "attributes_get",
@@ -28,6 +50,21 @@ __all__ = [
     "health_check",
     "maya_connect",
     "maya_disconnect",
+    "modeling_bevel",
+    "modeling_boolean",
+    "modeling_bridge",
+    "modeling_center_pivot",
+    "modeling_combine",
+    "modeling_create_polygon_primitive",
+    "modeling_delete_faces",
+    "modeling_delete_history",
+    "modeling_extrude_faces",
+    "modeling_freeze_transforms",
+    "modeling_insert_edge_loop",
+    "modeling_merge_vertices",
+    "modeling_move_components",
+    "modeling_separate",
+    "modeling_set_pivot",
     "nodes_create",
     "nodes_delete",
     "nodes_info",
@@ -39,4 +76,7 @@ __all__ = [
     "selection_clear",
     "selection_get",
     "selection_set",
+    "shading_assign_material",
+    "shading_create_material",
+    "shading_set_material_color",
 ]
