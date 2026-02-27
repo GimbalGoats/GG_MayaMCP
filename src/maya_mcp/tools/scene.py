@@ -12,6 +12,7 @@ from maya_mcp.errors import ValidationError
 from maya_mcp.transport import get_client
 from maya_mcp.utils.parsing import parse_json_response
 from maya_mcp.utils.response_guard import guard_response_size
+from maya_mcp.utils.validation import FORBIDDEN_PATH_CHARS
 
 # Mapping of Maya time units to FPS values
 TIME_UNIT_TO_FPS: dict[str, float] = {
@@ -89,7 +90,7 @@ ALLOWED_EXPORT_EXTENSIONS: tuple[str, ...] = (
     ".usda",
     ".usdc",
 )
-FORBIDDEN_PATH_CHARACTERS: str = ";|&$`"
+FORBIDDEN_PATH_CHARACTERS: str = FORBIDDEN_PATH_CHARS
 
 
 def scene_info() -> dict[str, Any]:
@@ -341,45 +342,7 @@ def scene_open(file_path: str, force: bool = False) -> dict[str, Any]:
         >>> result = scene_open("/path/to/scene.ma", force=True)
         >>> assert result['success']
     """
-    # --- Server-side validation (before sending anything to Maya) ---
-    normalized_file_path = file_path.strip()
-
-    if not normalized_file_path:
-        raise ValidationError(
-            message="File path must not be empty.",
-            field_name="file_path",
-            value="",
-            constraint="non-empty string",
-        )
-
-    # Reject shell metacharacters (security)
-    for ch in FORBIDDEN_PATH_CHARACTERS:
-        if ch in normalized_file_path:
-            raise ValidationError(
-                message=f"File path contains forbidden character: {ch!r}",
-                field_name="file_path",
-                value=normalized_file_path,
-                constraint="no shell metacharacters",
-            )
-
-    # Reject control characters to prevent command-string injection/newline breaks
-    if any(ord(ch) < 32 for ch in normalized_file_path):
-        raise ValidationError(
-            message="File path contains forbidden control characters.",
-            field_name="file_path",
-            value=normalized_file_path,
-            constraint="printable path string",
-        )
-
-    # Validate file extension
-    lower_path = normalized_file_path.lower()
-    if not lower_path.endswith(ALLOWED_SCENE_EXTENSIONS):
-        raise ValidationError(
-            message=(f"Unsupported file extension. Allowed: {', '.join(ALLOWED_SCENE_EXTENSIONS)}"),
-            field_name="file_path",
-            value=normalized_file_path,
-            constraint="supported Maya file extension",
-        )
+    normalized_file_path = _validate_file_path(file_path, ALLOWED_SCENE_EXTENSIONS)
 
     client = get_client()
 
@@ -578,45 +541,7 @@ def scene_save_as(file_path: str) -> dict[str, Any]:
         >>> if result['success']:
         ...     print(f"Saved as: {result['file_path']}")
     """
-    # --- Server-side validation ---
-    normalized_file_path = file_path.strip()
-
-    if not normalized_file_path:
-        raise ValidationError(
-            message="File path must not be empty.",
-            field_name="file_path",
-            value="",
-            constraint="non-empty string",
-        )
-
-    # Reject shell metacharacters (security)
-    for ch in FORBIDDEN_PATH_CHARACTERS:
-        if ch in normalized_file_path:
-            raise ValidationError(
-                message=f"File path contains forbidden character: {ch!r}",
-                field_name="file_path",
-                value=normalized_file_path,
-                constraint="no shell metacharacters",
-            )
-
-    # Reject control characters
-    if any(ord(ch) < 32 for ch in normalized_file_path):
-        raise ValidationError(
-            message="File path contains forbidden control characters.",
-            field_name="file_path",
-            value=normalized_file_path,
-            constraint="printable path string",
-        )
-
-    # Validate file extension
-    lower_path = normalized_file_path.lower()
-    if not lower_path.endswith(ALLOWED_SCENE_EXTENSIONS):
-        raise ValidationError(
-            message=(f"Unsupported file extension. Allowed: {', '.join(ALLOWED_SCENE_EXTENSIONS)}"),
-            field_name="file_path",
-            value=normalized_file_path,
-            constraint="supported Maya file extension",
-        )
+    normalized_file_path = _validate_file_path(file_path, ALLOWED_SCENE_EXTENSIONS)
 
     client = get_client()
 

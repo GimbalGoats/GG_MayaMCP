@@ -11,39 +11,8 @@ from typing import Any
 
 from maya_mcp.transport import get_client
 from maya_mcp.utils.parsing import parse_json_response
-
-# Characters that are not allowed in node/attribute names for security
-FORBIDDEN_CHARS = frozenset([";", "|", "&", "$", "`", "\n", "\r"])
-
-
-def _validate_node_name(node: str) -> None:
-    """Validate a node name for security.
-
-    Args:
-        node: The node name to validate.
-
-    Raises:
-        ValueError: If the node name is invalid or contains forbidden characters.
-    """
-    if not node or not isinstance(node, str):
-        raise ValueError(f"Invalid node name: {node}")
-    if any(c in node for c in FORBIDDEN_CHARS):
-        raise ValueError(f"Invalid characters in node name: {node}")
-
-
-def _validate_attribute_name(attr: str) -> None:
-    """Validate an attribute name for security.
-
-    Args:
-        attr: The attribute name to validate.
-
-    Raises:
-        ValueError: If the attribute name is invalid or contains forbidden characters.
-    """
-    if not attr or not isinstance(attr, str):
-        raise ValueError(f"Invalid attribute name: {attr}")
-    if any(c in attr for c in FORBIDDEN_CHARS):
-        raise ValueError(f"Invalid characters in attribute name: {attr}")
+from maya_mcp.utils.validation import validate_attribute_name as _validate_attribute_name
+from maya_mcp.utils.validation import validate_node_name as _validate_node_name
 
 
 def attributes_get(

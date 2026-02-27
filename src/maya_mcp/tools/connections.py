@@ -12,57 +12,11 @@ from typing import Any, Literal
 from maya_mcp.transport import get_client
 from maya_mcp.utils.parsing import parse_json_response
 from maya_mcp.utils.response_guard import guard_response_size
-
-FORBIDDEN_CHARS = frozenset([";", "|", "&", "$", "`", "\n", "\r"])
+from maya_mcp.utils.validation import validate_attribute_name as _validate_attribute_name
+from maya_mcp.utils.validation import validate_node_name as _validate_node_name
+from maya_mcp.utils.validation import validate_plug_name as _validate_plug_name
 
 DEFAULT_CONNECTIONS_LIMIT = 500
-
-
-def _validate_node_name(node: str) -> None:
-    """Validate a node name for security.
-
-    Args:
-        node: The node name to validate.
-
-    Raises:
-        ValueError: If the node name is invalid or contains forbidden characters.
-    """
-    if not node or not isinstance(node, str):
-        raise ValueError(f"Invalid node name: {node}")
-    if any(c in node for c in FORBIDDEN_CHARS):
-        raise ValueError(f"Invalid characters in node name: {node}")
-
-
-def _validate_plug_name(plug: str) -> None:
-    """Validate a plug name (node.attribute) for security.
-
-    Args:
-        plug: The plug name to validate.
-
-    Raises:
-        ValueError: If the plug name is invalid or contains forbidden characters.
-    """
-    if not plug or not isinstance(plug, str):
-        raise ValueError(f"Invalid plug name: {plug}")
-    if "." not in plug:
-        raise ValueError(f"Invalid plug format: '{plug}'. Expected 'node.attribute'")
-    if any(c in plug for c in FORBIDDEN_CHARS):
-        raise ValueError(f"Invalid characters in plug name: {plug}")
-
-
-def _validate_attribute_name(attr: str) -> None:
-    """Validate an attribute name for security.
-
-    Args:
-        attr: The attribute name to validate.
-
-    Raises:
-        ValueError: If the attribute name is invalid or contains forbidden characters.
-    """
-    if not attr or not isinstance(attr, str):
-        raise ValueError(f"Invalid attribute name: {attr}")
-    if any(c in attr for c in FORBIDDEN_CHARS):
-        raise ValueError(f"Invalid characters in attribute name: {attr}")
 
 
 def connections_list(
