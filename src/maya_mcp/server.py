@@ -1250,7 +1250,9 @@ def tool_modeling_create_polygon_primitive(
     subdivisions_width: Annotated[int | None, "Width subdivisions"] = None,
     subdivisions_height: Annotated[int | None, "Height subdivisions"] = None,
     subdivisions_depth: Annotated[int | None, "Depth subdivisions"] = None,
-    subdivisions_axis: Annotated[int | None, "Axis subdivisions (sphere/cylinder/cone/torus)"] = None,
+    subdivisions_axis: Annotated[
+        int | None, "Axis subdivisions (sphere/cylinder/cone/torus)"
+    ] = None,
     axis: Annotated[Literal["x", "y", "z"], "Up axis for the primitive"] = "y",
 ) -> dict[str, Any]:
     """Create a polygon primitive.
@@ -1298,7 +1300,9 @@ def tool_modeling_create_polygon_primitive(
     ),
 )
 def tool_modeling_extrude_faces(
-    faces: Annotated[list[str], "Face components to extrude (e.g., ['pCube1.f[0]', 'pCube1.f[2]'])"],
+    faces: Annotated[
+        list[str], "Face components to extrude (e.g., ['pCube1.f[0]', 'pCube1.f[2]'])"
+    ],
     local_translate_z: Annotated[float | None, "Local Z translation (extrusion thickness)"] = None,
     local_translate_x: Annotated[float | None, "Local X translation"] = None,
     local_translate_y: Annotated[float | None, "Local Y translation"] = None,
@@ -1455,7 +1459,9 @@ def tool_modeling_merge_vertices(
     ),
 )
 def tool_modeling_bevel(
-    components: Annotated[list[str], "Edge or vertex components to bevel (e.g., ['pCube1.e[0:3]'])"],
+    components: Annotated[
+        list[str], "Edge or vertex components to bevel (e.g., ['pCube1.e[0:3]'])"
+    ],
     offset: Annotated[float, "Bevel offset distance (default 0.5)"] = 0.5,
     segments: Annotated[int, "Number of bevel segments (default 1)"] = 1,
     fraction: Annotated[float, "Bevel fraction (default 0.5)"] = 0.5,
@@ -1504,9 +1510,7 @@ def tool_modeling_bridge(
     Returns:
         Dictionary with node, new_face_count, and errors.
     """
-    return modeling_bridge(
-        edge_loops=edge_loops, divisions=divisions, twist=twist, taper=taper
-    )
+    return modeling_bridge(edge_loops=edge_loops, divisions=divisions, twist=twist, taper=taper)
 
 
 @mcp.tool(
@@ -1631,9 +1635,7 @@ def tool_modeling_freeze_transforms(
     Returns:
         Dictionary with frozen list, count, and errors.
     """
-    return modeling_freeze_transforms(
-        nodes=nodes, translate=translate, rotate=rotate, scale=scale
-    )
+    return modeling_freeze_transforms(nodes=nodes, translate=translate, rotate=rotate, scale=scale)
 
 
 @mcp.tool(
@@ -1744,9 +1746,7 @@ def tool_shading_create_material(
     Returns:
         Dictionary with material, shading_group, material_type, and errors.
     """
-    return shading_create_material(
-        material_type=material_type, name=name, color=color
-    )
+    return shading_create_material(material_type=material_type, name=name, color=color)
 
 
 @mcp.tool(
@@ -1804,9 +1804,7 @@ def tool_shading_set_material_color(
     Returns:
         Dictionary with material, attribute, color, and errors.
     """
-    return shading_set_material_color(
-        material=material, color=color, attribute=attribute
-    )
+    return shading_set_material_color(material=material, color=color, attribute=attribute)
 
 
 # Register skin tools

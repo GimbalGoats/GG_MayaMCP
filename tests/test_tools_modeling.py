@@ -420,9 +420,7 @@ class TestModelingMergeVertices:
         mock_client.execute.return_value = mock_response
 
         with patch("maya_mcp.tools.modeling.get_client", return_value=mock_client):
-            result = modeling_merge_vertices(
-                "pCube1", vertices=["pCube1.vtx[0]", "pCube1.vtx[1]"]
-            )
+            result = modeling_merge_vertices("pCube1", vertices=["pCube1.vtx[0]", "pCube1.vtx[1]"])
 
         assert result["errors"] is None
 
@@ -623,9 +621,7 @@ class TestModelingMoveComponents:
         mock_client.execute.return_value = mock_response
 
         with patch("maya_mcp.tools.modeling.get_client", return_value=mock_client):
-            result = modeling_move_components(
-                ["pCube1.vtx[0:3]"], translate=[0.0, 1.0, 0.0]
-            )
+            result = modeling_move_components(["pCube1.vtx[0:3]"], translate=[0.0, 1.0, 0.0])
 
         assert result["components_moved"] == 4
         assert result["errors"] is None
@@ -644,9 +640,7 @@ class TestModelingMoveComponents:
         mock_client.execute.return_value = mock_response
 
         with patch("maya_mcp.tools.modeling.get_client", return_value=mock_client):
-            result = modeling_move_components(
-                ["pCube1.vtx[0]"], absolute=[5.0, 5.0, 5.0]
-            )
+            result = modeling_move_components(["pCube1.vtx[0]"], absolute=[5.0, 5.0, 5.0])
 
         assert result["errors"] is None
 
@@ -698,9 +692,7 @@ class TestModelingBevel:
         mock_client.execute.return_value = mock_response
 
         with patch("maya_mcp.tools.modeling.get_client", return_value=mock_client):
-            result = modeling_bevel(
-                ["pCube1.e[0:3]"], offset=0.2, segments=2
-            )
+            result = modeling_bevel(["pCube1.e[0:3]"], offset=0.2, segments=2)
 
         assert result["node"] == "polyBevel1"
         assert result["errors"] is None

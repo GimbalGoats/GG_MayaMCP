@@ -293,8 +293,6 @@ class TestShadingSetMaterialColor:
         mock_client.execute.return_value = mock_response
 
         with patch("maya_mcp.tools.shading.get_client", return_value=mock_client):
-            result = shading_set_material_color(
-                "lambert2", [1.0, 0.0, 0.0], attribute="fakeAttr"
-            )
+            result = shading_set_material_color("lambert2", [1.0, 0.0, 0.0], attribute="fakeAttr")
 
         assert "_attribute" in result["errors"]

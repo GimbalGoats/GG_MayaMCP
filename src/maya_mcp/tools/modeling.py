@@ -63,9 +63,7 @@ def modeling_create_polygon_primitive(
             f"Must be one of: {', '.join(sorted(VALID_PRIMITIVES))}"
         )
     if axis not in VALID_AXES:
-        raise ValueError(
-            f"Invalid axis: {axis!r}. Must be one of: {', '.join(sorted(VALID_AXES))}"
-        )
+        raise ValueError(f"Invalid axis: {axis!r}. Must be one of: {', '.join(sorted(VALID_AXES))}")
     if name is not None:
         _validate_node_name(name)
 
@@ -288,8 +286,7 @@ def modeling_boolean(
     valid_ops = {"union", "difference", "intersection"}
     if operation not in valid_ops:
         raise ValueError(
-            f"Invalid operation: {operation!r}. "
-            f"Must be one of: {', '.join(sorted(valid_ops))}"
+            f"Invalid operation: {operation!r}. Must be one of: {', '.join(sorted(valid_ops))}"
         )
 
     op_map = {"union": 1, "difference": 2, "intersection": 3}
