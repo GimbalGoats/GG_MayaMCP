@@ -5,7 +5,7 @@
 **Product**: Maya MCP Server  
 **Version**: 0.1.0 (v0)  
 **Status**: Active Development  
-**Last Updated**: 2025-02-02
+**Last Updated**: 2026-02-27
 
 Maya MCP is an MCP (Model Context Protocol) server that enables AI assistants and other MCP-compatible clients to control a running instance of Autodesk Maya via its commandPort socket interface.
 
@@ -235,7 +235,7 @@ Improvements based on [Block's MCP Playbook](https://engineering.block.xyz/blog/
 
 ---
 
-### M4: Scene Operations 🚧
+### M4: Scene Operations ✅
 
 **Goal**: File and scene management workflows.
 
@@ -243,10 +243,10 @@ Improvements based on [Block's MCP Playbook](https://engineering.block.xyz/blog/
 |----|---------|-------------|--------|--------|
 | M4.1 | `scene.new` | Create new scene (with save prompt option) | Low | ✅ |
 | M4.2 | `scene.open` | Open scene file (path validated) | Medium | ✅ |
-| M4.3 | `scene.save` | Save current scene | Low | 📋 |
-| M4.4 | `scene.save_as` | Save scene to new path | Low | 📋 |
-| M4.5 | `scene.import` | Import file into current scene | Medium | 📋 |
-| M4.6 | `scene.export` | Export selection to file | Medium | 📋 |
+| M4.3 | `scene.save` | Save current scene | Low | ✅ |
+| M4.4 | `scene.save_as` | Save scene to new path | Low | ✅ |
+| M4.5 | `scene.import` | Import file into current scene | Medium | ✅ |
+| M4.6 | `scene.export` | Export selection to file | Medium | ✅ |
 | M4.7 | `nodes.rename` | Rename nodes (batch support) | Low | ✅ |
 | M4.8 | `nodes.parent` | Reparent nodes in hierarchy | Low | ✅ |
 | M4.9 | `nodes.duplicate` | Duplicate nodes with hierarchy | Medium | ✅ |
@@ -487,11 +487,10 @@ Document common rigging workflows to inform future tool design. **No implementat
 ## Milestone Priority
 
 ```
-M0 ✅ ─► M1 ✅ ─► M2 ✅ ─► M3 🚧 ─► M4 🚧 ─► M5 📋 ─► M6 💡
-                          │            │
-                          ├─► M3-A ✅  ├─► M4.1: scene.new ✅
-                          └─► M3-B 🚧  └─► M4.2–M4.9: 📋
-                              (3/4)
+M0 ✅ ─► M1 ✅ ─► M2 ✅ ─► M3 🚧 ─► M4 ✅ ─► M5 📋 ─► M6 💡
+                          │
+                          ├─► M3-A ✅
+                          └─► M3-B 🚧 (3/4)
 
 M7 ✅ (Node Graph & Connections)
 
@@ -503,7 +502,7 @@ M5 📋 ─► M8 📋 ─► M9 📋 ─► M10 📋 ─► M11 📋 ─► M12
 |----------|-----------|-----------|
 | 1 | ~~M3-A (Maya UI Panel)~~ | ✅ Complete |
 | 2 | M3-B (LLM Optimization) | 1 remaining item: markdown output |
-| 3 | M4 (Scene Operations) | 1/9 done (`scene.new`); 8 remaining |
+| 3 | ~~M4 (Scene Operations)~~ | ✅ Complete |
 | 4 | ~~M7 (Node Graph & Connections)~~ | ✅ Complete |
 | 5 | M5-A (Core Animation) | Essential animation tools |
 | 6 | M5-B (Rigging Patterns) | Design documentation only |
