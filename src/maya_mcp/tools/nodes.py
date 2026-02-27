@@ -12,43 +12,11 @@ from typing import Any
 from maya_mcp.transport import get_client
 from maya_mcp.utils.parsing import parse_json_response
 from maya_mcp.utils.response_guard import guard_response_size
-
-# Characters that are not allowed in patterns for security
-FORBIDDEN_PATTERN_CHARS = frozenset([";", "|", "&", "$", "`", "\n", "\r", '"', "'"])
-
-# Characters that are not allowed in node names for security
-FORBIDDEN_NAME_CHARS = frozenset([";", "&", "$", "`", "\n", "\r"])
+from maya_mcp.utils.validation import validate_node_name as _validate_node_name
+from maya_mcp.utils.validation import validate_pattern as _validate_pattern
 
 # Default limit for node listing to prevent token budget explosion
 DEFAULT_NODE_LIMIT = 500
-
-
-def _validate_pattern(pattern: str) -> None:
-    """Validate a node name pattern for security.
-
-    Args:
-        pattern: The pattern to validate.
-
-    Raises:
-        ValueError: If the pattern contains forbidden characters.
-    """
-    if any(c in pattern for c in FORBIDDEN_PATTERN_CHARS):
-        raise ValueError(f"Invalid characters in pattern: {pattern}")
-
-
-def _validate_node_name(name: str) -> None:
-    """Validate a node name for security.
-
-    Args:
-        name: The node name to validate.
-
-    Raises:
-        ValueError: If the name is invalid or contains forbidden characters.
-    """
-    if not name or not isinstance(name, str):
-        raise ValueError(f"Invalid node name: {name}")
-    if any(c in name for c in FORBIDDEN_NAME_CHARS):
-        raise ValueError(f"Invalid characters in node name: {name}")
 
 
 def nodes_list(

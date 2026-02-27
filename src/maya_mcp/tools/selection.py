@@ -11,24 +11,7 @@ from typing import Any
 from maya_mcp.transport import get_client
 from maya_mcp.utils.parsing import parse_json_response
 from maya_mcp.utils.response_guard import guard_response_size
-
-# Characters that are not allowed in node names for security
-FORBIDDEN_NODE_CHARS = frozenset([";", "|", "&", "$", "`", "\n", "\r"])
-
-
-def _validate_node_name(node: str) -> None:
-    """Validate a node name for security.
-
-    Args:
-        node: The node name to validate.
-
-    Raises:
-        ValueError: If the node name is invalid or contains forbidden characters.
-    """
-    if not node or not isinstance(node, str):
-        raise ValueError(f"Invalid node name: {node}")
-    if any(c in node for c in FORBIDDEN_NODE_CHARS):
-        raise ValueError(f"Invalid characters in node name: {node}")
+from maya_mcp.utils.validation import validate_node_name as _validate_node_name
 
 
 def selection_get() -> dict[str, Any]:
