@@ -481,9 +481,7 @@ print(json.dumps(result))
 def skin_copy_weights(
     source_mesh: str,
     target_mesh: str,
-    surface_association: Literal[
-        "closestPoint", "closestComponent", "rayCast"
-    ] = "closestPoint",
+    surface_association: Literal["closestPoint", "closestComponent", "rayCast"] = "closestPoint",
     influence_association: Literal[
         "closestJoint", "closestBone", "oneToOne", "name", "label"
     ] = "closestJoint",

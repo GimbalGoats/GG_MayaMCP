@@ -102,9 +102,7 @@ class TestSkinBind:
         mock_client.execute.return_value = mock_response
 
         with patch("maya_mcp.tools.skin.get_client", return_value=mock_client):
-            result = skin_bind(
-                "pCube1", ["joint1"], max_influences=2, bind_method="heatMap"
-            )
+            result = skin_bind("pCube1", ["joint1"], max_influences=2, bind_method="heatMap")
 
         assert result["skin_cluster"] == "skinCluster1"
         assert result["errors"] is None
@@ -289,9 +287,7 @@ class TestSkinWeightsGet:
                 "vertex_count": 1000,
                 "influence_count": 4,
                 "influences": ["j1", "j2", "j3", "j4"],
-                "vertices": [
-                    {"vertex_id": i, "weights": {"j1": 1.0}} for i in range(100)
-                ],
+                "vertices": [{"vertex_id": i, "weights": {"j1": 1.0}} for i in range(100)],
                 "offset": 0,
                 "count": 100,
                 "truncated": True,
@@ -324,10 +320,7 @@ class TestSkinWeightsGet:
         large_vertices = [
             {
                 "vertex_id": i,
-                "weights": {
-                    f"joint_{j}": round(1.0 / 10, 6)
-                    for j in range(10)
-                },
+                "weights": {f"joint_{j}": round(1.0 / 10, 6) for j in range(10)},
             }
             for i in range(500)
         ]
