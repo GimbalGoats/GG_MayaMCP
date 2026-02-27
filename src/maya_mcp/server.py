@@ -1112,8 +1112,7 @@ def tool_selection_set_components(
 
 @mcp.tool(
     name="selection.get_components",
-    description="Get currently selected mesh components grouped by type "
-    "(vertices, edges, faces).",
+    description="Get currently selected mesh components grouped by type (vertices, edges, faces).",
     annotations=ToolAnnotations(
         readOnlyHint=True,
         destructiveHint=False,
