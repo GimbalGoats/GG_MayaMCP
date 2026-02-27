@@ -856,6 +856,7 @@ try:
         elif ext == ".obj":
             export_kwargs["type"] = "OBJexport"
         elif ext == ".fbx":
+            export_kwargs["type"] = "FBX export"
             if animation:
                 cmds.bakeResults(simulation=True)
         elif ext == ".abc":

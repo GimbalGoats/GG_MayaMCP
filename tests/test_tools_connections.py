@@ -345,7 +345,7 @@ class TestConnectionsConnect:
         assert "checker1.outColor" in result["disconnected"]
 
     def test_connections_connect_already_connected_error(self) -> None:
-        """Connect fails when destination already connected and force=False."""
+        """Connect returns error when destination already connected and force=False."""
         mock_client = MagicMock()
         mock_response = json.dumps(
             {
@@ -358,14 +358,14 @@ class TestConnectionsConnect:
         )
         mock_client.execute.return_value = mock_response
 
-        with (
-            patch("maya_mcp.tools.connections.get_client", return_value=mock_client),
-            pytest.raises(ValueError, match="already connected"),
-        ):
-            connections_connect("ramp1.outColor", "lambert1.color", force=False)
+        with patch("maya_mcp.tools.connections.get_client", return_value=mock_client):
+            result = connections_connect("ramp1.outColor", "lambert1.color", force=False)
+
+        assert result["connected"] is False
+        assert "already connected" in result["error"]
 
     def test_connections_connect_source_not_exists(self) -> None:
-        """Connect fails when source doesn't exist."""
+        """Connect returns error when source doesn't exist."""
         mock_client = MagicMock()
         mock_response = json.dumps(
             {
@@ -378,11 +378,11 @@ class TestConnectionsConnect:
         )
         mock_client.execute.return_value = mock_response
 
-        with (
-            patch("maya_mcp.tools.connections.get_client", return_value=mock_client),
-            pytest.raises(ValueError, match="does not exist"),
-        ):
-            connections_connect("nonExistent.outColor", "lambert1.color")
+        with patch("maya_mcp.tools.connections.get_client", return_value=mock_client):
+            result = connections_connect("nonExistent.outColor", "lambert1.color")
+
+        assert result["connected"] is False
+        assert "does not exist" in result["error"]
 
     def test_connections_connect_invalid_plug_format(self) -> None:
         """Connect raises ValueError for invalid plug format."""
@@ -456,7 +456,7 @@ class TestConnectionsDisconnect:
         assert result["count"] == 2
 
     def test_connections_disconnect_no_connection_exists(self) -> None:
-        """Disconnect fails when no connection exists."""
+        """Disconnect returns error when no connection exists."""
         mock_client = MagicMock()
         mock_response = json.dumps(
             {
@@ -467,11 +467,11 @@ class TestConnectionsDisconnect:
         )
         mock_client.execute.return_value = mock_response
 
-        with (
-            patch("maya_mcp.tools.connections.get_client", return_value=mock_client),
-            pytest.raises(ValueError, match="No connection exists"),
-        ):
-            connections_disconnect("ramp1.outColor", "lambert1.color")
+        with patch("maya_mcp.tools.connections.get_client", return_value=mock_client):
+            result = connections_disconnect("ramp1.outColor", "lambert1.color")
+
+        assert result["count"] == 0
+        assert "No connection exists" in result["error"]
 
     def test_connections_disconnect_neither_provided(self) -> None:
         """Disconnect raises ValueError when neither source nor destination provided."""
