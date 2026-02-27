@@ -35,6 +35,7 @@ from maya_mcp.tools.connections import (
     connections_list,
 )
 from maya_mcp.tools.health import health_check
+from maya_mcp.tools.mesh import mesh_evaluate, mesh_info, mesh_vertices
 from maya_mcp.tools.nodes import (
     nodes_create,
     nodes_delete,
@@ -55,7 +56,14 @@ from maya_mcp.tools.scene import (
     scene_save_as,
     scene_undo,
 )
-from maya_mcp.tools.selection import selection_clear, selection_get, selection_set
+from maya_mcp.tools.selection import (
+    selection_clear,
+    selection_convert_components,
+    selection_get,
+    selection_get_components,
+    selection_set,
+    selection_set_components,
+)
 
 # Create the FastMCP server instance
 mcp = FastMCP(
@@ -90,9 +98,15 @@ Available tools:
 - connections.connect: Connect two attributes (with optional force disconnect)
 - connections.disconnect: Disconnect attributes (specific or all incoming/outgoing)
 - connections.history: List construction/deformation history on a node
+- mesh.info: Get mesh statistics (vertex/face/edge counts, bounding box, UV status)
+- mesh.vertices: Query vertex positions with offset/limit pagination
+- mesh.evaluate: Analyze mesh topology (non-manifold edges, lamina faces, holes, borders)
 - selection.get: Get current selection
 - selection.set: Set selection (replace, add, or deselect)
 - selection.clear: Clear the selection (deselect all)
+- selection.set_components: Select mesh components (vertices, edges, faces)
+- selection.get_components: Get selected components grouped by type
+- selection.convert_components: Convert selection between vertex/edge/face
 
 Workflow tips:
 - Use nodes.info for a quick overview of any node before making changes
@@ -103,6 +117,8 @@ Workflow tips:
 - Use scene.new(force=True) to discard unsaved changes, or check the error message first
 - Use scene.import with namespace to organize imported assets
 - Use scene.export(export_mode="all") to export the entire scene
+- Use mesh.evaluate() to check mesh topology before rigging or exporting
+- Use selection.set_components() for precise vertex/edge/face selection
 
 Before using Maya tools, ensure Maya is running with commandPort enabled:
     import maya.cmds as cmds
@@ -965,6 +981,185 @@ def tool_selection_clear() -> dict[str, Any]:
         Empty selection state with selection array and count of 0.
     """
     return selection_clear()
+
+
+# Register mesh tools
+@mcp.tool(
+    name="mesh.info",
+    description="Get mesh statistics: vertex/face/edge counts, bounding box, UV status",
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_mesh_info(
+    node: Annotated[str, "Name of the mesh node (transform or shape)"],
+) -> dict[str, Any]:
+    """Get mesh statistics.
+
+    Args:
+        node: Name of the mesh node (transform or shape).
+
+    Returns:
+        Dictionary with vertex_count, face_count, edge_count, bounding_box,
+        uv_sets, has_uvs, and errors.
+    """
+    return mesh_info(node=node)
+
+
+@mcp.tool(
+    name="mesh.vertices",
+    description="Query vertex positions from a mesh with offset/limit pagination. "
+    "Returns vertex positions as [x, y, z] arrays.",
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_mesh_vertices(
+    node: Annotated[str, "Name of the mesh node (transform or shape)"],
+    offset: Annotated[int, "Starting vertex index (0-based)"] = 0,
+    limit: Annotated[
+        int | None,
+        "Maximum vertices to return (default 1000, use 0 for unlimited)",
+    ] = 1000,
+) -> dict[str, Any]:
+    """Query vertex positions from a mesh.
+
+    Args:
+        node: Name of the mesh node.
+        offset: Starting vertex index.
+        limit: Maximum vertices to return.
+
+    Returns:
+        Dictionary with vertices list, vertex_count, offset, count, and errors.
+    """
+    return mesh_vertices(node=node, offset=offset, limit=limit)
+
+
+@mcp.tool(
+    name="mesh.evaluate",
+    description="Analyze mesh topology for issues: non-manifold edges, lamina faces, "
+    "holes, and border edges.",
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_mesh_evaluate(
+    node: Annotated[str, "Name of the mesh node (transform or shape)"],
+    checks: Annotated[
+        list[Literal["non_manifold", "lamina", "holes", "border"]] | None,
+        "Checks to perform (default: all)",
+    ] = None,
+    limit: Annotated[
+        int | None,
+        "Max components per check (default 500)",
+    ] = 500,
+) -> dict[str, Any]:
+    """Analyze mesh topology.
+
+    Args:
+        node: Name of the mesh node.
+        checks: List of checks to perform. Options:
+            non_manifold, lamina, holes, border. Default: all.
+        limit: Maximum components to return per check.
+
+    Returns:
+        Dictionary with topology analysis results and is_clean flag.
+    """
+    return mesh_evaluate(node=node, checks=checks, limit=limit)
+
+
+# Register component selection tools
+@mcp.tool(
+    name="selection.set_components",
+    description="Select mesh components (vertices, edges, or faces) using Maya notation "
+    "(e.g., 'pCube1.vtx[0:10]', 'pSphere1.e[5]', 'pPlane1.f[0:99]').",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_selection_set_components(
+    components: Annotated[
+        list[str],
+        "Component specifications (e.g., ['pCube1.vtx[0:7]', 'pCube1.f[0]'])",
+    ],
+    add: Annotated[bool, "Add to existing selection"] = False,
+    deselect: Annotated[bool, "Remove from selection"] = False,
+) -> dict[str, Any]:
+    """Select mesh components.
+
+    Args:
+        components: List of component specifications in Maya notation.
+        add: Add to existing selection.
+        deselect: Remove from selection.
+
+    Returns:
+        Dictionary with selection list, count, and errors.
+    """
+    return selection_set_components(components=components, add=add, deselect=deselect)
+
+
+@mcp.tool(
+    name="selection.get_components",
+    description="Get currently selected mesh components grouped by type (vertices, edges, faces).",
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_selection_get_components() -> dict[str, Any]:
+    """Get selected mesh components.
+
+    Returns:
+        Dictionary with selection, vertices, edges, faces lists and counts.
+    """
+    return selection_get_components()
+
+
+@mcp.tool(
+    name="selection.convert_components",
+    description="Convert the current selection to a different component type "
+    "(vertex, edge, or face).",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_selection_convert_components(
+    to_type: Annotated[
+        Literal["vertex", "edge", "face"],
+        "Target component type",
+    ],
+    nodes: Annotated[
+        list[str] | None,
+        "Nodes to convert (None = use current selection)",
+    ] = None,
+) -> dict[str, Any]:
+    """Convert selection to different component type.
+
+    Args:
+        to_type: Target component type (vertex, edge, face).
+        nodes: Optional nodes to convert. If None, uses current selection.
+
+    Returns:
+        Dictionary with converted selection list and count.
+    """
+    return selection_convert_components(to_type=to_type, nodes=nodes)
 
 
 def main() -> None:

@@ -1498,6 +1498,358 @@ Clear the Maya selection (deselect all).
 
 ---
 
+## Mesh Tools
+
+Mesh tools provide geometry queries and topology analysis for polygon meshes.
+
+### `mesh.info`
+
+Get mesh statistics: vertex/face/edge counts, bounding box, UV status.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `node` | `string` | Yes | - | Name of the mesh node (transform or shape) |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `node` | `string` | The queried node name |
+| `exists` | `boolean` | Whether the node exists |
+| `is_mesh` | `boolean` | Whether the node is a mesh |
+| `shape` | `string` | Shape node name (if mesh) |
+| `vertex_count` | `integer` | Number of vertices |
+| `face_count` | `integer` | Number of faces |
+| `edge_count` | `integer` | Number of edges |
+| `uv_count` | `integer` | Number of UV coordinates |
+| `has_uvs` | `boolean` | Whether the mesh has UVs |
+| `uv_sets` | `string[]` | List of UV set names |
+| `bounding_box` | `[number, number, number, number, number, number]` | Bounding box as [min_x, min_y, min_z, max_x, max_y, max_z] |
+| `errors` | `object \| null` | Error details if any queries failed |
+
+**Example Request**:
+
+```json
+{
+  "node": "pCube1"
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "node": "pCube1",
+  "exists": true,
+  "is_mesh": true,
+  "shape": "pCubeShape1",
+  "vertex_count": 8,
+  "face_count": 6,
+  "edge_count": 12,
+  "uv_count": 8,
+  "has_uvs": true,
+  "uv_sets": ["map1"],
+  "bounding_box": [-0.5, -0.5, -0.5, 0.5, 0.5, 0.5],
+  "errors": null
+}
+```
+
+---
+
+### `mesh.vertices`
+
+Query vertex positions from a mesh with offset/limit pagination.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `node` | `string` | Yes | - | Name of the mesh node (transform or shape) |
+| `offset` | `integer` | No | `0` | Starting vertex index (0-based) |
+| `limit` | `integer` | No | `1000` | Maximum vertices to return. Use 0 for unlimited. |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `node` | `string` | The queried node name |
+| `exists` | `boolean` | Whether the node exists |
+| `is_mesh` | `boolean` | Whether the node is a mesh |
+| `vertex_count` | `integer` | Total number of vertices in mesh |
+| `vertices` | `array` | List of [x, y, z] position arrays |
+| `offset` | `integer` | The offset used |
+| `count` | `integer` | Number of vertices returned |
+| `truncated` | `boolean` | True if results were truncated (only if limit hit) |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "node": "pCube1",
+  "offset": 0,
+  "limit": 100
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "node": "pCube1",
+  "exists": true,
+  "is_mesh": true,
+  "vertex_count": 8,
+  "vertices": [
+    [-0.5, -0.5, -0.5],
+    [0.5, -0.5, -0.5],
+    [0.5, 0.5, -0.5],
+    [-0.5, 0.5, -0.5],
+    [-0.5, 0.5, 0.5],
+    [0.5, 0.5, 0.5],
+    [0.5, -0.5, 0.5],
+    [-0.5, -0.5, 0.5]
+  ],
+  "offset": 0,
+  "count": 8,
+  "errors": null
+}
+```
+
+---
+
+### `mesh.evaluate`
+
+Analyze mesh topology for issues: non-manifold edges, lamina faces, holes, and border edges.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `node` | `string` | Yes | - | Name of the mesh node (transform or shape) |
+| `checks` | `string[]` | No | `["non_manifold", "lamina", "holes", "border"]` | List of checks to perform |
+| `limit` | `integer` | No | `500` | Max components to return per check. Use 0 for unlimited. |
+
+**Valid Check Types**:
+
+| Check | Description |
+|-------|-------------|
+| `non_manifold` | Find non-manifold edges (edges shared by more than 2 faces) |
+| `lamina` | Find lamina faces (faces that share all edges with another face) |
+| `holes` | Find edges bordering holes in the mesh |
+| `border` | Find border edges (edges with only one adjacent face) |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `node` | `string` | The queried node name |
+| `exists` | `boolean` | Whether the node exists |
+| `is_mesh` | `boolean` | Whether the node is a mesh |
+| `is_clean` | `boolean` | True if mesh has no topology issues (excludes borders) |
+| `non_manifold_edges` | `string[]` | List of non-manifold edge names (if checked) |
+| `non_manifold_count` | `integer` | Count of non-manifold edges |
+| `lamina_faces` | `string[]` | List of lamina face names (if checked) |
+| `lamina_count` | `integer` | Count of lamina faces |
+| `holes` | `string[]` | List of edges bordering holes (if checked) |
+| `hole_count` | `integer` | Count of hole-bordering edges |
+| `border_edges` | `string[]` | List of border edge names (if checked) |
+| `border_count` | `integer` | Count of border edges |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "node": "pCube1",
+  "checks": ["non_manifold", "holes"]
+}
+```
+
+**Example Response (Clean Mesh)**:
+
+```json
+{
+  "node": "pCube1",
+  "exists": true,
+  "is_mesh": true,
+  "is_clean": true,
+  "non_manifold_edges": [],
+  "non_manifold_count": 0,
+  "holes": [],
+  "hole_count": 0,
+  "errors": null
+}
+```
+
+**Example Response (Mesh with Issues)**:
+
+```json
+{
+  "node": "badMesh",
+  "exists": true,
+  "is_mesh": true,
+  "is_clean": false,
+  "non_manifold_edges": ["badMeshShape.e[5]", "badMeshShape.e[6]"],
+  "non_manifold_count": 2,
+  "lamina_faces": [],
+  "lamina_count": 0,
+  "holes": ["badMeshShape.e[10]"],
+  "hole_count": 1,
+  "border_edges": [],
+  "border_count": 0,
+  "errors": null
+}
+```
+
+---
+
+## Component Selection Tools
+
+Component selection tools provide vertex, edge, and face selection operations.
+
+### `selection.set_components`
+
+Select mesh components (vertices, edges, or faces) using Maya notation.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `components` | `string[]` | Yes | - | Component specifications in Maya notation |
+| `add` | `boolean` | No | `false` | Add to existing selection |
+| `deselect` | `boolean` | No | `false` | Remove from selection |
+
+**Component Notation Examples**:
+
+| Notation | Description |
+|----------|-------------|
+| `pCube1.vtx[0]` | Single vertex |
+| `pCube1.vtx[0:10]` | Vertex range (0 through 10) |
+| `pCube1.vtx[0:10:2]` | Vertex range with step (0, 2, 4, 6, 8, 10) |
+| `pCube1.e[5]` | Single edge |
+| `pCube1.e[0:99]` | Edge range |
+| `pCube1.f[0]` | Single face |
+| `pCube1.f[0:99]` | Face range |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `selection` | `string[]` | List of currently selected components |
+| `count` | `integer` | Number of selected components |
+| `errors` | `object \| null` | Map of component to error message |
+
+**Example Request**:
+
+```json
+{
+  "components": ["pCube1.vtx[0:7]"]
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "selection": [
+    "pCube1.vtx[0]",
+    "pCube1.vtx[1]",
+    "pCube1.vtx[2]",
+    "pCube1.vtx[3]",
+    "pCube1.vtx[4]",
+    "pCube1.vtx[5]",
+    "pCube1.vtx[6]",
+    "pCube1.vtx[7]"
+  ],
+  "count": 8,
+  "errors": null
+}
+```
+
+---
+
+### `selection.get_components`
+
+Get the currently selected mesh components grouped by type.
+
+**Input**: None
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `selection` | `string[]` | List of all selected components (flattened) |
+| `vertices` | `string[]` | List of selected vertex specifications |
+| `edges` | `string[]` | List of selected edge specifications |
+| `faces` | `string[]` | List of selected face specifications |
+| `vertex_count` | `integer` | Number of selected vertices |
+| `edge_count` | `integer` | Number of selected edges |
+| `face_count` | `integer` | Number of selected faces |
+| `total_count` | `integer` | Total number of selected components |
+| `has_components` | `boolean` | True if any components are selected |
+
+**Example Response**:
+
+```json
+{
+  "selection": ["pCube1.vtx[0]", "pCube1.vtx[1]", "pCube1.e[5]"],
+  "vertices": ["pCube1.vtx[0]", "pCube1.vtx[1]"],
+  "edges": ["pCube1.e[5]"],
+  "faces": [],
+  "vertex_count": 2,
+  "edge_count": 1,
+  "face_count": 0,
+  "total_count": 3,
+  "has_components": true
+}
+```
+
+---
+
+### `selection.convert_components`
+
+Convert the current selection to a different component type.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `to_type` | `string` | Yes | - | Target component type: `"vertex"`, `"edge"`, or `"face"` |
+| `nodes` | `string[]` | No | `null` | Nodes to convert. If null, uses current selection. |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `selection` | `string[]` | List of converted components |
+| `to_type` | `string` | The target component type |
+| `count` | `integer` | Number of converted components |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "to_type": "face"
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "selection": ["pCube1.f[0]", "pCube1.f[1]", "pCube1.f[2]", "pCube1.f[3]"],
+  "to_type": "face",
+  "count": 4,
+  "errors": null
+}
+```
+
+---
+
 ## Error Responses
 
 All tools may return errors in a consistent format:
@@ -1575,9 +1927,15 @@ All tools include MCP annotations to help AI clients understand their behavior a
 | `connections.connect` | false | false | true |
 | `connections.disconnect` | false | false | true |
 | `connections.history` | true | false | true |
+| `mesh.info` | true | false | true |
+| `mesh.vertices` | true | false | true |
+| `mesh.evaluate` | true | false | true |
 | `selection.get` | true | false | true |
 | `selection.set` | false | false | false |
 | `selection.clear` | false | false | true |
+| `selection.set_components` | false | false | false |
+| `selection.get_components` | true | false | true |
+| `selection.convert_components` | false | false | false |
 
 ---
 
@@ -1592,6 +1950,8 @@ Large Maya scenes can contain thousands of nodes. To prevent token budget explos
 | `nodes.list` | 500 nodes | Yes (`limit` param) |
 | `connections.list` | 500 connections | Yes (`limit` param) |
 | `connections.history` | 500 history nodes | Yes (`limit` param) |
+| `mesh.vertices` | 1000 vertices | Yes (`limit` param) |
+| `mesh.evaluate` | 500 components per check | Yes (`limit` param) |
 
 ### Handling Truncated Results
 
