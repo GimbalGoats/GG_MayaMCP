@@ -259,7 +259,7 @@ def scene_new(force: bool = False) -> dict[str, Any]:
     """
     client = get_client()
 
-    force_py = str(json.loads("true" if force else "false"))
+    force_py = str(force)
     command = f"""
 import maya.cmds as cmds
 import json
@@ -350,7 +350,7 @@ def scene_open(file_path: str, force: bool = False) -> dict[str, Any]:
     safe_path = normalized_file_path.replace("\\", "/")
     path_literal = json.dumps(safe_path)
 
-    force_py = str(json.loads("true" if force else "false"))
+    force_py = str(force)
     command = f"""
 import maya.cmds as cmds
 import json
@@ -692,7 +692,7 @@ def scene_import(
     path_literal = json.dumps(safe_path)
 
     namespace_literal = "None" if namespace is None else json.dumps(namespace)
-    force_py = str(json.loads("true" if force else "false"))
+    force_py = str(force)
 
     command = f"""
 import maya.cmds as cmds
@@ -820,7 +820,7 @@ def scene_export(
     safe_path = normalized_file_path.replace("\\", "/")
     path_literal = json.dumps(safe_path)
 
-    animation_py = str(json.loads("true" if animation else "false"))
+    animation_py = str(animation)
 
     command = f"""
 import maya.cmds as cmds

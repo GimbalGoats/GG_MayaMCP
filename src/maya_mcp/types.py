@@ -10,7 +10,7 @@ that MCP clients can rely on.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Literal
 
@@ -185,7 +185,7 @@ class ClientState:
 
     def update_contact(self) -> None:
         """Update last_contact to current time."""
-        self.last_contact = datetime.utcnow()
+        self.last_contact = datetime.now(timezone.utc)
 
     def get_last_contact_iso(self) -> str | None:
         """Get last_contact as ISO8601 string."""

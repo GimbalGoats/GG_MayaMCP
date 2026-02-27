@@ -517,12 +517,7 @@ for node in nodes_to_delete:
         if not cmds.objExists(node):
             result["errors"][node] = f"Node '{{node}}' does not exist"
         else:
-            if delete_hierarchy:
-                # Get all descendants and delete
-                descendants = cmds.listRelatives(node, allDescendents=True, fullPath=True) or []
-                cmds.delete(node)
-            else:
-                cmds.delete(node)
+            cmds.delete(node)
             result["deleted"].append(node)
     except Exception as e:
         result["errors"][node] = str(e)
