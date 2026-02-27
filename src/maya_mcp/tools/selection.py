@@ -16,10 +16,6 @@ from maya_mcp.utils.response_guard import guard_response_size
 # Characters that are not allowed in node names for security
 FORBIDDEN_NODE_CHARS = frozenset([";", "|", "&", "$", "`", "\n", "\r"])
 
-# Characters allowed in component specifications (in addition to normal chars)
-# Component syntax uses `[`, `]`, `:`, and `.` characters (e.g., `pCube1.vtx[0:10]`)
-COMPONENT_ALLOWED_CHARS = frozenset(["[", "]", ":", "."])
-
 
 def _validate_node_name(node: str) -> None:
     """Validate a node name for security.
@@ -380,11 +376,6 @@ print(json.dumps(result))
     else:
         result["errors"] = None
 
-    result = guard_response_size(result, list_key="selection")
-
-    return result
-
-    # Apply response size guard for large selections
     result = guard_response_size(result, list_key="selection")
 
     return result
