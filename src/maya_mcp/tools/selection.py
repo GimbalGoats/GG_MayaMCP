@@ -12,26 +12,8 @@ from typing import Any, Literal
 from maya_mcp.transport import get_client
 from maya_mcp.utils.parsing import parse_json_response
 from maya_mcp.utils.response_guard import guard_response_size
+from maya_mcp.utils.validation import validate_component_name as _validate_component_name
 from maya_mcp.utils.validation import validate_node_name as _validate_node_name
-
-
-def _validate_component_name(component: str) -> None:
-    """Validate a component specification for security.
-
-    Component syntax uses `[`, `]`, `:`, and `.` characters
-    (e.g., `pCube1.vtx[0:10]`). These are allowed but shell
-    metacharacters are still blocked.
-
-    Args:
-        component: The component specification to validate.
-
-    Raises:
-        ValueError: If the component contains forbidden characters.
-    """
-    if not component or not isinstance(component, str):
-        raise ValueError(f"Invalid component specification: {component}")
-    if any(c in component for c in FORBIDDEN_NODE_CHARS):
-        raise ValueError(f"Invalid characters in component specification: {component}")
 
 
 def selection_get() -> dict[str, Any]:
