@@ -29,6 +29,7 @@ Note:
 from __future__ import annotations
 
 import contextlib
+import logging
 import socket
 import time
 
@@ -42,6 +43,8 @@ from maya_mcp.types import (
     ConnectionStatus,
     HealthCheckResult,
 )
+
+logger = logging.getLogger(__name__)
 
 # Buffer size for socket receive
 BUFFER_SIZE = 4096
@@ -227,6 +230,7 @@ class CommandPortClient:
 
         self.state.status = ConnectionStatus.RECONNECTING
         last_error: str | None = None
+        logger.info("Connecting to Maya at %s:%d", self.config.host, self.config.port)
 
         for attempt in range(self.config.max_retries):
             try:
@@ -238,6 +242,7 @@ class CommandPortClient:
                 self.state.status = ConnectionStatus.OK
                 self.state.last_error = None
                 self.state.update_contact()
+                logger.info("Connected to Maya at %s:%d", self.config.host, self.config.port)
                 return True
 
             except TimeoutError:
@@ -253,11 +258,23 @@ class CommandPortClient:
             # Exponential backoff before retry
             if attempt < self.config.max_retries - 1:
                 delay = self.config.retry_base_delay * (2**attempt)
+                logger.debug(
+                    "Connection attempt %d/%d failed: %s. Retrying in %.1fs",
+                    attempt + 1,
+                    self.config.max_retries,
+                    last_error,
+                    delay,
+                )
                 time.sleep(delay)
 
         # All retries exhausted
         self.state.status = ConnectionStatus.OFFLINE
         self.state.last_error = last_error
+        logger.warning(
+            "Failed to connect to Maya after %d attempts: %s",
+            self.config.max_retries,
+            last_error,
+        )
 
         raise MayaUnavailableError(
             message=f"Cannot connect to Maya commandPort at {self.config.host}:{self.config.port}",
@@ -280,6 +297,8 @@ class CommandPortClient:
         was_connected = self._socket is not None
         self._cleanup_socket()
         self.state.status = ConnectionStatus.OFFLINE
+        if was_connected:
+            logger.info("Disconnected from Maya")
         return was_connected
 
     def execute(self, command: str) -> str:
@@ -322,6 +341,7 @@ class CommandPortClient:
 
             # Prepare command
             command = command.strip()
+            logger.debug("Executing command (%d chars)", len(command))
 
             # Maya commandPort requires a newline to execute the command
             if not command.endswith("\n"):
@@ -356,12 +376,14 @@ class CommandPortClient:
             # Update state on success
             self.state.update_contact()
             self.state.last_error = None
+            logger.debug("Command completed (%d chars response)", len(response))
 
             return response
 
         except TimeoutError as exc:
             self.state.last_error = f"Command timed out after {self.config.command_timeout}s"
             self._handle_socket_error()
+            logger.error("Command timed out after %.1fs", self.config.command_timeout)
             raise MayaTimeoutError(
                 message="Command execution timed out",
                 timeout_seconds=self.config.command_timeout,
@@ -372,6 +394,7 @@ class CommandPortClient:
             error_msg = f"Connection lost: {e}"
             self.state.last_error = error_msg
             self._handle_socket_error()
+            logger.error("Connection lost during command execution: %s", e)
             raise MayaUnavailableError(
                 message="Lost connection to Maya during command execution",
                 host=self.config.host,
