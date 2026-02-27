@@ -262,7 +262,7 @@ def mesh_evaluate(
         checks: List of checks to perform. Options:
             - "non_manifold": Find non-manifold edges
             - "lamina": Find lamina faces (faces sharing all edges)
-            - "holes": Find holes in the mesh
+            - "holes": Find faces with holes
             - "border": Find border edges
             If None, performs all checks.
         limit: Maximum number of components to return per check. Default 500.
@@ -277,8 +277,8 @@ def mesh_evaluate(
             - non_manifold_count: Count of non-manifold edges
             - lamina_faces: List of lamina face names (if checked)
             - lamina_count: Count of lamina faces
-            - holes: List of edges bordering holes (if checked)
-            - hole_count: Count of hole-bordering edges
+            - holes: List of faces with holes (if checked)
+            - hole_count: Count of faces with holes
             - border_edges: List of border edge names (if checked)
             - border_count: Count of border edges
             - is_clean: True if mesh has no topology issues
@@ -390,41 +390,67 @@ try:
                 except Exception as e:
                     result["errors"]["lamina"] = str(e)
 
-            # Holes (using polyInfo with holes)
+            # Holes (using polySelectConstraint to find faces with holes)
             if "holes" in checks:
                 try:
-                    hole_edges = cmds.polyInfo(shape, holes=True) or []
-                    edge_list = []
-                    for line in hole_edges:
-                        parts = line.split()
-                        for idx in parts[1:]:
-                            edge_name = shape + ".e[" + idx + "]"
-                            edge_list.append(edge_name)
-                            if limit and limit > 0 and len(edge_list) >= limit:
+                    # Store current selection
+                    orig_sel = cmds.ls(selection=True, flatten=True) or []
+
+                    # Select faces with holes using polySelectConstraint
+                    cmds.select(shape, replace=True)
+                    cmds.polySelectConstraint(mode=3, type=8, holes=1)
+                    holed_faces = cmds.ls(selection=True, flatten=True) or []
+
+                    # Reset constraint and restore selection
+                    cmds.polySelectConstraint(holes=0)
+                    cmds.polySelectConstraint(disable=True)
+                    if orig_sel:
+                        cmds.select(orig_sel, replace=True)
+                    else:
+                        cmds.select(clear=True)
+
+                    # Filter to only include faces from this shape
+                    face_list = []
+                    for face in holed_faces:
+                        if shape in face and ".f[" in face:
+                            face_list.append(face)
+                            if limit and limit > 0 and len(face_list) >= limit:
                                 break
-                        if limit and limit > 0 and len(edge_list) >= limit:
-                            break
-                    result["holes"] = edge_list
-                    result["hole_count"] = len(edge_list)
-                    if len(edge_list) > 0:
+
+                    result["holes"] = face_list
+                    result["hole_count"] = len(face_list)
+                    if len(face_list) > 0:
                         result["is_clean"] = False
                 except Exception as e:
                     result["errors"]["holes"] = str(e)
 
-            # Border edges
+            # Border edges (using polySelectConstraint)
             if "border" in checks:
                 try:
-                    border_edges = cmds.polyInfo(shape, edgeToBorderEdges=True) or []
+                    # Store current selection
+                    orig_sel = cmds.ls(selection=True, flatten=True) or []
+
+                    # Select border edges using polySelectConstraint
+                    cmds.select(shape, replace=True)
+                    cmds.polySelectConstraint(mode=3, type=0x8000, where=1)
+                    border_edges = cmds.ls(selection=True, flatten=True) or []
+
+                    # Reset constraint and restore selection
+                    cmds.polySelectConstraint(where=0)
+                    cmds.polySelectConstraint(disable=True)
+                    if orig_sel:
+                        cmds.select(orig_sel, replace=True)
+                    else:
+                        cmds.select(clear=True)
+
+                    # Filter to only include edges from this shape
                     edge_list = []
-                    for line in border_edges:
-                        parts = line.split()
-                        for idx in parts[1:]:
-                            edge_name = shape + ".e[" + idx + "]"
-                            edge_list.append(edge_name)
+                    for edge in border_edges:
+                        if shape in edge and ".e[" in edge:
+                            edge_list.append(edge)
                             if limit and limit > 0 and len(edge_list) >= limit:
                                 break
-                        if limit and limit > 0 and len(edge_list) >= limit:
-                            break
+
                     result["border_edges"] = edge_list
                     result["border_count"] = len(edge_list)
                 except Exception as e:
