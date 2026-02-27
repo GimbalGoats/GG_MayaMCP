@@ -445,9 +445,6 @@ print(json.dumps(result))
     response = client.execute(command)
     parsed: dict[str, Any] = parse_json_response(response)
 
-    if parsed.get("error"):
-        raise ValueError(parsed["error"])
-
     return parsed
 
 
@@ -573,9 +570,6 @@ print(json.dumps(result))
 
     response = client.execute(command)
     parsed: dict[str, Any] = parse_json_response(response)
-
-    if parsed.get("error"):
-        raise ValueError(parsed["error"])
 
     return parsed
 
