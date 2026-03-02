@@ -64,9 +64,7 @@ class TestAnimationSetTime:
     def test_set_time_maya_error(self) -> None:
         """Set time returns error on Maya exception."""
         mock_client = MagicMock()
-        mock_response = json.dumps(
-            {"time": None, "errors": {"_exception": "Runtime error"}}
-        )
+        mock_response = json.dumps({"time": None, "errors": {"_exception": "Runtime error"}})
         mock_client.execute.return_value = mock_response
 
         with patch("maya_mcp.tools.animation.get_client", return_value=mock_client):
@@ -191,9 +189,7 @@ class TestAnimationSetTimeRange:
         mock_client.execute.return_value = mock_response
 
         with patch("maya_mcp.tools.animation.get_client", return_value=mock_client):
-            result = animation_set_time_range(
-                10.0, 50.0, animation_start=1.0, animation_end=100.0
-            )
+            result = animation_set_time_range(10.0, 50.0, animation_start=1.0, animation_end=100.0)
 
         assert result["min_time"] == 10.0
         assert result["max_time"] == 50.0

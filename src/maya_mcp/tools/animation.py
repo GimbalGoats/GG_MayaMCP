@@ -17,8 +17,16 @@ from maya_mcp.utils.validation import validate_attribute_name as _validate_attri
 from maya_mcp.utils.validation import validate_node_name as _validate_node_name
 
 TangentType = Literal[
-    "auto", "linear", "flat", "step", "stepnext",
-    "spline", "clamped", "plateau", "fast", "slow",
+    "auto",
+    "linear",
+    "flat",
+    "step",
+    "stepnext",
+    "spline",
+    "clamped",
+    "plateau",
+    "fast",
+    "slow",
 ]
 
 VALID_TANGENT_TYPES: frozenset[str] = frozenset(TangentType.__args__)  # type: ignore[attr-defined]
@@ -156,13 +164,9 @@ def animation_set_time_range(
     anim_end = animation_end if animation_end is not None else max_time
 
     if anim_start > min_time:
-        raise ValueError(
-            f"animation_start ({anim_start}) must be <= min_time ({min_time})"
-        )
+        raise ValueError(f"animation_start ({anim_start}) must be <= min_time ({min_time})")
     if anim_end < max_time:
-        raise ValueError(
-            f"animation_end ({anim_end}) must be >= max_time ({max_time})"
-        )
+        raise ValueError(f"animation_end ({anim_end}) must be >= max_time ({max_time})")
 
     client = get_client()
 
@@ -471,9 +475,7 @@ print(json.dumps(result))
                     truncated.setdefault(a, []).append(entry)
                 parsed["keyframes"] = truncated
                 parsed["attribute_count"] = len(truncated)
-                parsed["total_keyframe_count"] = sum(
-                    len(v) for v in truncated.values()
-                )
+                parsed["total_keyframe_count"] = sum(len(v) for v in truncated.values())
                 parsed["truncated"] = True
 
     return parsed
