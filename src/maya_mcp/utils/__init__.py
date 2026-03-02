@@ -5,6 +5,7 @@ This package contains shared utility functions used across Maya MCP tools.
 
 from __future__ import annotations
 
+from maya_mcp.utils.coercion import coerce_dict, coerce_list
 from maya_mcp.utils.parsing import parse_json_response
 from maya_mcp.utils.response_guard import (
     DEFAULT_MAX_RESPONSE_BYTES,
@@ -13,6 +14,8 @@ from maya_mcp.utils.response_guard import (
 
 __all__ = [
     "DEFAULT_MAX_RESPONSE_BYTES",
+    "coerce_dict",
+    "coerce_list",
     "guard_response_size",
     "parse_json_response",
 ]
