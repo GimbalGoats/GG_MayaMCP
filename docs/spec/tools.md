@@ -2975,6 +2975,239 @@ Copy skin weights from one mesh to another using surface and influence associati
 
 ---
 
+## Animation Tools
+
+Animation tools provide keyframing, timeline control, and playback range management for animation workflows.
+
+### `animation.set_time`
+
+Set the current time (go to a specific frame).
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `time` | `float` | Yes | - | The frame number to set as current time |
+| `update` | `boolean` | No | `true` | Whether to update the viewport |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `time` | `float \| null` | The time that was set |
+| `errors` | `object \| null` | Error details or null |
+
+**Example Response**:
+
+```json
+{
+  "time": 24.0,
+  "errors": null
+}
+```
+
+---
+
+### `animation.get_time_range`
+
+Get playback range, animation range, and current time.
+
+**Input**: None
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `current_time` | `float` | Current frame |
+| `min_time` | `float` | Playback start time |
+| `max_time` | `float` | Playback end time |
+| `animation_start` | `float` | Animation range start |
+| `animation_end` | `float` | Animation range end |
+| `fps` | `float \| string` | Current FPS setting |
+| `errors` | `object \| null` | Error details or null |
+
+**Example Response**:
+
+```json
+{
+  "current_time": 1.0,
+  "min_time": 1.0,
+  "max_time": 120.0,
+  "animation_start": 1.0,
+  "animation_end": 200.0,
+  "fps": 24,
+  "errors": null
+}
+```
+
+---
+
+### `animation.set_time_range`
+
+Set the playback and animation range.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `min_time` | `float` | Yes | - | Playback start time |
+| `max_time` | `float` | Yes | - | Playback end time |
+| `animation_start` | `float` | No | `min_time` | Animation range start (must be <= min_time) |
+| `animation_end` | `float` | No | `max_time` | Animation range end (must be >= max_time) |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `min_time` | `float` | The playback start time that was set |
+| `max_time` | `float` | The playback end time that was set |
+| `animation_start` | `float` | The animation start that was set |
+| `animation_end` | `float` | The animation end that was set |
+| `errors` | `object \| null` | Error details or null |
+
+**Example Response**:
+
+```json
+{
+  "min_time": 1.0,
+  "max_time": 100.0,
+  "animation_start": 1.0,
+  "animation_end": 100.0,
+  "errors": null
+}
+```
+
+**Raises**: `ValueError` if `min_time >= max_time`, `animation_start > min_time`, or `animation_end < max_time`.
+
+---
+
+### `animation.set_keyframe`
+
+Set keyframe on attribute(s) at current or specified time.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `node` | `string` | Yes | - | Name of the node to keyframe |
+| `attributes` | `string[]` | No | `null` | Attribute names to keyframe (null = all keyable) |
+| `time` | `float` | No | `null` | Time/frame to set keyframe at (null = current time) |
+| `value` | `float` | No | `null` | Value to set (null = current value) |
+| `in_tangent_type` | `string` | No | `"auto"` | In-tangent type |
+| `out_tangent_type` | `string` | No | `"auto"` | Out-tangent type |
+
+Valid tangent types: `auto`, `linear`, `flat`, `step`, `stepnext`, `spline`, `clamped`, `plateau`, `fast`, `slow`.
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `node` | `string` | The node that was keyed |
+| `attributes` | `string[]` | Attributes that were keyed |
+| `time` | `float` | The time the keyframe was set at |
+| `keyframe_count` | `integer` | Number of keyframes set |
+| `errors` | `object \| null` | Error details or null |
+
+**Example Response**:
+
+```json
+{
+  "node": "pCube1",
+  "attributes": ["translateY"],
+  "time": 10.0,
+  "keyframe_count": 1,
+  "errors": null
+}
+```
+
+**Raises**: `ValueError` if node/attribute names contain invalid characters or tangent types are invalid.
+
+---
+
+### `animation.get_keyframes`
+
+Query keyframes for attribute(s) on a node within optional time range.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `node` | `string` | Yes | - | Name of the node to query |
+| `attributes` | `string[]` | No | `null` | Attribute names to query (null = all animated) |
+| `time_range_start` | `float` | No | `null` | Start of time range (null = all time) |
+| `time_range_end` | `float` | No | `null` | End of time range (null = all time) |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `node` | `string` | The queried node name |
+| `keyframes` | `object` | Dict mapping attribute names to lists of `{time, value}` entries |
+| `attribute_count` | `integer` | Number of attributes with keyframes |
+| `total_keyframe_count` | `integer` | Total number of keyframes found |
+| `errors` | `object \| null` | Error details or null |
+
+**Example Response**:
+
+```json
+{
+  "node": "pCube1",
+  "keyframes": {
+    "translateY": [
+      {"time": 1.0, "value": 0.0},
+      {"time": 10.0, "value": 5.0},
+      {"time": 24.0, "value": 0.0}
+    ]
+  },
+  "attribute_count": 1,
+  "total_keyframe_count": 3,
+  "errors": null
+}
+```
+
+**Raises**: `ValueError` if node/attribute names contain invalid characters.
+
+---
+
+### `animation.delete_keyframes`
+
+Delete keyframes in a time range for attribute(s).
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `node` | `string` | Yes | - | Name of the node to delete keyframes from |
+| `attributes` | `string[]` | No | `null` | Attribute names (null = all animated) |
+| `time_range_start` | `float` | No | `null` | Start of time range (null = all time) |
+| `time_range_end` | `float` | No | `null` | End of time range (null = all time) |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `node` | `string` | The node that was modified |
+| `deleted_count` | `integer` | Number of keyframes deleted |
+| `attributes` | `string[]` | Attributes that were affected |
+| `time_range` | `array \| string` | Time range used, or `"all"` |
+| `errors` | `object \| null` | Error details or null |
+
+**Example Response**:
+
+```json
+{
+  "node": "pCube1",
+  "deleted_count": 3,
+  "attributes": ["translateY"],
+  "time_range": "all",
+  "errors": null
+}
+```
+
+**Raises**: `ValueError` if node/attribute names contain invalid characters.
+
+---
+
 ## Error Responses
 
 All tools may return errors in a consistent format:
