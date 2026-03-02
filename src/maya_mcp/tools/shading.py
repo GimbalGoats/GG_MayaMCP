@@ -47,8 +47,8 @@ def shading_create_material(
 
     client = get_client()
     mtype_escaped = json.dumps(material_type)
-    name_escaped = json.dumps(name)
-    color_escaped = json.dumps([float(c) for c in color] if color else None)
+    name_escaped = json.dumps(name) if name is not None else "None"
+    color_escaped = json.dumps([float(c) for c in color]) if color is not None else "None"
 
     command = f"""
 import maya.cmds as cmds

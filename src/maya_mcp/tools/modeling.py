@@ -68,7 +68,7 @@ def modeling_create_polygon_primitive(
         _validate_node_name(name)
 
     client = get_client()
-    name_escaped = json.dumps(name)
+    name_escaped = json.dumps(name) if name is not None else "None"
     ptype_escaped = json.dumps(primitive_type)
     axis_escaped = json.dumps(axis)
 
@@ -99,7 +99,7 @@ axis_str = {axis_escaped}
 axis_map = {{"x": [1, 0, 0], "y": [0, 1, 0], "z": [0, 0, 1]}}
 ax = axis_map[axis_str]
 
-result = {{"transform": None, "shape": None, "constructor": None, "primitive_type": ptype, "vertex_count": 0, "face_count": 0, "errors": {{}}}}
+result = {{"transform": None, "shape": None, "constructor_node": None, "primitive_type": ptype, "vertex_count": 0, "face_count": 0, "errors": {{}}}}
 
 try:
     kwargs = {{}}
@@ -146,7 +146,7 @@ try:
         transform = created[0]
         constructor = created[1] if len(created) > 1 else None
         result["transform"] = transform
-        result["constructor"] = constructor
+        result["constructor_node"] = constructor
 
         shapes = cmds.listRelatives(transform, shapes=True, fullPath=False) or []
         if shapes:
@@ -207,14 +207,14 @@ def modeling_extrude_faces(
     # Build optional kwargs
     kwarg_lines: list[str] = []
     if local_translate_z is not None:
-        kwarg_lines.append(f"    kwargs['localTranslateZ'] = {float(local_translate_z)}")
+        kwarg_lines.append(f"        kwargs['localTranslateZ'] = {float(local_translate_z)}")
     if local_translate_x is not None:
-        kwarg_lines.append(f"    kwargs['localTranslateX'] = {float(local_translate_x)}")
+        kwarg_lines.append(f"        kwargs['localTranslateX'] = {float(local_translate_x)}")
     if local_translate_y is not None:
-        kwarg_lines.append(f"    kwargs['localTranslateY'] = {float(local_translate_y)}")
+        kwarg_lines.append(f"        kwargs['localTranslateY'] = {float(local_translate_y)}")
     if offset is not None:
-        kwarg_lines.append(f"    kwargs['offset'] = {float(offset)}")
-    kwarg_block = "\n".join(kwarg_lines) if kwarg_lines else "    pass"
+        kwarg_lines.append(f"        kwargs['offset'] = {float(offset)}")
+    kwarg_block = "\n".join(kwarg_lines) if kwarg_lines else "        pass"
 
     kft_val = "True" if keep_faces_together else "False"
 
@@ -363,7 +363,7 @@ def modeling_combine(
 
     client = get_client()
     meshes_escaped = json.dumps(meshes)
-    name_escaped = json.dumps(name)
+    name_escaped = json.dumps(name) if name is not None else "None"
 
     command = f"""
 import maya.cmds as cmds
@@ -485,7 +485,7 @@ def modeling_merge_vertices(
 
     client = get_client()
     mesh_escaped = json.dumps(mesh)
-    vertices_escaped = json.dumps(vertices)
+    vertices_escaped = json.dumps(vertices) if vertices is not None else "None"
 
     command = f"""
 import maya.cmds as cmds
@@ -551,7 +551,7 @@ def modeling_delete_history(
             _validate_node_name(node)
 
     client = get_client()
-    nodes_escaped = json.dumps(nodes)
+    nodes_escaped = json.dumps(nodes) if nodes is not None else "None"
     all_val = "True" if all_nodes else "False"
 
     command = f"""
