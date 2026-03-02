@@ -328,8 +328,19 @@ try:
             result["influences"] = influences
             result["influence_count"] = len(influences)
 
-            # Get vertex count
-            vtx_count = cmds.polyEvaluate(mesh, vertex=True)
+            # Detect geometry type for correct component prefix
+            shapes = cmds.listRelatives(mesh, shapes=True, fullPath=False) or []
+            shape = shapes[0] if shapes else mesh
+            geo_type = cmds.nodeType(shape)
+            result["geometry_type"] = geo_type
+
+            if geo_type in ("nurbsCurve", "nurbsSurface"):
+                comp_prefix = ".cv["
+                vtx_count = len(cmds.ls(shape + ".cv[*]", flatten=True))
+            else:
+                comp_prefix = ".vtx["
+                vtx_count = cmds.polyEvaluate(mesh, vertex=True)
+
             result["vertex_count"] = vtx_count
 
             # Calculate range
@@ -338,13 +349,13 @@ try:
             if limit and limit > 0:
                 end_idx = min(offset + limit, vtx_count)
 
-            # Get weights per vertex
+            # Get weights per vertex/CV
             vertices = []
             for i in range(start_idx, end_idx):
-                vtx = mesh + ".vtx[" + str(i) + "]"
+                comp = mesh + comp_prefix + str(i) + "]"
                 weights = {{}}
                 for inf in influences:
-                    w = cmds.skinPercent(sc, vtx, query=True, transform=inf, value=True)
+                    w = cmds.skinPercent(sc, comp, query=True, transform=inf, value=True)
                     if w is not None and w > 0.001:
                         weights[inf] = round(w, 6)
                 vertices.append({{"vertex_id": i, "weights": weights}})
@@ -447,14 +458,24 @@ try:
             set_count = 0
             vertex_errors = {{}}
 
+            # Detect geometry type for correct component prefix
+            shapes = cmds.listRelatives(mesh, shapes=True, fullPath=False) or []
+            shape = shapes[0] if shapes else mesh
+            geo_type = cmds.nodeType(shape)
+
+            if geo_type in ("nurbsCurve", "nurbsSurface"):
+                comp_prefix = ".cv["
+            else:
+                comp_prefix = ".vtx["
+
             for entry in weight_data:
                 vid = entry.get("vertex_id")
                 w = entry.get("weights", {{}})
-                vtx = mesh + ".vtx[" + str(vid) + "]"
+                comp = mesh + comp_prefix + str(vid) + "]"
 
                 try:
                     tv_list = [(joint, weight) for joint, weight in w.items()]
-                    cmds.skinPercent(sc, vtx, transformValue=tv_list, normalize=normalize)
+                    cmds.skinPercent(sc, comp, transformValue=tv_list, normalize=normalize)
                     set_count += 1
                 except Exception as e:
                     vertex_errors[str(vid)] = str(e)

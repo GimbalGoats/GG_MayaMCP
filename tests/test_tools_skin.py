@@ -422,6 +422,62 @@ class TestSkinWeightsSet:
         with pytest.raises(ValueError, match="Invalid characters"):
             skin_weights_set("skinCluster1;bad", weights)
 
+    def test_skin_weights_get_curve_success(self) -> None:
+        """Skin weights get works on curves using cv[] components."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "skin_cluster": "skinCluster1",
+                "mesh": "curve1",
+                "vertex_count": 4,
+                "influence_count": 2,
+                "influences": ["joint1", "joint2"],
+                "geometry_type": "nurbsCurve",
+                "vertices": [
+                    {"vertex_id": 0, "weights": {"joint1": 1.0}},
+                    {"vertex_id": 1, "weights": {"joint1": 0.7, "joint2": 0.3}},
+                ],
+                "offset": 0,
+                "count": 2,
+                "errors": None,
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.skin.get_client", return_value=mock_client):
+            result = skin_weights_get("skinCluster1", offset=0, limit=2)
+
+        assert result["geometry_type"] == "nurbsCurve"
+        assert result["vertex_count"] == 4
+        assert len(result["vertices"]) == 2
+        assert result["errors"] is None
+        # Verify the command uses cv[] instead of vtx[]
+        cmd = mock_client.execute.call_args[0][0]
+        assert "nurbsCurve" in cmd or "comp_prefix" in cmd
+
+    def test_skin_weights_set_curve_success(self) -> None:
+        """Skin weights set works on curves using cv[] components."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "skin_cluster": "skinCluster1",
+                "set_count": 1,
+                "errors": None,
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        weights = [{"vertex_id": 0, "weights": {"joint1": 1.0}}]
+
+        with patch("maya_mcp.tools.skin.get_client", return_value=mock_client):
+            result = skin_weights_set("skinCluster1", weights)
+
+        assert result["set_count"] == 1
+        assert result["errors"] is None
+        # Verify the command contains geometry type detection
+        cmd = mock_client.execute.call_args[0][0]
+        assert "nurbsCurve" in cmd
+
 
 class TestSkinCopyWeights:
     """Tests for the skin.copy_weights tool."""
