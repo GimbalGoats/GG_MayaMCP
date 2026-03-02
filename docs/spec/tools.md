@@ -12,6 +12,8 @@ Tools use a hierarchical naming scheme:
 - `nodes.*` - Node operations (list, create, delete, info)
 - `attributes.*` - Attribute operations (get, set)
 - `selection.*` - Selection management
+- `modeling.*` - Polygon modeling operations
+- `shading.*` - Material creation and assignment
 - `skin.*` - Skinning and weight management
 
 ## Health Tools
@@ -1851,6 +1853,830 @@ Convert the current selection to a different component type.
 
 ---
 
+## Modeling Tools
+
+Polygon modeling tools provide geometry creation, topology editing, and cleanup operations.
+
+### `modeling.create_polygon_primitive`
+
+Create a polygon primitive (cube, sphere, cylinder, cone, torus, plane) with configurable dimensions, subdivisions, and axis.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `primitive_type` | `"cube" \| "sphere" \| "cylinder" \| "cone" \| "torus" \| "plane"` | Yes | - | Type of primitive to create |
+| `name` | `string` | No | `null` | Optional name for the transform node |
+| `width` | `number` | No | `1.0` | Width (cube, plane) |
+| `height` | `number` | No | `1.0` | Height (cube, cylinder, cone, plane) |
+| `depth` | `number` | No | `1.0` | Depth (cube) |
+| `radius` | `number` | No | `0.5` | Radius (sphere, cylinder, cone, torus) |
+| `subdivisions_width` | `integer` | No | `null` | Width subdivisions |
+| `subdivisions_height` | `integer` | No | `null` | Height subdivisions |
+| `subdivisions_depth` | `integer` | No | `null` | Depth subdivisions |
+| `subdivisions_axis` | `integer` | No | `null` | Axis subdivisions (sphere, cylinder, cone, torus) |
+| `axis` | `"x" \| "y" \| "z"` | No | `"y"` | Up axis for the primitive |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `transform` | `string` | Name of the created transform node |
+| `shape` | `string` | Name of the mesh shape node |
+| `constructor_node` | `string` | Name of the constructor/history node |
+| `primitive_type` | `string` | The primitive type that was created |
+| `vertex_count` | `integer` | Number of vertices |
+| `face_count` | `integer` | Number of faces |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "primitive_type": "cube",
+  "name": "myCube",
+  "width": 2.0,
+  "height": 3.0,
+  "depth": 1.5
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "transform": "myCube",
+  "shape": "myCubeShape",
+  "constructor_node": "polyCube1",
+  "primitive_type": "cube",
+  "vertex_count": 8,
+  "face_count": 6,
+  "errors": null
+}
+```
+
+---
+
+### `modeling.extrude_faces`
+
+Extrude polygon faces with local translation, offset, and division options.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `faces` | `string[]` | Yes | - | Face components to extrude (e.g., `["pCube1.f[0]", "pCube1.f[2]"]`) |
+| `local_translate_z` | `number` | No | `null` | Local Z translation (extrusion thickness) |
+| `local_translate_x` | `number` | No | `null` | Local X translation |
+| `local_translate_y` | `number` | No | `null` | Local Y translation |
+| `offset` | `number` | No | `null` | Offset amount for the extrusion |
+| `divisions` | `integer` | No | `1` | Number of extrusion divisions |
+| `keep_faces_together` | `boolean` | No | `true` | Keep faces together during extrusion |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `node` | `string` | Result node name |
+| `faces_extruded` | `integer` | Number of faces that were extruded |
+| `new_face_count` | `integer` | Total face count after extrusion |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "faces": ["pCube1.f[0]"],
+  "local_translate_z": 1.5,
+  "divisions": 2
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "node": "polyExtrudeFace1",
+  "faces_extruded": 1,
+  "new_face_count": 13,
+  "errors": null
+}
+```
+
+---
+
+### `modeling.boolean`
+
+Perform a boolean operation (union, difference, intersection) on two meshes.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `mesh_a` | `string` | Yes | - | First mesh (the base) |
+| `mesh_b` | `string` | Yes | - | Second mesh (the operand) |
+| `operation` | `"union" \| "difference" \| "intersection"` | No | `"union"` | Boolean operation type |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `result_mesh` | `string` | Name of the resulting mesh |
+| `operation` | `string` | The operation that was performed |
+| `vertex_count` | `integer` | Vertex count of result |
+| `face_count` | `integer` | Face count of result |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "mesh_a": "pCube1",
+  "mesh_b": "pSphere1",
+  "operation": "difference"
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "result_mesh": "pCube1",
+  "operation": "difference",
+  "vertex_count": 142,
+  "face_count": 280,
+  "errors": null
+}
+```
+
+---
+
+### `modeling.combine`
+
+Combine multiple meshes into a single mesh.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `meshes` | `string[]` | Yes | - | List of mesh names to combine (minimum 2) |
+| `name` | `string` | No | `null` | Optional name for the combined mesh |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `result_mesh` | `string` | Name of the combined mesh |
+| `source_meshes` | `string[]` | List of source mesh names |
+| `vertex_count` | `integer` | Total vertex count |
+| `face_count` | `integer` | Total face count |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "meshes": ["pCube1", "pSphere1", "pCylinder1"],
+  "name": "combinedMesh"
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "result_mesh": "combinedMesh",
+  "source_meshes": ["pCube1", "pSphere1", "pCylinder1"],
+  "vertex_count": 450,
+  "face_count": 448,
+  "errors": null
+}
+```
+
+---
+
+### `modeling.separate`
+
+Separate a combined mesh into individual meshes.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `mesh` | `string` | Yes | - | Name of the mesh to separate |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `source_mesh` | `string` | Original mesh name |
+| `result_meshes` | `string[]` | List of separated mesh names |
+| `count` | `integer` | Number of resulting meshes |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "mesh": "combinedMesh"
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "source_mesh": "combinedMesh",
+  "result_meshes": ["combinedMesh", "polySurface2", "polySurface3"],
+  "count": 3,
+  "errors": null
+}
+```
+
+---
+
+### `modeling.merge_vertices`
+
+Merge vertices on a mesh within a distance threshold.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `mesh` | `string` | Yes | - | Name of the mesh |
+| `threshold` | `number` | No | `0.001` | Distance threshold for merging |
+| `vertices` | `string[]` | No | `null` | Specific vertex components to merge. If null, merges all. |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mesh` | `string` | The mesh name |
+| `vertices_merged` | `integer` | Number of vertices merged |
+| `vertex_count_before` | `integer` | Vertex count before merge |
+| `vertex_count_after` | `integer` | Vertex count after merge |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "mesh": "combinedMesh",
+  "threshold": 0.01
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "mesh": "combinedMesh",
+  "vertices_merged": 8,
+  "vertex_count_before": 16,
+  "vertex_count_after": 8,
+  "errors": null
+}
+```
+
+---
+
+### `modeling.bevel`
+
+Bevel edges or vertices with offset, segments, and fraction options.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `components` | `string[]` | Yes | - | Edge or vertex components to bevel (e.g., `["pCube1.e[0:3]"]`) |
+| `offset` | `number` | No | `0.5` | Bevel offset distance |
+| `segments` | `integer` | No | `1` | Number of bevel segments |
+| `fraction` | `number` | No | `0.5` | Bevel fraction |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `node` | `string` | Result node name |
+| `components_beveled` | `integer` | Number of components that were beveled |
+| `new_vertex_count` | `integer` | Vertex count after bevel |
+| `new_face_count` | `integer` | Face count after bevel |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "components": ["pCube1.e[0:3]"],
+  "offset": 0.2,
+  "segments": 2
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "node": "polyBevel1",
+  "components_beveled": 4,
+  "new_vertex_count": 24,
+  "new_face_count": 14,
+  "errors": null
+}
+```
+
+---
+
+### `modeling.bridge`
+
+Bridge between edge loops to create connecting faces.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `edge_loops` | `string[]` | Yes | - | Edge components for the edge loops to bridge |
+| `divisions` | `integer` | No | `0` | Number of divisions in the bridge |
+| `twist` | `integer` | No | `0` | Twist amount |
+| `taper` | `number` | No | `1.0` | Taper amount |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `node` | `string` | Result node name |
+| `new_face_count` | `integer` | Face count after bridge |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "edge_loops": ["pCube1.e[4:7]", "pCube1.e[8:11]"],
+  "divisions": 2
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "node": "polyBridgeEdge1",
+  "new_face_count": 18,
+  "errors": null
+}
+```
+
+---
+
+### `modeling.insert_edge_loop`
+
+Insert an edge loop at the specified edge using polySplitRing.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `edge` | `string` | Yes | - | Single edge component (e.g., `"pCube1.e[4]"`) |
+| `divisions` | `integer` | No | `1` | Number of edge loops to insert |
+| `weight` | `number` | No | `0.5` | Position weight along the edge (0-1) |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `node` | `string` | Result node name |
+| `edge` | `string` | The edge component that was used |
+| `new_edge_count` | `integer` | Total edge count after insert |
+| `new_vertex_count` | `integer` | Total vertex count after insert |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "edge": "pCube1.e[4]",
+  "weight": 0.3
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "node": "polySplitRing1",
+  "edge": "pCube1.e[4]",
+  "new_edge_count": 16,
+  "new_vertex_count": 12,
+  "errors": null
+}
+```
+
+---
+
+### `modeling.delete_faces`
+
+Delete polygon faces from a mesh.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `faces` | `string[]` | Yes | - | Face components to delete (e.g., `["pCube1.f[0]", "pCube1.f[3]"]`) |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `faces_deleted` | `integer` | Number of faces deleted |
+| `mesh` | `string` | The mesh node name |
+| `remaining_face_count` | `integer` | Face count after deletion |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "faces": ["pCube1.f[0]", "pCube1.f[5]"]
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "faces_deleted": 2,
+  "mesh": "pCube1",
+  "remaining_face_count": 4,
+  "errors": null
+}
+```
+
+---
+
+### `modeling.move_components`
+
+Move mesh components (vertices, edges, faces) by relative translation or to an absolute position.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `components` | `string[]` | Yes | - | Component strings to move (e.g., `["pCube1.vtx[0:3]"]`) |
+| `translate` | `[number, number, number]` | No | `null` | Relative [x, y, z] translation (mutually exclusive with `absolute`) |
+| `absolute` | `[number, number, number]` | No | `null` | Absolute [x, y, z] position (mutually exclusive with `translate`) |
+| `world_space` | `boolean` | No | `true` | Use world space coordinates |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `components_moved` | `integer` | Number of components moved |
+| `translate` or `absolute` | `[number, number, number]` | The translation/position values used |
+| `world_space` | `boolean` | Whether world space was used |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "components": ["pCube1.vtx[0:3]"],
+  "translate": [0, 1.5, 0]
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "components_moved": 4,
+  "translate": [0, 1.5, 0],
+  "world_space": true,
+  "errors": null
+}
+```
+
+---
+
+### `modeling.freeze_transforms`
+
+Freeze (reset) transforms on nodes, applying current values as identity.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `nodes` | `string[]` | Yes | - | Node names to freeze transforms on |
+| `translate` | `boolean` | No | `true` | Freeze translation |
+| `rotate` | `boolean` | No | `true` | Freeze rotation |
+| `scale` | `boolean` | No | `true` | Freeze scale |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `frozen` | `string[]` | List of nodes that were frozen |
+| `count` | `integer` | Number of nodes frozen |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "nodes": ["pCube1", "pSphere1"]
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "frozen": ["pCube1", "pSphere1"],
+  "count": 2,
+  "errors": null
+}
+```
+
+---
+
+### `modeling.delete_history`
+
+Delete construction history from nodes or the entire scene.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `nodes` | `string[]` | No | `null` | Node names to delete history from |
+| `all_nodes` | `boolean` | No | `false` | If true, delete history from all nodes in the scene |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `cleaned` | `string[]` | List of nodes that were cleaned |
+| `count` | `integer` | Number of nodes cleaned |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "nodes": ["pCube1"]
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "cleaned": ["pCube1"],
+  "count": 1,
+  "errors": null
+}
+```
+
+**Example Request (All Nodes)**:
+
+```json
+{
+  "all_nodes": true
+}
+```
+
+---
+
+### `modeling.center_pivot`
+
+Center the pivot point on nodes.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `nodes` | `string[]` | Yes | - | Node names to center pivots on |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `centered` | `string[]` | List of nodes where pivots were centered |
+| `count` | `integer` | Number of nodes processed |
+| `pivot_positions` | `object` | Map of node name to pivot position [x, y, z] |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "nodes": ["pCube1"]
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "centered": ["pCube1"],
+  "count": 1,
+  "pivot_positions": {
+    "pCube1": [0.0, 0.5, 0.0]
+  },
+  "errors": null
+}
+```
+
+---
+
+### `modeling.set_pivot`
+
+Set the pivot point of a node to an explicit position.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `node` | `string` | Yes | - | Node name to set pivot on |
+| `position` | `[number, number, number]` | Yes | - | [x, y, z] position for the pivot |
+| `world_space` | `boolean` | No | `true` | Position is in world space |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `node` | `string` | The node name |
+| `pivot` | `[number, number, number]` | The actual pivot position set |
+| `world_space` | `boolean` | Whether world space was used |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "node": "pCube1",
+  "position": [0, 0, 0],
+  "world_space": true
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "node": "pCube1",
+  "pivot": [0.0, 0.0, 0.0],
+  "world_space": true,
+  "errors": null
+}
+```
+
+---
+
+## Shading Tools
+
+Shading tools provide material creation, assignment, and color management for shading workflows.
+
+**Workflow-first**: `shading.create_material` consolidates 4 internal Maya steps (createNode material, createNode shadingGroup, connectAttr outColor, connectAttr dagSetMembers) into a single tool call.
+
+### `shading.create_material`
+
+Create a material (lambert, blinn, phong, standardSurface) with an associated shading group and optional color.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `material_type` | `"lambert" \| "blinn" \| "phong" \| "standardSurface"` | No | `"lambert"` | Type of material shader to create |
+| `name` | `string` | No | `null` | Optional name for the material node |
+| `color` | `[number, number, number]` | No | `null` | Optional [r, g, b] color values (0-1 range) |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `material` | `string` | Name of the created material node |
+| `shading_group` | `string` | Name of the created shading group |
+| `material_type` | `string` | The material type that was created |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "material_type": "blinn",
+  "name": "redMetal",
+  "color": [0.8, 0.1, 0.1]
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "material": "redMetal",
+  "shading_group": "redMetalSG",
+  "material_type": "blinn",
+  "errors": null
+}
+```
+
+---
+
+### `shading.assign_material`
+
+Assign a material to meshes or face components. Resolves the shading group from the material automatically.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `targets` | `string[]` | Yes | - | Mesh names or face component strings to assign material to |
+| `material` | `string` | Yes | - | Name of the material (or shading group) to assign |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `assigned` | `string[]` | List of targets that were successfully assigned |
+| `material` | `string` | The material node name |
+| `shading_group` | `string` | The shading group that was assigned |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "targets": ["pCube1", "pSphere1"],
+  "material": "redMetal"
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "assigned": ["pCube1", "pSphere1"],
+  "material": "redMetal",
+  "shading_group": "redMetalSG",
+  "errors": null
+}
+```
+
+**Example Request (Per-Face Assignment)**:
+
+```json
+{
+  "targets": ["pCube1.f[0:2]"],
+  "material": "redMetal"
+}
+```
+
+---
+
+### `shading.set_material_color`
+
+Set a color attribute on a material (e.g., color, baseColor, transparency).
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `material` | `string` | Yes | - | Name of the material node |
+| `color` | `[number, number, number]` | Yes | - | [r, g, b] color values (0-1 range) |
+| `attribute` | `string` | No | `"color"` | Color attribute name (e.g., `"color"`, `"baseColor"`, `"transparency"`, `"incandescence"`) |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `material` | `string` | The material node name |
+| `attribute` | `string` | The attribute that was set |
+| `color` | `[number, number, number]` | The color values that were set |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "material": "redMetal",
+  "color": [0.2, 0.4, 0.8],
+  "attribute": "color"
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "material": "redMetal",
+  "attribute": "color",
+  "color": [0.2, 0.4, 0.8],
+  "errors": null
+}
+```
+
+---
+
 ## Skinning Tools
 
 Skinning tools provide skin binding, weight management, and weight transfer for character rigging workflows.
@@ -2235,6 +3061,24 @@ All tools include MCP annotations to help AI clients understand their behavior a
 | `selection.set_components` | false | false | false |
 | `selection.get_components` | true | false | true |
 | `selection.convert_components` | false | false | false |
+| `modeling.create_polygon_primitive` | false | false | false |
+| `modeling.extrude_faces` | false | false | false |
+| `modeling.boolean` | false | false | false |
+| `modeling.combine` | false | false | false |
+| `modeling.separate` | false | false | false |
+| `modeling.merge_vertices` | false | false | false |
+| `modeling.bevel` | false | false | false |
+| `modeling.bridge` | false | false | false |
+| `modeling.insert_edge_loop` | false | false | false |
+| `modeling.delete_faces` | false | false | false |
+| `modeling.move_components` | false | false | false |
+| `modeling.freeze_transforms` | false | false | true |
+| `modeling.delete_history` | false | false | true |
+| `modeling.center_pivot` | false | false | true |
+| `modeling.set_pivot` | false | false | true |
+| `shading.create_material` | false | false | false |
+| `shading.assign_material` | false | false | false |
+| `shading.set_material_color` | false | false | true |
 | `skin.bind` | false | false | false |
 | `skin.unbind` | false | false | false |
 | `skin.influences` | true | false | true |
@@ -2257,6 +3101,9 @@ Large Maya scenes can contain thousands of nodes. To prevent token budget explos
 | `connections.history` | 500 history nodes | Yes (`limit` param) |
 | `mesh.vertices` | 1000 vertices | Yes (`limit` param) |
 | `mesh.evaluate` | 500 components per check | Yes (`limit` param) |
+| `modeling.combine` | 50KB response guard | No |
+| `modeling.separate` | 50KB response guard | No |
+| `modeling.delete_history` | 50KB response guard | No |
 | `skin.weights.get` | 100 vertices | Yes (`limit` param) |
 
 ### Handling Truncated Results
