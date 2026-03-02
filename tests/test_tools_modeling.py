@@ -40,7 +40,7 @@ class TestModelingCreatePolygonPrimitive:
             {
                 "transform": "pCube1",
                 "shape": "pCubeShape1",
-                "constructor": "polyCube1",
+                "constructor_node": "polyCube1",
                 "primitive_type": "cube",
                 "vertex_count": 8,
                 "face_count": 6,
@@ -54,7 +54,7 @@ class TestModelingCreatePolygonPrimitive:
 
         assert result["transform"] == "pCube1"
         assert result["shape"] == "pCubeShape1"
-        assert result["constructor"] == "polyCube1"
+        assert result["constructor_node"] == "polyCube1"
         assert result["primitive_type"] == "cube"
         assert result["vertex_count"] == 8
         assert result["face_count"] == 6
@@ -67,7 +67,7 @@ class TestModelingCreatePolygonPrimitive:
             {
                 "transform": "pSphere1",
                 "shape": "pSphereShape1",
-                "constructor": "polySphere1",
+                "constructor_node": "polySphere1",
                 "primitive_type": "sphere",
                 "vertex_count": 382,
                 "face_count": 400,
@@ -91,7 +91,7 @@ class TestModelingCreatePolygonPrimitive:
             {
                 "transform": "myBox",
                 "shape": "myBoxShape",
-                "constructor": "polyCube1",
+                "constructor_node": "polyCube1",
                 "primitive_type": "cube",
                 "vertex_count": 8,
                 "face_count": 6,
@@ -128,7 +128,7 @@ class TestModelingCreatePolygonPrimitive:
             {
                 "transform": "pCube1",
                 "shape": "pCubeShape1",
-                "constructor": "polyCube1",
+                "constructor_node": "polyCube1",
                 "primitive_type": "cube",
                 "vertex_count": 50,
                 "face_count": 48,
