@@ -9,9 +9,12 @@ MCP (Model Context Protocol) server for controlling Autodesk Maya via its comman
 
 Maya MCP enables AI assistants to interact with a running Maya instance. It provides a typed, safe interface for:
 
-- Querying scene information
-- Managing selections
-- Manipulating nodes
+- Querying scene information and managing files
+- Manipulating nodes, attributes, and connections
+- Polygon modeling (primitives, extrude, bevel, boolean, combine/separate)
+- Material creation and assignment
+- Skin binding and weight management
+- Component-level mesh selection and editing
 - Health monitoring and connection management
 
 **Key Design Principles:**
@@ -232,6 +235,8 @@ fastmcp install mcp-json
 
 ## Available Tools
 
+### Connection & Scene
+
 | Tool | Description |
 |------|-------------|
 | `health.check` | Check Maya connection status |
@@ -239,18 +244,95 @@ fastmcp install mcp-json
 | `maya.disconnect` | Close Maya connection |
 | `scene.info` | Get current scene information |
 | `scene.new` | Create new scene (with unsaved changes safety check) |
-| `scene.open` | Open scene file (with path validation and unsaved changes safety check) |
+| `scene.open` | Open scene file (with path validation) |
+| `scene.save` | Save current scene |
+| `scene.save_as` | Save scene to a new file path |
+| `scene.import` | Import file into current scene |
+| `scene.export` | Export selection or entire scene |
 | `scene.undo` | Undo last operation (LLM error recovery) |
 | `scene.redo` | Redo last undone operation |
+
+### Nodes & Attributes
+
+| Tool | Description |
+|------|-------------|
 | `nodes.list` | List nodes by type/pattern (default limit: 500) |
 | `nodes.create` | Create node with optional name, parent, and attributes |
 | `nodes.delete` | Delete nodes with optional hierarchy |
+| `nodes.rename` | Rename nodes (batch support) |
+| `nodes.parent` | Reparent nodes in hierarchy |
+| `nodes.duplicate` | Duplicate nodes with hierarchy |
 | `nodes.info` | Get comprehensive node info (summary, transform, hierarchy, attributes, shape, or all) |
 | `attributes.get` | Get attribute values (batch support) |
 | `attributes.set` | Set attribute values (batch support) |
+
+### Selection
+
+| Tool | Description |
+|------|-------------|
 | `selection.get` | Get current selection |
 | `selection.set` | Set/add/remove selection |
 | `selection.clear` | Clear selection |
+| `selection.set_components` | Select mesh components (vertices, edges, faces) |
+| `selection.get_components` | Get selected components grouped by type |
+| `selection.convert_components` | Convert selection between vertex/edge/face |
+
+### Connections
+
+| Tool | Description |
+|------|-------------|
+| `connections.list` | List connections on a node with direction/type filters |
+| `connections.get` | Get connection details for specific attributes |
+| `connections.connect` | Connect two attributes |
+| `connections.disconnect` | Disconnect attributes |
+| `connections.history` | List construction/deformation history |
+
+### Mesh
+
+| Tool | Description |
+|------|-------------|
+| `mesh.info` | Get mesh statistics (vertex/face/edge counts, bounding box, UVs) |
+| `mesh.vertices` | Query vertex positions with pagination |
+| `mesh.evaluate` | Analyze mesh topology (non-manifold, lamina, holes, borders) |
+
+### Modeling
+
+| Tool | Description |
+|------|-------------|
+| `modeling.create_polygon_primitive` | Create cube, sphere, cylinder, cone, torus, or plane |
+| `modeling.extrude_faces` | Extrude polygon faces with translation and offset |
+| `modeling.boolean` | Boolean union, difference, or intersection |
+| `modeling.combine` | Combine multiple meshes into one |
+| `modeling.separate` | Separate a combined mesh |
+| `modeling.merge_vertices` | Merge vertices within a distance threshold |
+| `modeling.bevel` | Bevel edges or vertices |
+| `modeling.bridge` | Bridge between edge loops |
+| `modeling.insert_edge_loop` | Insert edge loop at an edge |
+| `modeling.delete_faces` | Delete polygon faces |
+| `modeling.move_components` | Move vertices, edges, or faces |
+| `modeling.freeze_transforms` | Freeze transforms to identity |
+| `modeling.delete_history` | Delete construction history |
+| `modeling.center_pivot` | Center pivot point |
+| `modeling.set_pivot` | Set pivot to explicit position |
+
+### Shading
+
+| Tool | Description |
+|------|-------------|
+| `shading.create_material` | Create material (lambert, blinn, phong, standardSurface) with shading group |
+| `shading.assign_material` | Assign material to meshes or face components |
+| `shading.set_material_color` | Set color attribute on a material |
+
+### Skinning
+
+| Tool | Description |
+|------|-------------|
+| `skin.bind` | Bind mesh to skeleton with influence options |
+| `skin.unbind` | Detach skin cluster from mesh |
+| `skin.influences` | List influences on a skin cluster |
+| `skin.weights.get` | Get per-vertex skin weights with pagination |
+| `skin.weights.set` | Set per-vertex skin weights with normalization |
+| `skin.copy_weights` | Copy weights between meshes |
 
 ---
 
@@ -374,7 +456,16 @@ maya-mcp/
 │   │   ├── scene.py
 │   │   ├── nodes.py
 │   │   ├── attributes.py
-│   │   └── selection.py
+│   │   ├── selection.py
+│   │   ├── connections.py
+│   │   ├── mesh.py
+│   │   ├── modeling.py
+│   │   ├── shading.py
+│   │   └── skin.py
+│   ├── utils/             # Shared utilities
+│   │   ├── validation.py
+│   │   ├── parsing.py
+│   │   └── response_guard.py
 │   └── transport/
 │       └── commandport.py # Maya commandPort TCP client
 ├── tests/                 # Pytest test suite
