@@ -14,6 +14,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     Maya's interactive "Save changes?" dialog from blocking commandPort
   - `force=True` discards unsaved changes without prompting
 - Shared `parse_json_response()` utility in `maya_mcp.utils.parsing`
+- **M14: Polygon Modeling Tools**
+  - `modeling.create_polygon_primitive` — create cube, sphere, cylinder, cone, torus, plane
+  - `modeling.extrude_faces` — extrude polygon faces with local translation and offset
+  - `modeling.boolean` — boolean union, difference, and intersection on two meshes
+  - `modeling.combine` — combine multiple meshes into one
+  - `modeling.separate` — separate a combined mesh into individual meshes
+  - `modeling.merge_vertices` — merge vertices within a distance threshold
+  - `modeling.bevel` — bevel edges or vertices with offset and segments
+  - `modeling.bridge` — bridge between edge loops
+  - `modeling.insert_edge_loop` — insert edge loop at an edge using polySplitRing
+  - `modeling.delete_faces` — delete polygon faces from a mesh
+  - `modeling.move_components` — move vertices, edges, or faces (relative or absolute)
+  - `modeling.freeze_transforms` — freeze (reset) transforms to identity
+  - `modeling.delete_history` — delete construction history from nodes
+  - `modeling.center_pivot` — center pivot point on nodes
+  - `modeling.set_pivot` — set pivot point to an explicit position
+- **M12: Shading Tools**
+  - `shading.create_material` — create material (lambert, blinn, phong, standardSurface) with shading group
+  - `shading.assign_material` — assign material to meshes or face components
+  - `shading.set_material_color` — set color attribute on a material
+- **M8: Skinning Tools**
+  - `skin.bind` — bind mesh to skeleton with influence options
+  - `skin.unbind` — detach skin cluster from mesh
+  - `skin.influences` — list influences on a skin cluster
+  - `skin.weights.get` — get per-vertex skin weights with pagination
+  - `skin.weights.set` — set per-vertex skin weights with normalization
+  - `skin.copy_weights` — copy weights between meshes
+
+### Fixed
+
+- Reserved JavaScript property name `constructor` in MCP responses replaced with
+  `constructor_node` to avoid `Object.prototype.constructor` collision causing
+  Zod validation failures
+- `json.dumps(None)` producing `"null"` instead of Python `None` in Maya commands
+  sent via commandPort, causing `NameError` on the Maya side
+- Dynamic code block indentation mismatch in f-string Maya command builders
 
 ### Changed
 
@@ -104,7 +140,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - No arbitrary code execution — all operations are explicit tools
 - No raw Python/MEL string evaluation exposed to clients
 
-[Unreleased]: https://gitlab.pixel-nexus.com/rigging/gg_mayamcp/-/compare/v0.3.0...feature/m4-scene-new
+[Unreleased]: https://gitlab.pixel-nexus.com/rigging/gg_mayamcp/-/compare/v0.3.0...main
 [0.3.0]: https://gitlab.pixel-nexus.com/rigging/gg_mayamcp/-/compare/v0.2.0...v0.3.0
 [0.2.0]: https://gitlab.pixel-nexus.com/rigging/gg_mayamcp/-/compare/v0.1.0...v0.2.0
 [0.1.0]: https://gitlab.pixel-nexus.com/rigging/gg_mayamcp/-/releases/v0.1.0

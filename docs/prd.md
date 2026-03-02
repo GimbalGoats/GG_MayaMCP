@@ -5,7 +5,7 @@
 **Product**: Maya MCP Server  
 **Version**: 0.1.0 (v0)  
 **Status**: Active Development  
-**Last Updated**: 2026-02-27
+**Last Updated**: 2026-03-02
 
 Maya MCP is an MCP (Model Context Protocol) server that enables AI assistants and other MCP-compatible clients to control a running instance of Autodesk Maya via its commandPort socket interface.
 
@@ -412,20 +412,21 @@ Document common rigging workflows to inform future tool design. **No implementat
 
 ---
 
-### M12: Materials & Shading 📋
+### M12: Materials & Shading ✅
 
 **Goal**: Basic material creation and assignment for shading workflows.
 
-**Namespace**: `materials.*`
+**Namespace**: `shading.*`
 
-| ID | Feature | Description | Effort |
-|----|---------|-------------|--------|
-| M12.1 | `materials.list` | List materials in the scene with optional type filter | Low |
-| M12.2 | `materials.get` | Get material attributes and assigned objects | Low |
-| M12.3 | `materials.assign` | Assign material to objects or faces | Medium |
-| M12.4 | `materials.create` | Create material with shading group (lambert, blinn, phong, aiStandardSurface) | Medium |
+| ID | Feature | Description | Effort | Status |
+|----|---------|-------------|--------|--------|
+| M12.1 | `shading.create_material` | Create material with shading group (lambert, blinn, phong, standardSurface) | Medium | ✅ |
+| M12.2 | `shading.assign_material` | Assign material to meshes or face components | Medium | ✅ |
+| M12.3 | `shading.set_material_color` | Set color attribute on a material (color, baseColor, transparency, etc.) | Low | ✅ |
 
-**Workflow-first**: `materials.create` consolidates 4 internal Maya steps (createNode material → createNode shadingGroup → connectAttr outColor → connectAttr dagSetMembers) into a single tool call.
+**Workflow-first**: `shading.create_material` consolidates 4 internal Maya steps (createNode material → createNode shadingGroup → connectAttr outColor → connectAttr dagSetMembers) into a single tool call.
+
+**Implementation note**: The namespace was changed from the original `materials.*` plan to `shading.*` to better reflect the scope (material creation, assignment, and color setting rather than full material management). `materials.list` and `materials.get` were deferred — AI clients can use `nodes.list(node_type="lambert")` and `nodes.info` as alternatives.
 
 ---
 
@@ -484,6 +485,36 @@ Document common rigging workflows to inform future tool design. **No implementat
 
 ---
 
+### M14: Polygon Modeling ✅
+
+**Goal**: Polygon modeling operations for geometry creation and editing workflows.
+
+**Namespace**: `modeling.*`
+
+| ID | Feature | Description | Effort | Status |
+|----|---------|-------------|--------|--------|
+| M14.1 | `modeling.create_polygon_primitive` | Create polygon primitives (cube, sphere, cylinder, cone, torus, plane) | Medium | ✅ |
+| M14.2 | `modeling.extrude_faces` | Extrude polygon faces with local translation and offset | Medium | ✅ |
+| M14.3 | `modeling.boolean` | Boolean operations (union, difference, intersection) on two meshes | Medium | ✅ |
+| M14.4 | `modeling.combine` | Combine multiple meshes into one | Low | ✅ |
+| M14.5 | `modeling.separate` | Separate a combined mesh into individual meshes | Low | ✅ |
+| M14.6 | `modeling.merge_vertices` | Merge vertices within a distance threshold | Low | ✅ |
+| M14.7 | `modeling.bevel` | Bevel edges or vertices with offset and segments | Medium | ✅ |
+| M14.8 | `modeling.bridge` | Bridge between edge loops | Medium | ✅ |
+| M14.9 | `modeling.insert_edge_loop` | Insert edge loop at an edge using polySplitRing | Low | ✅ |
+| M14.10 | `modeling.delete_faces` | Delete polygon faces from a mesh | Low | ✅ |
+| M14.11 | `modeling.move_components` | Move vertices, edges, or faces (relative or absolute) | Medium | ✅ |
+| M14.12 | `modeling.freeze_transforms` | Freeze (reset) transforms to identity | Low | ✅ |
+| M14.13 | `modeling.delete_history` | Delete construction history from nodes | Low | ✅ |
+| M14.14 | `modeling.center_pivot` | Center pivot point on nodes | Low | ✅ |
+| M14.15 | `modeling.set_pivot` | Set pivot point to an explicit position | Low | ✅ |
+
+**Workflow-first**: Tools cover the full modeling workflow — create primitives, edit topology (extrude, bevel, bridge, insert edge loop), combine/separate meshes, boolean operations, and cleanup (freeze transforms, delete history, center pivot).
+
+**Token budget**: `modeling.combine` and `modeling.separate` responses are guarded to prevent oversized results with many meshes.
+
+---
+
 ## Milestone Priority
 
 ```
@@ -495,7 +526,9 @@ M0 ✅ ─► M1 ✅ ─► M2 ✅ ─► M3 🚧 ─► M4 ✅ ─► M5 📋 �
 M7 ✅ (Node Graph & Connections)
 
 After M5:
-M5 📋 ─► M8 ✅ ─► M9 📋 ─► M10 📋 ─► M11 ✅ ─► M12 📋 ─► M13 📋
+M5 📋 ─► M8 ✅ ─► M9 📋 ─► M10 📋 ─► M11 ✅ ─► M12 ✅ ─► M13 📋
+
+M14 ✅ (Polygon Modeling)
 ```
 
 | Priority | Milestone | Rationale |
@@ -511,8 +544,9 @@ M5 📋 ─► M8 ✅ ─► M9 📋 ─► M10 📋 ─► M11 ✅ ─► M12 �
 | 9 | M9 (Deformers & Blend Shapes) | Essential for modeling and rigging; implements M5-B Blend Shapes pattern |
 | 10 | M10 (Constraints) | Core rigging and animation workflow |
 | 11 | ~~M11 (Mesh Operations & Component Selection)~~ | ✅ Complete |
-| 12 | M12 (Materials & Shading) | Basic shading; lower priority than geometry workflows |
+| 12 | ~~M12 (Materials & Shading)~~ | ✅ Complete |
 | 13 | M13 (Custom Script Execution) | Escape hatch for workflows without dedicated tools; three-tier trust model |
+| 14 | ~~M14 (Polygon Modeling)~~ | ✅ Complete |
 
 ---
 
