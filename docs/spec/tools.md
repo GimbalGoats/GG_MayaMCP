@@ -12,6 +12,7 @@ Tools use a hierarchical naming scheme:
 - `nodes.*` - Node operations (list, create, delete, info)
 - `attributes.*` - Attribute operations (get, set)
 - `selection.*` - Selection management
+- `skin.*` - Skinning and weight management
 
 ## Health Tools
 
@@ -1850,6 +1851,304 @@ Convert the current selection to a different component type.
 
 ---
 
+## Skinning Tools
+
+Skinning tools provide skin binding, weight management, and weight transfer for character rigging workflows.
+
+**Token budget**: Skin weight data can reach 4-15MB for production meshes (100K vertices x ~4 influences). `skin.weights.get` uses offset/limit pagination with a default limit of 100 vertices. The 50KB response guard applies.
+
+### `skin.bind`
+
+Bind a mesh to a skeleton with influence options. Creates a skinCluster.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `mesh` | `string` | Yes | - | Name of the mesh to bind |
+| `joints` | `string[]` | Yes | - | List of joint names to use as influences |
+| `max_influences` | `integer` | No | `4` | Maximum influences per vertex |
+| `bind_method` | `string` | No | `"closestDistance"` | Binding algorithm: `"closestDistance"`, `"heatMap"`, or `"geodesicVoxel"` |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mesh` | `string` | The mesh that was bound |
+| `skin_cluster` | `string \| null` | Name of the created skinCluster |
+| `influences` | `string[]` | List of influence joint names |
+| `influence_count` | `integer` | Number of influences |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "mesh": "pCube1",
+  "joints": ["joint1", "joint2", "joint3"],
+  "max_influences": 4,
+  "bind_method": "closestDistance"
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "mesh": "pCube1",
+  "skin_cluster": "skinCluster1",
+  "influences": ["joint1", "joint2", "joint3"],
+  "influence_count": 3,
+  "errors": null
+}
+```
+
+---
+
+### `skin.unbind`
+
+Detach a skin cluster from a mesh, removing skin deformation.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `mesh` | `string` | Yes | - | Name of the mesh to unbind |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mesh` | `string` | The mesh that was unbound |
+| `unbound` | `boolean` | Whether unbinding succeeded |
+| `skin_cluster` | `string \| null` | Name of the removed skinCluster |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "mesh": "pCube1"
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "mesh": "pCube1",
+  "unbound": true,
+  "skin_cluster": "skinCluster1",
+  "errors": null
+}
+```
+
+---
+
+### `skin.influences`
+
+List influences (joints) on a skin cluster with index mapping.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `skin_cluster` | `string` | Yes | - | Name of the skinCluster node |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `skin_cluster` | `string` | The queried skinCluster name |
+| `influences` | `array` | List of influence objects |
+| `influences[].name` | `string` | Influence joint name |
+| `influences[].index` | `integer` | Influence index |
+| `count` | `integer` | Number of influences |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "skin_cluster": "skinCluster1"
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "skin_cluster": "skinCluster1",
+  "influences": [
+    {"name": "joint1", "index": 0},
+    {"name": "joint2", "index": 1},
+    {"name": "joint3", "index": 2}
+  ],
+  "count": 3,
+  "errors": null
+}
+```
+
+---
+
+### `skin.weights.get`
+
+Get per-vertex skin weights with offset/limit pagination.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `skin_cluster` | `string` | Yes | - | Name of the skinCluster node |
+| `offset` | `integer` | No | `0` | Starting vertex index (0-based) |
+| `limit` | `integer` | No | `100` | Maximum vertices to return. Use 0 for unlimited. |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `skin_cluster` | `string` | The queried skinCluster name |
+| `mesh` | `string` | The bound mesh name |
+| `vertex_count` | `integer` | Total number of vertices in the mesh |
+| `influence_count` | `integer` | Number of influences |
+| `influences` | `string[]` | List of influence joint names |
+| `vertices` | `array` | List of vertex weight entries |
+| `vertices[].vertex_id` | `integer` | Vertex index |
+| `vertices[].weights` | `object` | Map of joint name to weight value (only > 0.001) |
+| `offset` | `integer` | The offset used |
+| `count` | `integer` | Number of vertices returned |
+| `truncated` | `boolean` | True if more vertices remain |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "skin_cluster": "skinCluster1",
+  "offset": 0,
+  "limit": 100
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "skin_cluster": "skinCluster1",
+  "mesh": "pCube1",
+  "vertex_count": 8,
+  "influence_count": 3,
+  "influences": ["joint1", "joint2", "joint3"],
+  "vertices": [
+    {"vertex_id": 0, "weights": {"joint1": 0.8, "joint2": 0.2}},
+    {"vertex_id": 1, "weights": {"joint1": 0.5, "joint2": 0.3, "joint3": 0.2}},
+    {"vertex_id": 2, "weights": {"joint2": 0.9, "joint3": 0.1}}
+  ],
+  "offset": 0,
+  "count": 3,
+  "errors": null
+}
+```
+
+---
+
+### `skin.weights.set`
+
+Set per-vertex skin weights with optional normalization.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `skin_cluster` | `string` | Yes | - | Name of the skinCluster node |
+| `weights` | `array` | Yes | - | List of `{vertex_id, weights}` entries (max 1000 per call) |
+| `weights[].vertex_id` | `integer` | Yes | - | Vertex index |
+| `weights[].weights` | `object` | Yes | - | Map of joint name to weight value |
+| `normalize` | `boolean` | No | `true` | Normalize weights after setting |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `skin_cluster` | `string` | The skinCluster name |
+| `set_count` | `integer` | Number of vertices updated |
+| `errors` | `object \| null` | Error details if any (keyed by vertex_id) |
+
+**Example Request**:
+
+```json
+{
+  "skin_cluster": "skinCluster1",
+  "weights": [
+    {"vertex_id": 0, "weights": {"joint1": 0.8, "joint2": 0.2}},
+    {"vertex_id": 1, "weights": {"joint1": 0.5, "joint2": 0.5}}
+  ],
+  "normalize": true
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "skin_cluster": "skinCluster1",
+  "set_count": 2,
+  "errors": null
+}
+```
+
+---
+
+### `skin.copy_weights`
+
+Copy skin weights from one mesh to another using surface and influence association methods.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `source_mesh` | `string` | Yes | - | Source mesh (must have a skinCluster) |
+| `target_mesh` | `string` | Yes | - | Target mesh (must have a skinCluster) |
+| `surface_association` | `string` | No | `"closestPoint"` | Surface matching: `"closestPoint"`, `"closestComponent"`, or `"rayCast"` |
+| `influence_association` | `string` | No | `"closestJoint"` | Influence matching: `"closestJoint"`, `"closestBone"`, `"oneToOne"`, `"name"`, or `"label"` |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `source_mesh` | `string` | The source mesh name |
+| `target_mesh` | `string` | The target mesh name |
+| `source_skin_cluster` | `string \| null` | Source skinCluster name |
+| `target_skin_cluster` | `string \| null` | Target skinCluster name |
+| `success` | `boolean` | Whether the copy succeeded |
+| `errors` | `object \| null` | Error details if any |
+
+**Example Request**:
+
+```json
+{
+  "source_mesh": "pCube1",
+  "target_mesh": "pCube2",
+  "surface_association": "closestPoint",
+  "influence_association": "closestJoint"
+}
+```
+
+**Example Response**:
+
+```json
+{
+  "source_mesh": "pCube1",
+  "target_mesh": "pCube2",
+  "source_skin_cluster": "skinCluster1",
+  "target_skin_cluster": "skinCluster2",
+  "success": true,
+  "errors": null
+}
+```
+
+---
+
 ## Error Responses
 
 All tools may return errors in a consistent format:
@@ -1936,6 +2235,12 @@ All tools include MCP annotations to help AI clients understand their behavior a
 | `selection.set_components` | false | false | false |
 | `selection.get_components` | true | false | true |
 | `selection.convert_components` | false | false | false |
+| `skin.bind` | false | false | false |
+| `skin.unbind` | false | false | false |
+| `skin.influences` | true | false | true |
+| `skin.weights.get` | true | false | true |
+| `skin.weights.set` | false | false | false |
+| `skin.copy_weights` | false | false | false |
 
 ---
 
@@ -1952,6 +2257,7 @@ Large Maya scenes can contain thousands of nodes. To prevent token budget explos
 | `connections.history` | 500 history nodes | Yes (`limit` param) |
 | `mesh.vertices` | 1000 vertices | Yes (`limit` param) |
 | `mesh.evaluate` | 500 components per check | Yes (`limit` param) |
+| `skin.weights.get` | 100 vertices | Yes (`limit` param) |
 
 ### Handling Truncated Results
 

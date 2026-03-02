@@ -327,7 +327,7 @@ Document common rigging workflows to inform future tool design. **No implementat
 
 ---
 
-### M8: Skinning 📋
+### M8: Skinning ✅
 
 **Goal**: Skin binding and weight management for character rigging workflows.
 
@@ -382,7 +382,7 @@ Document common rigging workflows to inform future tool design. **No implementat
 
 ---
 
-### M11: Mesh Operations & Component Selection 📋
+### M11: Mesh Operations & Component Selection ✅
 
 **Goal**: Mesh queries, topology analysis, and component-level selection for targeted editing.
 
@@ -495,7 +495,7 @@ M0 ✅ ─► M1 ✅ ─► M2 ✅ ─► M3 🚧 ─► M4 ✅ ─► M5 📋 �
 M7 ✅ (Node Graph & Connections)
 
 After M5:
-M5 📋 ─► M8 📋 ─► M9 📋 ─► M10 📋 ─► M11 📋 ─► M12 📋 ─► M13 📋
+M5 📋 ─► M8 ✅ ─► M9 📋 ─► M10 📋 ─► M11 ✅ ─► M12 📋 ─► M13 📋
 ```
 
 | Priority | Milestone | Rationale |
@@ -507,10 +507,10 @@ M5 📋 ─► M8 📋 ─► M9 📋 ─► M10 📋 ─► M11 📋 ─► M12
 | 5 | M5-A (Core Animation) | Essential animation tools |
 | 6 | M5-B (Rigging Patterns) | Design documentation only |
 | 7 | M6 (Production Hardening) | Nice to have |
-| 8 | M8 (Skinning) | Core rigging workflow; implements M5-B Skin Binding pattern |
+| 8 | ~~M8 (Skinning)~~ | ✅ Complete |
 | 9 | M9 (Deformers & Blend Shapes) | Essential for modeling and rigging; implements M5-B Blend Shapes pattern |
 | 10 | M10 (Constraints) | Core rigging and animation workflow |
-| 11 | M11 (Mesh Operations & Component Selection) | Targeted editing and QA workflows |
+| 11 | ~~M11 (Mesh Operations & Component Selection)~~ | ✅ Complete |
 | 12 | M12 (Materials & Shading) | Basic shading; lower priority than geometry workflows |
 | 13 | M13 (Custom Script Execution) | Escape hatch for workflows without dedicated tools; three-tier trust model |
 
