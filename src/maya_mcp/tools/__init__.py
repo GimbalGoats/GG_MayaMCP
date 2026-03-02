@@ -12,6 +12,7 @@ from maya_mcp.tools.connections import (
     connections_history,
     connections_list,
 )
+from maya_mcp.tools.curve import curve_cvs, curve_info
 from maya_mcp.tools.health import health_check
 from maya_mcp.tools.modeling import (
     modeling_bevel,
@@ -47,6 +48,8 @@ __all__ = [
     "connections_get",
     "connections_history",
     "connections_list",
+    "curve_cvs",
+    "curve_info",
     "health_check",
     "maya_connect",
     "maya_disconnect",
