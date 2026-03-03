@@ -430,7 +430,7 @@ Document common rigging workflows to inform future tool design. **No implementat
 
 ---
 
-### M13: Custom Script Execution 📋
+### M13: Custom Script Execution ✅
 
 **Goal**: Enable AI clients to discover and execute user-provided Python scripts inside Maya, with a three-tier trust model balancing usability and security.
 
@@ -526,7 +526,7 @@ M0 ✅ ─► M1 ✅ ─► M2 ✅ ─► M3 🚧 ─► M4 ✅ ─► M5 📋 �
 M7 ✅ (Node Graph & Connections)
 
 After M5:
-M5 📋 ─► M8 ✅ ─► M9 📋 ─► M10 📋 ─► M11 ✅ ─► M12 ✅ ─► M13 📋
+M5 📋 ─► M8 ✅ ─► M9 📋 ─► M10 📋 ─► M11 ✅ ─► M12 ✅ ─► M13 ✅
 
 M14 ✅ (Polygon Modeling)
 ```

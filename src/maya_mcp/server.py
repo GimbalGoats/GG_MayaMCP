@@ -164,6 +164,9 @@ Available tools:
 - skin.copy_weights: Copy weights between meshes
 - curve.info: Get NURBS curve information (degree, spans, form, CV count, knots, length, bbox)
 - curve.cvs: Query CV positions from a NURBS curve with offset/limit pagination
+- script.list: List available Python scripts from configured directories
+- script.execute: Execute a Python script file from an allowed directory in Maya
+- script.run: Execute raw Python or MEL code in Maya (requires opt-in env var)
 
 Workflow tips:
 - Use nodes.info for a quick overview of any node before making changes
@@ -187,6 +190,9 @@ Workflow tips:
 - Use skin.copy_weights() to transfer weights between similar meshes
 - Use curve.info() to inspect curve properties before modifying
 - Use curve.cvs() with offset/limit for curves with many CVs
+- Use script.list() to discover available scripts before executing
+- Use script.execute() with args dict to pass parameters to scripts
+- Use script.run() for ad-hoc Python/MEL (requires MAYA_MCP_ENABLE_RAW_EXECUTION=true)
 
 Before using Maya tools, ensure Maya is running with commandPort enabled:
     import maya.cmds as cmds
@@ -2103,6 +2109,105 @@ def tool_skin_copy_weights(
         surface_association=surface_association,
         influence_association=influence_association,
     )
+
+
+# Register script tools
+@mcp.tool(
+    name="script.list",
+    description="List available Python scripts from configured MAYA_MCP_SCRIPT_DIRS directories. "
+    "Read-only, does not require Maya connection.",
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_script_list() -> dict[str, Any]:
+    """List available scripts.
+
+    Returns:
+        Dictionary with scripts list, count, directories, and errors.
+    """
+    from maya_mcp.tools.scripts import script_list as _script_list
+
+    return _script_list()
+
+
+@mcp.tool(
+    name="script.execute",
+    description="Execute a Python script file in Maya from an allowed MAYA_MCP_SCRIPT_DIRS directory. "
+    "The script is read server-side and sent to Maya. "
+    "Optional args dict is injected as __args__ in the script namespace.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=True,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_script_execute(
+    file_path: Annotated[str, "Absolute path to the .py script file"],
+    args: Annotated[
+        dict[str, Any] | None,
+        "Optional arguments dict injected as __args__ in the script namespace",
+    ] = None,
+    timeout: Annotated[
+        int | None,
+        "Optional timeout override in seconds (default from MAYA_MCP_SCRIPT_TIMEOUT)",
+    ] = None,
+) -> dict[str, Any]:
+    """Execute a Python script file in Maya.
+
+    Args:
+        file_path: Absolute path to the .py script.
+        args: Optional arguments dict.
+        timeout: Optional timeout override.
+
+    Returns:
+        Dictionary with success, script, output, and errors.
+    """
+    from maya_mcp.tools.scripts import script_execute as _script_execute
+
+    return _script_execute(file_path=file_path, args=coerce_dict(args), timeout=timeout)
+
+
+@mcp.tool(
+    name="script.run",
+    description="Execute raw Python or MEL code in Maya. "
+    "REQUIRES MAYA_MCP_ENABLE_RAW_EXECUTION=true environment variable. "
+    "Disabled by default for security.",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=True,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
+def tool_script_run(
+    code: Annotated[str, "Python or MEL code to execute"],
+    language: Annotated[
+        Literal["python", "mel"],
+        "Code language (default: python)",
+    ] = "python",
+    timeout: Annotated[
+        int | None,
+        "Optional timeout override in seconds (default from MAYA_MCP_SCRIPT_TIMEOUT)",
+    ] = None,
+) -> dict[str, Any]:
+    """Execute raw Python or MEL code in Maya.
+
+    Args:
+        code: Code to execute.
+        language: Code language (python or mel).
+        timeout: Optional timeout override.
+
+    Returns:
+        Dictionary with success, output, language, and errors.
+    """
+    from maya_mcp.tools.scripts import script_run as _script_run
+
+    return _script_run(code=code, language=language, timeout=timeout)
 
 
 def main() -> None:
