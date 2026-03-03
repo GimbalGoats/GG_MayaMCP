@@ -306,7 +306,8 @@ class CommandPortClient:
         """Execute a Python command in Maya and return the result.
 
         Sends a command to Maya via commandPort and waits for the response.
-        Automatically connects if not already connected.
+        Automatically connects if not already connected. If the connection
+        drops during the send phase, reconnects and retries once.
 
         Args:
             command: Python code to execute in Maya.
@@ -324,6 +325,18 @@ class CommandPortClient:
             >>> print(result)
             ['pCube1', 'pSphere1']
         """
+        return self._execute_with_retry(command, allow_retry=True)
+
+    def _execute_with_retry(self, command: str, *, allow_retry: bool) -> str:
+        """Execute a command with optional reconnect-and-retry on send failure.
+
+        Args:
+            command: Python code to execute in Maya.
+            allow_retry: If True, reconnect and retry once on send-phase errors.
+
+        Returns:
+            Command output as string.
+        """
         # Ensure connected
         if self._socket is None:
             self.connect()
@@ -336,6 +349,7 @@ class CommandPortClient:
                 attempts=0,
             )
 
+        send_completed = False
         try:
             # Set command timeout
             self._socket.settimeout(self.config.command_timeout)
@@ -350,6 +364,7 @@ class CommandPortClient:
 
             command_bytes = command.encode("utf-8")
             self._socket.sendall(command_bytes)
+            send_completed = True
 
             # Receive response — use command_timeout for the first chunk (Maya
             # may take a while to process) and a short follow-up timeout for
@@ -398,12 +413,23 @@ class CommandPortClient:
             ) from exc
 
         except (ConnectionResetError, BrokenPipeError, OSError) as e:
-            error_msg = f"Connection lost: {e}"
+            phase = "receive" if send_completed else "send"
+            error_msg = f"Connection lost during {phase}: {e}"
             self.state.last_error = error_msg
             self._handle_socket_error()
-            logger.error("Connection lost during command execution: %s", e)
+
+            # Only retry on send-phase errors — the command was never delivered
+            if not send_completed and allow_retry:
+                logger.warning("Connection lost during send, reconnecting: %s", e)
+                try:
+                    self.connect()
+                    return self._execute_with_retry(command, allow_retry=False)
+                except (MayaUnavailableError, OSError):
+                    pass  # Fall through to raise original error
+
+            logger.error("Connection lost during %s: %s", phase, e)
             raise MayaUnavailableError(
-                message="Lost connection to Maya during command execution",
+                message=f"Lost connection to Maya during {phase}",
                 host=self.config.host,
                 port=self.config.port,
                 attempts=0,
