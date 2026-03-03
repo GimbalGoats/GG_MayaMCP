@@ -7,12 +7,11 @@ and playback range management for animation workflows.
 from __future__ import annotations
 
 import json
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from maya_mcp.tools.scene import TIME_UNIT_TO_FPS
 from maya_mcp.transport import get_client
 from maya_mcp.utils.parsing import parse_json_response
-from maya_mcp.utils.response_guard import guard_response_size
 from maya_mcp.utils.validation import validate_attribute_name as _validate_attribute_name
 from maya_mcp.utils.validation import validate_node_name as _validate_node_name
 
@@ -29,7 +28,7 @@ TangentType = Literal[
     "slow",
 ]
 
-VALID_TANGENT_TYPES: frozenset[str] = frozenset(TangentType.__args__)  # type: ignore[attr-defined]
+VALID_TANGENT_TYPES: frozenset[str] = frozenset(get_args(TangentType))
 
 
 def animation_set_time(
@@ -245,12 +244,7 @@ def animation_set_keyframe(
             or tangent types are invalid.
     """
     _validate_node_name(node)
-
-    if attributes is not None:
-        if not attributes:
-            raise ValueError("attributes list cannot be empty")
-        for attr in attributes:
-            _validate_attribute_name(attr)
+    _validate_optional_attributes(attributes)
 
     if in_tangent_type not in VALID_TANGENT_TYPES:
         raise ValueError(
@@ -320,6 +314,17 @@ print(json.dumps(result))
     return parsed
 
 
+def _validate_time_range(
+    time_range_start: float | None,
+    time_range_end: float | None,
+) -> None:
+    """Validate that time range params are both provided or both None."""
+    if (time_range_start is None) != (time_range_end is None):
+        raise ValueError(
+            "time_range_start and time_range_end must both be provided or both be None"
+        )
+
+
 def _build_time_range_code(
     time_range_start: float | None,
     time_range_end: float | None,
@@ -339,6 +344,87 @@ def _build_time_range_code(
     if time_range_start is not None and time_range_end is not None:
         return f"time_range = ({float(time_range_start)}, {float(time_range_end)})"
     return "time_range = None"
+
+
+def _build_anim_attr_discovery_code(result_var: str) -> str:
+    """Build Maya-side code to discover animated attributes on a node.
+
+    Generates a block of Maya Python code that finds all animated
+    attributes by inspecting anim curve connections. Uses batch
+    listConnections for efficiency.
+
+    Args:
+        result_var: Variable name to store the discovered attribute list.
+
+    Returns:
+        A string of Maya Python code to embed in a command.
+    """
+    return f"""\
+            anim_curves = cmds.keyframe(node, query=True, name=True) or []
+            {result_var} = []
+            if anim_curves:
+                seen = set()
+                conns = cmds.listConnections(
+                    [c + ".output" for c in anim_curves], plugs=True, connections=True
+                ) or []
+                for i in range(0, len(conns), 2):
+                    dest = conns[i + 1] if i + 1 < len(conns) else None
+                    if dest:
+                        parts = dest.split(".")
+                        if len(parts) >= 2 and parts[0] == node:
+                            attr = ".".join(parts[1:])
+                            if attr not in seen:
+                                seen.add(attr)
+                                {result_var}.append(attr)"""
+
+
+def _validate_optional_attributes(attributes: list[str] | None) -> None:
+    """Validate an optional attribute list (non-empty, valid names)."""
+    if attributes is not None:
+        if not attributes:
+            raise ValueError("attributes list cannot be empty")
+        for attr in attributes:
+            _validate_attribute_name(attr)
+
+
+def _guard_keyframe_response(parsed: dict[str, Any]) -> dict[str, Any]:
+    """Guard keyframe response against oversized data.
+
+    Flattens the nested keyframes dict for size checking, and if
+    truncated, rebuilds the nested structure from the truncated data.
+    """
+    from maya_mcp.utils.response_guard import guard_response_size
+
+    if "keyframes" not in parsed or not isinstance(parsed["keyframes"], dict):
+        return parsed
+
+    flat: list[dict[str, Any]] = []
+    for attr_name, entries in parsed["keyframes"].items():
+        if isinstance(entries, list):
+            for entry in entries:
+                flat.append({"attribute": attr_name, **entry})
+
+    if not flat:
+        return parsed
+
+    guard_data: dict[str, Any] = {**parsed, "_flat_keyframes": flat}
+    guarded = guard_response_size(guard_data, list_key="_flat_keyframes")
+
+    if "_size_warning" not in guarded:
+        return parsed
+
+    parsed["_size_warning"] = guarded["_size_warning"]
+    parsed["_original_size"] = guarded.get("_original_size")
+    truncated: dict[str, list[dict[str, Any]]] = {}
+    for entry in guarded["_flat_keyframes"]:
+        a = entry.get("attribute", "")
+        truncated.setdefault(a, []).append({k: v for k, v in entry.items() if k != "attribute"})
+    parsed["keyframes"] = truncated
+    parsed["attribute_count"] = len(truncated)
+    parsed["total_keyframe_count"] = sum(len(v) for v in truncated.values())
+    parsed["truncated"] = True
+
+    return parsed
 
 
 def animation_get_keyframes(
@@ -365,20 +451,18 @@ def animation_get_keyframes(
             - errors: Error details if any, or None
 
     Raises:
-        ValueError: If node name or attribute names contain invalid characters.
+        ValueError: If node name or attribute names contain invalid characters,
+            or time_range_start/time_range_end are not both provided or both None.
     """
     _validate_node_name(node)
-
-    if attributes is not None:
-        if not attributes:
-            raise ValueError("attributes list cannot be empty")
-        for attr in attributes:
-            _validate_attribute_name(attr)
+    _validate_optional_attributes(attributes)
+    _validate_time_range(time_range_start, time_range_end)
 
     client = get_client()
     node_escaped = json.dumps(node)
     attrs_escaped = json.dumps(attributes) if attributes is not None else "None"
     time_range_init = _build_time_range_code(time_range_start, time_range_end)
+    attr_discovery = _build_anim_attr_discovery_code("query_attrs")
 
     command = f"""
 import maya.cmds as cmds
@@ -400,23 +484,10 @@ try:
     if not cmds.objExists(node):
         result["errors"]["_node"] = "Node '" + node + "' does not exist"
     else:
-        # Determine which attributes to query
         if attrs is not None:
             query_attrs = attrs
         else:
-            # Find all animated attributes via anim curve connections
-            anim_curves = cmds.keyframe(node, query=True, name=True) or []
-            query_attrs = []
-            seen = set()
-            for curve in anim_curves:
-                conns = cmds.listConnections(curve + ".output", plugs=True) or []
-                for conn in conns:
-                    parts = conn.split(".")
-                    if len(parts) >= 2 and parts[0] == node:
-                        attr = ".".join(parts[1:])
-                        if attr not in seen:
-                            seen.add(attr)
-                            query_attrs.append(attr)
+{attr_discovery}
 
         keyframes = {{}}
         total_count = 0
@@ -452,31 +523,7 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    # Guard against oversized keyframe data by flattening to a list
-    if "keyframes" in parsed and isinstance(parsed["keyframes"], dict):
-        flat_keyframes: list[dict[str, Any]] = []
-        for attr_name, entries in parsed["keyframes"].items():
-            if isinstance(entries, list):
-                for entry in entries:
-                    flat_keyframes.append({"attribute": attr_name, **entry})
-        if flat_keyframes:
-            guard_data: dict[str, Any] = {
-                **parsed,
-                "_flat_keyframes": flat_keyframes,
-            }
-            guarded = guard_response_size(guard_data, list_key="_flat_keyframes")
-            if "_size_warning" in guarded:
-                parsed["_size_warning"] = guarded["_size_warning"]
-                parsed["_original_size"] = guarded.get("_original_size")
-                # Rebuild keyframes dict from truncated flat list
-                truncated: dict[str, list[dict[str, Any]]] = {}
-                for entry in guarded["_flat_keyframes"]:
-                    a = entry.pop("attribute")
-                    truncated.setdefault(a, []).append(entry)
-                parsed["keyframes"] = truncated
-                parsed["attribute_count"] = len(truncated)
-                parsed["total_keyframe_count"] = sum(len(v) for v in truncated.values())
-                parsed["truncated"] = True
+    parsed = _guard_keyframe_response(parsed)
 
     return parsed
 
@@ -504,20 +551,18 @@ def animation_delete_keyframes(
             - errors: Error details if any, or None
 
     Raises:
-        ValueError: If node name or attribute names contain invalid characters.
+        ValueError: If node name or attribute names contain invalid characters,
+            or time_range_start/time_range_end are not both provided or both None.
     """
     _validate_node_name(node)
-
-    if attributes is not None:
-        if not attributes:
-            raise ValueError("attributes list cannot be empty")
-        for attr in attributes:
-            _validate_attribute_name(attr)
+    _validate_optional_attributes(attributes)
+    _validate_time_range(time_range_start, time_range_end)
 
     client = get_client()
     node_escaped = json.dumps(node)
     attrs_escaped = json.dumps(attributes) if attributes is not None else "None"
     time_range_code = _build_time_range_code(time_range_start, time_range_end)
+    attr_discovery = _build_anim_attr_discovery_code("target_attrs")
 
     command = f"""
 import maya.cmds as cmds
@@ -539,23 +584,10 @@ try:
     if not cmds.objExists(node):
         result["errors"]["_node"] = "Node '" + node + "' does not exist"
     else:
-        # Determine which attributes to process
         if attrs is not None:
             target_attrs = attrs
         else:
-            # Find all animated attributes via anim curve connections
-            anim_curves = cmds.keyframe(node, query=True, name=True) or []
-            target_attrs = []
-            seen = set()
-            for curve in anim_curves:
-                conns = cmds.listConnections(curve + ".output", plugs=True) or []
-                for conn in conns:
-                    parts = conn.split(".")
-                    if len(parts) >= 2 and parts[0] == node:
-                        attr = ".".join(parts[1:])
-                        if attr not in seen:
-                            seen.add(attr)
-                            target_attrs.append(attr)
+{attr_discovery}
 
         total_deleted = 0
         affected_attrs = []

@@ -522,6 +522,16 @@ class TestAnimationGetKeyframes:
         with pytest.raises(ValueError, match="attributes list cannot be empty"):
             animation_get_keyframes("pCube1", attributes=[])
 
+    def test_get_keyframes_partial_time_range_start_only_raises(self) -> None:
+        """Get keyframes raises ValueError if only time_range_start is provided."""
+        with pytest.raises(ValueError, match="time_range_start and time_range_end must both"):
+            animation_get_keyframes("pCube1", time_range_start=5.0)
+
+    def test_get_keyframes_partial_time_range_end_only_raises(self) -> None:
+        """Get keyframes raises ValueError if only time_range_end is provided."""
+        with pytest.raises(ValueError, match="time_range_start and time_range_end must both"):
+            animation_get_keyframes("pCube1", time_range_end=15.0)
+
     def test_get_keyframes_nonexistent_node(self) -> None:
         """Get keyframes returns error for nonexistent node."""
         mock_client = MagicMock()
@@ -629,6 +639,16 @@ class TestAnimationDeleteKeyframes:
         """Delete keyframes raises ValueError for empty attributes list."""
         with pytest.raises(ValueError, match="attributes list cannot be empty"):
             animation_delete_keyframes("pCube1", attributes=[])
+
+    def test_delete_keyframes_partial_time_range_start_only_raises(self) -> None:
+        """Delete keyframes raises ValueError if only time_range_start is provided."""
+        with pytest.raises(ValueError, match="time_range_start and time_range_end must both"):
+            animation_delete_keyframes("pCube1", time_range_start=5.0)
+
+    def test_delete_keyframes_partial_time_range_end_only_raises(self) -> None:
+        """Delete keyframes raises ValueError if only time_range_end is provided."""
+        with pytest.raises(ValueError, match="time_range_start and time_range_end must both"):
+            animation_delete_keyframes("pCube1", time_range_end=15.0)
 
     def test_delete_keyframes_nonexistent_node(self) -> None:
         """Delete keyframes returns error for nonexistent node."""
