@@ -47,7 +47,7 @@ def load_script_config() -> ScriptConfig:
                 continue
             path = Path(d)
             if path.is_absolute() and path.is_dir():
-                script_dirs.append(path)
+                script_dirs.append(path.resolve())
 
     # Parse raw execution flag
     raw_str = os.environ.get("MAYA_MCP_ENABLE_RAW_EXECUTION", "").lower()

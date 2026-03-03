@@ -189,11 +189,10 @@ try:
             if limit and limit > 0:
                 end_idx = min(offset + limit, total_count)
 
-            # Get CV positions in world space
-            cvs = []
-            for i in range(start_idx, end_idx):
-                pos = cmds.pointPosition(shape + ".cv[" + str(i) + "]", world=True)
-                cvs.append([pos[0], pos[1], pos[2]])
+            # Get CV positions in world space (batch query)
+            cv_range = shape + ".cv[" + str(start_idx) + ":" + str(end_idx - 1) + "]"
+            flat = cmds.xform(cv_range, query=True, worldSpace=True, translation=True) or []
+            cvs = [[flat[i], flat[i+1], flat[i+2]] for i in range(0, len(flat), 3)]
 
             result["cvs"] = cvs
             result["offset"] = offset

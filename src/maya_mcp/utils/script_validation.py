@@ -157,7 +157,7 @@ def validate_script_path(file_path: str, allowed_dirs: tuple[Path, ...]) -> Path
 
     for allowed_dir in allowed_dirs:
         try:
-            resolved.relative_to(allowed_dir.resolve())
+            resolved.relative_to(allowed_dir)
             return resolved
         except ValueError:
             continue

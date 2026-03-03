@@ -9,8 +9,14 @@ in Maya with a three-tier trust model:
 
 from __future__ import annotations
 
+import contextlib
 import json
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from maya_mcp.transport.commandport import CommandPortClient
 
 from maya_mcp.errors import ValidationError
 from maya_mcp.transport import get_client
@@ -22,6 +28,22 @@ from maya_mcp.utils.script_config import (
     get_script_config,
 )
 from maya_mcp.utils.script_validation import validate_raw_code, validate_script_path
+
+# Maximum number of scripts to enumerate before stopping.
+_MAX_SCRIPT_SCAN = 500
+
+
+@contextlib.contextmanager
+def _override_timeout(client: CommandPortClient, timeout: float) -> Iterator[CommandPortClient]:
+    """Temporarily override a client's command timeout."""
+    original = client.config.command_timeout
+    if timeout != original:
+        client.config.command_timeout = timeout
+    try:
+        yield client
+    finally:
+        if timeout != original:
+            client.config.command_timeout = original
 
 
 def script_list() -> dict[str, Any]:
@@ -55,11 +77,17 @@ def script_list() -> dict[str, Any]:
 
     scripts: list[dict[str, Any]] = []
     scan_errors: dict[str, str] = {}
+    capped = False
 
     for script_dir in config.script_dirs:
+        if capped:
+            break
         try:
             resolved_dir = script_dir.resolve()
-            for py_file in sorted(resolved_dir.rglob("*.py")):
+            for py_file in resolved_dir.rglob("*.py"):
+                if len(scripts) >= _MAX_SCRIPT_SCAN:
+                    capped = True
+                    break
                 # Skip underscore-prefixed files
                 if py_file.name.startswith("_"):
                     continue
@@ -116,17 +144,17 @@ def script_execute(
     config = get_script_config()
     resolved = validate_script_path(file_path, config.script_dirs)
 
-    # Read script content server-side
-    file_size = resolved.stat().st_size
-    if file_size > MAX_SCRIPT_FILE_BYTES:
+    # Read script content server-side (single read avoids stat+read TOCTOU)
+    raw_bytes = resolved.read_bytes()
+    if len(raw_bytes) > MAX_SCRIPT_FILE_BYTES:
         raise ValidationError(
-            message=f"Script file too large ({file_size} bytes > {MAX_SCRIPT_FILE_BYTES} bytes)",
+            message=f"Script file too large ({len(raw_bytes)} bytes > {MAX_SCRIPT_FILE_BYTES} bytes)",
             field_name="file_path",
             value=str(resolved)[:50],
             constraint=f"max {MAX_SCRIPT_FILE_BYTES} bytes",
         )
 
-    script_content = resolved.read_text(encoding="utf-8")
+    script_content = raw_bytes.decode("utf-8")
     effective_timeout = timeout if timeout is not None else config.script_timeout
 
     client = get_client()
@@ -166,31 +194,8 @@ except Exception as e:
 print(json.dumps(result))
 """
 
-    # Use custom timeout if provided
-    original_timeout = client.config.command_timeout
-    if effective_timeout != original_timeout:
-        client.config = client.config.__class__(
-            host=client.config.host,
-            port=client.config.port,
-            connect_timeout=client.config.connect_timeout,
-            command_timeout=float(effective_timeout),
-            max_retries=client.config.max_retries,
-            retry_base_delay=client.config.retry_base_delay,
-        )
-
-    try:
+    with _override_timeout(client, float(effective_timeout)):
         response = client.execute(command)
-    finally:
-        # Restore original timeout
-        if effective_timeout != original_timeout:
-            client.config = client.config.__class__(
-                host=client.config.host,
-                port=client.config.port,
-                connect_timeout=client.config.connect_timeout,
-                command_timeout=original_timeout,
-                max_retries=client.config.max_retries,
-                retry_base_delay=client.config.retry_base_delay,
-            )
 
     parsed: dict[str, Any] = parse_json_response(response)
 
@@ -241,7 +246,6 @@ def script_run(
     effective_timeout = timeout if timeout is not None else config.script_timeout
     client = get_client()
     code_escaped = json.dumps(code)
-    language_escaped = json.dumps(language)
 
     if language == "mel":
         # Wrap MEL execution in Python
@@ -283,9 +287,8 @@ import json
 from io import StringIO
 
 _code = {code_escaped}
-_language = {language_escaped}
 
-result = {{"success": False, "output": "", "language": _language, "errors": {{}}}}
+result = {{"success": False, "output": "", "language": "python", "errors": {{}}}}
 
 try:
     _old_stdout = sys.stdout
@@ -307,31 +310,8 @@ except Exception as e:
 print(json.dumps(result))
 """
 
-    # Use custom timeout if provided
-    original_timeout = client.config.command_timeout
-    if effective_timeout != original_timeout:
-        client.config = client.config.__class__(
-            host=client.config.host,
-            port=client.config.port,
-            connect_timeout=client.config.connect_timeout,
-            command_timeout=float(effective_timeout),
-            max_retries=client.config.max_retries,
-            retry_base_delay=client.config.retry_base_delay,
-        )
-
-    try:
+    with _override_timeout(client, float(effective_timeout)):
         response = client.execute(command)
-    finally:
-        # Restore original timeout
-        if effective_timeout != original_timeout:
-            client.config = client.config.__class__(
-                host=client.config.host,
-                port=client.config.port,
-                connect_timeout=client.config.connect_timeout,
-                command_timeout=original_timeout,
-                max_retries=client.config.max_retries,
-                retry_base_delay=client.config.retry_base_delay,
-            )
 
     parsed: dict[str, Any] = parse_json_response(response)
 
