@@ -212,7 +212,7 @@ class TestCommandPortClientExecute:
             assert exc_info.value.operation == "execute"
 
     def test_execute_connection_lost(self) -> None:
-        """Execute raises MayaUnavailableError when connection is lost."""
+        """Execute raises MayaUnavailableError when connection is lost during receive."""
         client = CommandPortClient()
 
         with patch("socket.socket") as mock_socket_class:
@@ -221,14 +221,97 @@ class TestCommandPortClientExecute:
 
             client.connect()
 
-            # Simulate connection reset
-            mock_socket.sendall.side_effect = ConnectionResetError()
+            # Simulate connection reset during receive (after send succeeds)
+            mock_socket.recv.side_effect = ConnectionResetError()
 
             with pytest.raises(MayaUnavailableError) as exc_info:
                 client.execute("cmds.ls()")
 
-            assert "Lost connection" in exc_info.value.message
+            assert "during receive" in exc_info.value.message
             assert not client.is_connected()
+
+    def test_execute_reconnect_on_send_failure(self) -> None:
+        """Execute reconnects and retries on send-phase failure."""
+        client = CommandPortClient()
+
+        with patch("socket.socket") as mock_socket_class:
+            mock_socket_first = MagicMock()
+            mock_socket_retry = MagicMock()
+            mock_socket_class.side_effect = [
+                mock_socket_first,
+                mock_socket_retry,
+            ]
+
+            client.connect()
+
+            # First send fails (connection dropped)
+            mock_socket_first.sendall.side_effect = BrokenPipeError("Broken pipe")
+            # Retry socket works
+            mock_socket_retry.recv.side_effect = [b'{"ok": true}', TimeoutError()]
+
+            result = client.execute("cmds.ls()")
+
+            assert result == '{"ok": true}'
+            # First socket sendall was called, then failed
+            mock_socket_first.sendall.assert_called_once()
+            # Retry socket sendall was called successfully
+            mock_socket_retry.sendall.assert_called_once()
+
+    def test_execute_no_retry_on_receive_failure(self) -> None:
+        """Execute does NOT retry on receive-phase failure."""
+        client = CommandPortClient()
+
+        with patch("socket.socket") as mock_socket_class:
+            mock_socket = MagicMock()
+            mock_socket_class.return_value = mock_socket
+
+            client.connect()
+
+            # Send succeeds but receive fails
+            mock_socket.recv.side_effect = ConnectionResetError("Connection reset")
+
+            with pytest.raises(MayaUnavailableError) as exc_info:
+                client.execute("cmds.ls()")
+
+            assert "during receive" in exc_info.value.message
+
+    def test_execute_no_retry_on_timeout(self) -> None:
+        """Execute does NOT retry on timeout."""
+        client = CommandPortClient()
+
+        with patch("socket.socket") as mock_socket_class:
+            mock_socket = MagicMock()
+            mock_socket_class.return_value = mock_socket
+
+            client.connect()
+
+            mock_socket.sendall.side_effect = TimeoutError()
+
+            with pytest.raises(MayaTimeoutError):
+                client.execute("cmds.ls()")
+
+    def test_execute_reconnect_fails_raises_original(self) -> None:
+        """When reconnect also fails, raises MayaUnavailableError."""
+        client = CommandPortClient(max_retries=1, retry_base_delay=0.01)
+
+        with patch("socket.socket") as mock_socket_class:
+            mock_socket_first = MagicMock()
+            mock_socket_retry = MagicMock()
+            mock_socket_retry.connect.side_effect = ConnectionRefusedError()
+            mock_socket_class.side_effect = [
+                mock_socket_first,
+                mock_socket_retry,
+            ]
+
+            client.connect()
+
+            # Send fails
+            mock_socket_first.sendall.side_effect = BrokenPipeError("Broken pipe")
+
+            with pytest.raises(MayaUnavailableError) as exc_info:
+                client.execute("cmds.ls()")
+
+            assert "during send" in exc_info.value.message
 
 
 class TestCommandPortClientHealth:
