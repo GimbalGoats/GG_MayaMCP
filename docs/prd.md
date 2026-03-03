@@ -258,20 +258,20 @@ Improvements based on [Block's MCP Playbook](https://engineering.block.xyz/blog/
 
 ---
 
-### M5: Animation & Rigging 📋
+### M5: Animation & Rigging
 
 **Goal**: Support animation workflows with template patterns for rigging.
 
-#### M5-A: Core Animation Tools
+#### M5-A: Core Animation Tools ✅
 
-| ID | Feature | Description | Effort |
-|----|---------|-------------|--------|
-| M5.A1 | `animation.set_keyframe` | Set keyframe on attribute(s) at current/specified time | Medium |
-| M5.A2 | `animation.get_keyframes` | Query keyframes for attribute(s) in time range | Medium |
-| M5.A3 | `animation.delete_keyframes` | Delete keyframes in range | Low |
-| M5.A4 | `animation.set_time` | Set current time / go to frame | Low |
-| M5.A5 | `animation.get_time_range` | Get playback range | Low |
-| M5.A6 | `animation.set_time_range` | Set playback range | Low |
+| ID | Feature | Description | Effort | Status |
+|----|---------|-------------|--------|--------|
+| M5.A1 | `animation.set_keyframe` | Set keyframe on attribute(s) at current/specified time | Medium | ✅ |
+| M5.A2 | `animation.get_keyframes` | Query keyframes for attribute(s) in time range | Medium | ✅ |
+| M5.A3 | `animation.delete_keyframes` | Delete keyframes in range | Low | ✅ |
+| M5.A4 | `animation.set_time` | Set current time / go to frame | Low | ✅ |
+| M5.A5 | `animation.get_time_range` | Get playback range | Low | ✅ |
+| M5.A6 | `animation.set_time_range` | Set playback range | Low | ✅ |
 
 #### M5-B: Rigging Workflow Patterns (Design Only)
 
@@ -537,7 +537,7 @@ M14 ✅ (Polygon Modeling)
 | 2 | M3-B (LLM Optimization) | 1 remaining item: markdown output |
 | 3 | ~~M4 (Scene Operations)~~ | ✅ Complete |
 | 4 | ~~M7 (Node Graph & Connections)~~ | ✅ Complete |
-| 5 | M5-A (Core Animation) | Essential animation tools |
+| 5 | ~~M5-A (Core Animation)~~ | ✅ Complete |
 | 6 | M5-B (Rigging Patterns) | Design documentation only |
 | 7 | M6 (Production Hardening) | Nice to have |
 | 8 | ~~M8 (Skinning)~~ | ✅ Complete |
