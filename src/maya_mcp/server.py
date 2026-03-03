@@ -623,7 +623,7 @@ def tool_nodes_delete(
     Returns:
         Dictionary with deleted list, count, and errors (if any nodes failed).
     """
-    return nodes_delete(nodes=coerce_list(nodes), hierarchy=hierarchy)  # type: ignore[arg-type]
+    return nodes_delete(nodes=coerce_list(nodes), hierarchy=hierarchy)
 
 
 @mcp.tool(
@@ -647,7 +647,7 @@ def tool_nodes_rename(
     Returns:
         Dictionary with renamed list and errors (if any nodes failed).
     """
-    return nodes_rename(mapping=coerce_dict(mapping))  # type: ignore[arg-type]
+    return nodes_rename(mapping=coerce_dict(mapping))
 
 
 @mcp.tool(
@@ -675,7 +675,7 @@ def tool_nodes_parent(
     Returns:
         Dictionary with parented list and errors.
     """
-    return nodes_parent(nodes=coerce_list(nodes), parent=parent, relative=relative)  # type: ignore[arg-type]
+    return nodes_parent(nodes=coerce_list(nodes), parent=parent, relative=relative)
 
 
 @mcp.tool(
@@ -710,7 +710,7 @@ def tool_nodes_duplicate(
         Dictionary with duplicated map and errors.
     """
     return nodes_duplicate(
-        nodes=coerce_list(nodes),  # type: ignore[arg-type]
+        nodes=coerce_list(nodes),
         name=name,
         input_connections=input_connections,
         upstream_nodes=upstream_nodes,
@@ -781,7 +781,7 @@ def tool_attributes_get(
         Dictionary with node, attributes (name→value map), count,
         and errors (if any attributes failed).
     """
-    return attributes_get(node=node, attributes=coerce_list(attributes))  # type: ignore[arg-type]
+    return attributes_get(node=node, attributes=coerce_list(attributes))
 
 
 @mcp.tool(
@@ -809,7 +809,7 @@ def tool_attributes_set(
         Dictionary with node, set (list of attrs set), count,
         and errors (if any attributes failed).
     """
-    return attributes_set(node=node, attributes=coerce_dict(attributes))  # type: ignore[arg-type]
+    return attributes_set(node=node, attributes=coerce_dict(attributes))
 
 
 # Register connection tools
@@ -1035,7 +1035,7 @@ def tool_selection_set(
     Returns:
         New selection state with selection array and count.
     """
-    return selection_set(nodes=coerce_list(nodes), add=add, deselect=deselect)  # type: ignore[arg-type]
+    return selection_set(nodes=coerce_list(nodes), add=add, deselect=deselect)
 
 
 @mcp.tool(
@@ -1248,7 +1248,7 @@ def tool_selection_set_components(
     return selection_set_components(
         components=coerce_list(components),
         add=add,
-        deselect=deselect,  # type: ignore[arg-type]
+        deselect=deselect,
     )
 
 
@@ -1404,7 +1404,7 @@ def tool_modeling_extrude_faces(
         Dictionary with node, faces_extruded, new_face_count, and errors.
     """
     return modeling_extrude_faces(
-        faces=coerce_list(faces),  # type: ignore[arg-type]
+        faces=coerce_list(faces),
         local_translate_z=local_translate_z,
         local_translate_x=local_translate_x,
         local_translate_y=local_translate_y,
@@ -1468,7 +1468,7 @@ def tool_modeling_combine(
     Returns:
         Dictionary with result_mesh, source_meshes, vertex_count, face_count, and errors.
     """
-    return modeling_combine(meshes=coerce_list(meshes), name=name)  # type: ignore[arg-type]
+    return modeling_combine(meshes=coerce_list(meshes), name=name)
 
 
 @mcp.tool(
@@ -1558,7 +1558,7 @@ def tool_modeling_bevel(
         new_face_count, and errors.
     """
     return modeling_bevel(
-        components=coerce_list(components),  # type: ignore[arg-type]
+        components=coerce_list(components),
         offset=offset,
         segments=segments,
         fraction=fraction,
@@ -1593,7 +1593,7 @@ def tool_modeling_bridge(
         Dictionary with node, new_face_count, and errors.
     """
     return modeling_bridge(
-        edge_loops=coerce_list(edge_loops),  # type: ignore[arg-type]
+        edge_loops=coerce_list(edge_loops),
         divisions=divisions,
         twist=twist,
         taper=taper,
@@ -1649,7 +1649,7 @@ def tool_modeling_delete_faces(
     Returns:
         Dictionary with faces_deleted, mesh, remaining_face_count, and errors.
     """
-    return modeling_delete_faces(faces=coerce_list(faces))  # type: ignore[arg-type]
+    return modeling_delete_faces(faces=coerce_list(faces))
 
 
 @mcp.tool(
@@ -1688,7 +1688,7 @@ def tool_modeling_move_components(
         Dictionary with components_moved, translate/absolute, world_space, and errors.
     """
     return modeling_move_components(
-        components=coerce_list(components),  # type: ignore[arg-type]
+        components=coerce_list(components),
         translate=coerce_list(translate),
         absolute=coerce_list(absolute),
         world_space=world_space,
@@ -1726,7 +1726,7 @@ def tool_modeling_freeze_transforms(
         nodes=coerce_list(nodes),
         translate=translate,
         rotate=rotate,
-        scale=scale,  # type: ignore[arg-type]
+        scale=scale,
     )
 
 
@@ -1777,7 +1777,7 @@ def tool_modeling_center_pivot(
     Returns:
         Dictionary with centered list, count, pivot_positions, and errors.
     """
-    return modeling_center_pivot(nodes=coerce_list(nodes))  # type: ignore[arg-type]
+    return modeling_center_pivot(nodes=coerce_list(nodes))
 
 
 @mcp.tool(
@@ -1807,7 +1807,7 @@ def tool_modeling_set_pivot(
     """
     return modeling_set_pivot(
         node=node,
-        position=coerce_list(position),  # type: ignore[arg-type]
+        position=coerce_list(position),
         world_space=world_space,
     )
 
@@ -1871,7 +1871,7 @@ def tool_shading_assign_material(
     """
     return shading_assign_material(
         targets=coerce_list(targets),
-        material=material,  # type: ignore[arg-type]
+        material=material,
     )
 
 
@@ -1905,7 +1905,7 @@ def tool_shading_set_material_color(
     """
     return shading_set_material_color(
         material=material,
-        color=coerce_list(color),  # type: ignore[arg-type]
+        color=coerce_list(color),
         attribute=attribute,
     )
 
@@ -1944,7 +1944,7 @@ def tool_skin_bind(
     """
     return skin_bind(
         mesh=mesh,
-        joints=coerce_list(joints),  # type: ignore[arg-type]
+        joints=coerce_list(joints),
         max_influences=max_influences,
         bind_method=bind_method,
     )
@@ -2063,7 +2063,7 @@ def tool_skin_weights_set(
     """
     return skin_weights_set(
         skin_cluster=skin_cluster,
-        weights=coerce_list(weights),  # type: ignore[arg-type]
+        weights=coerce_list(weights),
         normalize=normalize,
     )
 

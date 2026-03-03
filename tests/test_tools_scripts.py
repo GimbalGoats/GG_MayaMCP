@@ -133,7 +133,7 @@ class TestScriptPathValidation:
         """Non-.py extension is rejected."""
         script = tmp_path / "test.txt"
         script.write_text("hello")
-        with pytest.raises(ValidationError, match=".py extension"):
+        with pytest.raises(ValidationError, match=r"\.py extension"):
             validate_script_path(str(script), (tmp_path,))
 
     def test_device_name_rejected(self, tmp_path: Path) -> None:
@@ -296,9 +296,11 @@ class TestScriptExecute:
         """Script execute rejects paths outside allowed dirs."""
         config = ScriptConfig(script_dirs=())
 
-        with patch("maya_mcp.tools.scripts.get_script_config", return_value=config):
-            with pytest.raises(ValidationError):
-                script_execute("/some/bad/path.py")
+        with (
+            patch("maya_mcp.tools.scripts.get_script_config", return_value=config),
+            pytest.raises(ValidationError),
+        ):
+            script_execute("/some/bad/path.py")
 
     def test_execute_file_too_large(self, tmp_path: Path) -> None:
         """Script execute rejects files exceeding size limit."""
@@ -307,9 +309,11 @@ class TestScriptExecute:
 
         config = ScriptConfig(script_dirs=(tmp_path,))
 
-        with patch("maya_mcp.tools.scripts.get_script_config", return_value=config):
-            with pytest.raises(ValidationError, match="too large"):
-                script_execute(str(script))
+        with (
+            patch("maya_mcp.tools.scripts.get_script_config", return_value=config),
+            pytest.raises(ValidationError, match="too large"),
+        ):
+            script_execute(str(script))
 
 
 class TestScriptRun:
@@ -366,22 +370,28 @@ class TestScriptRun:
         """Script run raises when raw execution is disabled."""
         config = ScriptConfig(raw_execution_enabled=False)
 
-        with patch("maya_mcp.tools.scripts.get_script_config", return_value=config):
-            with pytest.raises(ValidationError, match="disabled"):
-                script_run("print('hello')")
+        with (
+            patch("maya_mcp.tools.scripts.get_script_config", return_value=config),
+            pytest.raises(ValidationError, match="disabled"),
+        ):
+            script_run("print('hello')")
 
     def test_run_empty_code_raises(self) -> None:
         """Script run raises for empty code."""
         config = ScriptConfig(raw_execution_enabled=True)
 
-        with patch("maya_mcp.tools.scripts.get_script_config", return_value=config):
-            with pytest.raises(ValidationError, match="non-empty"):
-                script_run("")
+        with (
+            patch("maya_mcp.tools.scripts.get_script_config", return_value=config),
+            pytest.raises(ValidationError, match="non-empty"),
+        ):
+            script_run("")
 
     def test_run_oversized_code_raises(self) -> None:
         """Script run raises for oversized code."""
         config = ScriptConfig(raw_execution_enabled=True)
 
-        with patch("maya_mcp.tools.scripts.get_script_config", return_value=config):
-            with pytest.raises(ValidationError, match="exceeds maximum"):
-                script_run("x" * 102_401)
+        with (
+            patch("maya_mcp.tools.scripts.get_script_config", return_value=config),
+            pytest.raises(ValidationError, match="exceeds maximum"),
+        ):
+            script_run("x" * 102_401)
