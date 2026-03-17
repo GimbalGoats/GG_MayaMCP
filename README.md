@@ -14,7 +14,10 @@ Maya MCP enables AI assistants to interact with a running Maya instance. It prov
 - Polygon modeling (primitives, extrude, bevel, boolean, combine/separate)
 - Material creation and assignment
 - Skin binding and weight management
+- Keyframe animation and timeline control
+- NURBS curve inspection
 - Component-level mesh selection and editing
+- Python/MEL script execution
 - Health monitoring and connection management
 
 **Key Design Principles:**
@@ -332,6 +335,32 @@ fastmcp install mcp-json
 | `skin.weights.set` | Set per-vertex skin weights with normalization |
 | `skin.copy_weights` | Copy weights between meshes |
 
+### Animation
+
+| Tool | Description |
+|------|-------------|
+| `animation.set_time` | Set the current time (go to a specific frame) |
+| `animation.get_time_range` | Get playback range, animation range, and current time |
+| `animation.set_time_range` | Set the playback and animation range |
+| `animation.set_keyframe` | Set keyframe on attribute(s) at current or specified time |
+| `animation.get_keyframes` | Query keyframes for attribute(s) in a time range |
+| `animation.delete_keyframes` | Delete keyframes in range for attribute(s) |
+
+### Curves
+
+| Tool | Description |
+|------|-------------|
+| `curve.info` | Get NURBS curve information (degree, spans, form, CV count, length) |
+| `curve.cvs` | Query CV positions from a NURBS curve with pagination |
+
+### Scripts
+
+| Tool | Description |
+|------|-------------|
+| `script.list` | List available Python scripts from configured directories |
+| `script.execute` | Execute a Python script file from an allowed directory in Maya |
+| `script.run` | Execute raw Python or MEL code in Maya (requires opt-in env var) |
+
 ---
 
 ## Troubleshooting
@@ -459,7 +488,10 @@ maya-mcp/
 │   │   ├── mesh.py
 │   │   ├── modeling.py
 │   │   ├── shading.py
-│   │   └── skin.py
+│   │   ├── skin.py
+│   │   ├── animation.py
+│   │   ├── curve.py
+│   │   └── scripts.py
 │   ├── utils/             # Shared utilities
 │   │   ├── validation.py
 │   │   ├── parsing.py
