@@ -78,7 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **M3-B4: Consolidated `nodes.info`** — single tool with `info_category`
   parameter (`summary`, `transform`, `hierarchy`, `attributes`, `shape`, `all`)
   replacing multiple `attributes.get` / `nodes.list` call chains
-- OpenCode integration guide (`docs/usage/opencode-integration.md`)
+- Editor integration guide
 
 ### Fixed
 
@@ -140,7 +140,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - No arbitrary code execution — all operations are explicit tools
 - No raw Python/MEL string evaluation exposed to clients
 
-[Unreleased]: https://gitlab.pixel-nexus.com/rigging/gg_mayamcp/-/compare/v0.3.0...main
-[0.3.0]: https://gitlab.pixel-nexus.com/rigging/gg_mayamcp/-/compare/v0.2.0...v0.3.0
-[0.2.0]: https://gitlab.pixel-nexus.com/rigging/gg_mayamcp/-/compare/v0.1.0...v0.2.0
-[0.1.0]: https://gitlab.pixel-nexus.com/rigging/gg_mayamcp/-/releases/v0.1.0
+[Unreleased]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.3.0...main
+[0.3.0]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/GimbalGoats/GG_MayaMCP/releases/tag/v0.1.0

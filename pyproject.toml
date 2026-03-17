@@ -51,10 +51,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://gitlab.pixel-nexus.com/rigging/gg_mayamcp"
-Documentation = "https://gitlab.pixel-nexus.com/rigging/gg_mayamcp/-/blob/main/README.md"
-Repository = "https://gitlab.pixel-nexus.com/rigging/gg_mayamcp"
-Issues = "https://gitlab.pixel-nexus.com/rigging/gg_mayamcp/-/issues"
+Homepage = "https://github.com/GimbalGoats/GG_MayaMCP"
+Documentation = "https://github.com/GimbalGoats/GG_MayaMCP/blob/main/README.md"
+Repository = "https://github.com/GimbalGoats/GG_MayaMCP"
+Issues = "https://github.com/GimbalGoats/GG_MayaMCP/issues"
 
 [project.scripts]
 maya-mcp = "maya_mcp.server:main"

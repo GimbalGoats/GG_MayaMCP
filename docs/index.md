@@ -124,4 +124,4 @@ Maya MCP follows best practices from [Block's MCP Playbook](https://engineering.
 
 ## License
 
-MIT License - see [LICENSE](https://gitlab.pixel-nexus.com/rigging/gg_mayamcp/-/blob/main/LICENSE)
+MIT License - see [LICENSE](https://github.com/GimbalGoats/GG_MayaMCP/blob/main/LICENSE)

@@ -62,7 +62,7 @@ pip install maya-mcp
 
 **Option C: From source**
 ```bash
-git clone https://gitlab.pixel-nexus.com/rigging/gg_mayamcp.git
+git clone https://github.com/GimbalGoats/GG_MayaMCP.git
 cd gg_mayamcp
 pip install -e .
 ```
@@ -211,8 +211,6 @@ python -m maya_mcp.server
 ```
 
 **Important:** Restart OpenCode after editing config for changes to take effect.
-
-**Full guide:** See [OpenCode Integration Guide](docs/usage/opencode-integration.md) for troubleshooting and advanced configuration.
 
 ---
 
@@ -423,7 +421,7 @@ pip install -e .
 
 ```bash
 # Clone and install with dev dependencies
-git clone https://gitlab.pixel-nexus.com/rigging/gg_mayamcp.git
+git clone https://github.com/GimbalGoats/GG_MayaMCP.git
 cd gg_mayamcp
 pip install -e ".[dev]"
 
