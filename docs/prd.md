@@ -3,9 +3,9 @@
 ## Overview
 
 **Product**: Maya MCP Server  
-**Version**: 0.1.0 (v0)  
-**Status**: Active Development  
-**Last Updated**: 2026-03-02
+**Version**: 0.3.0
+**Status**: Active Development
+**Last Updated**: 2026-03-17
 
 Maya MCP is an MCP (Model Context Protocol) server that enables AI assistants and other MCP-compatible clients to control a running instance of Autodesk Maya via its commandPort socket interface.
 

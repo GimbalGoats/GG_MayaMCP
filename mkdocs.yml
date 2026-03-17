@@ -1,10 +1,10 @@
 site_name: Maya MCP
 site_description: MCP server for controlling Autodesk Maya via commandPort
 site_author: Maya MCP Contributors
-site_url: https://your-org.github.io/maya-mcp
+site_url: https://GimbalGoats.github.io/GG_MayaMCP
 
-repo_name: your-org/maya-mcp
-repo_url: https://github.com/your-org/maya-mcp
+repo_name: GimbalGoats/GG_MayaMCP
+repo_url: https://github.com/GimbalGoats/GG_MayaMCP
 edit_uri: edit/main/docs/
 
 theme:
@@ -104,6 +104,6 @@ nav:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/your-org/maya-mcp
+      link: https://github.com/GimbalGoats/GG_MayaMCP
 
 copyright: Copyright &copy; 2025 Maya MCP Contributors

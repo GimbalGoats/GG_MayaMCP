@@ -359,7 +359,7 @@ fastmcp install mcp-json
 |------|-------------|
 | `script.list` | List available Python scripts from configured directories |
 | `script.execute` | Execute a Python script file from an allowed directory in Maya |
-| `script.run` | Execute raw Python or MEL code in Maya (requires opt-in env var) |
+| `script.run` | Execute raw Python or MEL code in Maya (requires `MAYA_MCP_ENABLE_RAW_EXECUTION=true`) |
 
 ---
 
