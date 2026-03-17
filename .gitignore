@@ -84,3 +84,14 @@ Thumbs.db
 # Project specific
 *.log
 blog/
+
+# AI tool configs
+.claude/
+.opencode/
+.sisyphus/
+.mcp.json
+CLAUDE.md
+AGENTS.md
+opencode.jsonc
+.tmp/
+nul
