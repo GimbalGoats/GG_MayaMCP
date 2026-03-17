@@ -79,39 +79,25 @@ Add to your client's MCP configuration:
 | [Tool Specifications](spec/tools.md) | Available MCP tools and their APIs |
 | [Transport Layer](spec/transport.md) | commandPort client details |
 | [Security Model](spec/security.md) | Security considerations |
-| [API Reference](api/reference.md) | Python module documentation |
 
-> **📋 Roadmap**: See the [Milestones section in the PRD](prd.md#milestones) for the complete project roadmap. The PRD is the single source of truth for all planned work.
-
-## Current Status
-
-### Completed (v0.1.0)
-
-| Milestone | Status | Description |
-|-----------|--------|-------------|
-| M0: Scaffold | ✅ | Project structure, transport layer, test infrastructure |
-| M1: Core Tools | ✅ | `scene.info`, `nodes.list`, `selection.get/set` |
-| M2: Extended Tools | ✅ | `attributes.get/set`, `nodes.create/delete`, `scene.undo/redo` |
-
-### Available Tools
+## Available Tools (70 total)
 
 | Category | Tools |
 |----------|-------|
 | **Health** | `health.check` |
 | **Connection** | `maya.connect`, `maya.disconnect` |
-| **Scene** | `scene.info`, `scene.undo`, `scene.redo` |
-| **Nodes** | `nodes.list`, `nodes.create`, `nodes.delete` |
+| **Scene** | `scene.info`, `scene.new`, `scene.open`, `scene.save`, `scene.save_as`, `scene.import`, `scene.export`, `scene.undo`, `scene.redo` |
+| **Nodes** | `nodes.list`, `nodes.create`, `nodes.delete`, `nodes.rename`, `nodes.parent`, `nodes.duplicate`, `nodes.info` |
 | **Attributes** | `attributes.get`, `attributes.set` |
-| **Selection** | `selection.get`, `selection.set`, `selection.clear` |
-
-### Planned
-
-See [PRD Milestones](prd.md#milestones) for the complete roadmap:
-
-- **M3**: Maya UI Panel + LLM Optimization
-- **M4**: Scene Operations (file management)
-- **M5**: Animation & Rigging
-- **M6**: Production Hardening (nice to have)
+| **Selection** | `selection.get`, `selection.set`, `selection.clear`, `selection.set_components`, `selection.get_components`, `selection.convert_components` |
+| **Connections** | `connections.list`, `connections.get`, `connections.connect`, `connections.disconnect`, `connections.history` |
+| **Mesh** | `mesh.info`, `mesh.vertices`, `mesh.evaluate` |
+| **Modeling** | `modeling.create_polygon_primitive`, `modeling.extrude_faces`, `modeling.boolean`, `modeling.combine`, `modeling.separate`, `modeling.merge_vertices`, `modeling.bevel`, `modeling.bridge`, `modeling.insert_edge_loop`, `modeling.delete_faces`, `modeling.move_components`, `modeling.freeze_transforms`, `modeling.delete_history`, `modeling.center_pivot`, `modeling.set_pivot` |
+| **Shading** | `shading.create_material`, `shading.assign_material`, `shading.set_material_color` |
+| **Skinning** | `skin.bind`, `skin.unbind`, `skin.influences`, `skin.weights.get`, `skin.weights.set`, `skin.copy_weights` |
+| **Animation** | `animation.set_time`, `animation.get_time_range`, `animation.set_time_range`, `animation.set_keyframe`, `animation.get_keyframes`, `animation.delete_keyframes` |
+| **Curves** | `curve.info`, `curve.cvs` |
+| **Scripts** | `script.list`, `script.execute`, `script.run` |
 
 ## Design Principles
 

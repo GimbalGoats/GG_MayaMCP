@@ -8,13 +8,16 @@ Tools use a hierarchical naming scheme:
 
 - `health.*` - Health and diagnostics
 - `maya.*` - Connection management
-- `scene.*` - Scene-level operations (info, new, open, undo, redo)
+- `scene.*` - Scene-level operations (info, new, open, save, import, export, undo, redo)
 - `nodes.*` - Node operations (list, create, delete, info)
 - `attributes.*` - Attribute operations (get, set)
 - `selection.*` - Selection management
 - `modeling.*` - Polygon modeling operations
 - `shading.*` - Material creation and assignment
 - `skin.*` - Skinning and weight management
+- `animation.*` - Keyframe animation and timeline control
+- `curve.*` - NURBS curve inspection
+- `script.*` - Python/MEL script execution
 
 ## Health Tools
 
@@ -3357,3 +3360,168 @@ When results are truncated, the response includes additional fields:
 2. Use `pattern` or `node_type` filters to narrow results
 3. Increase `limit` only when necessary (e.g., `limit: 1000`)
 4. Use `limit: 0` with caution (unlimited results)
+
+---
+
+## Scene Tools (continued)
+
+### `scene.import`
+
+Import a file into the current Maya scene.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `file_path` | `string` | Yes | - | Path to the file to import (.ma, .mb, .obj, .fbx, .abc, .usd, .usda, .usdc, .usdz) |
+| `namespace` | `string \| null` | No | `null` | Namespace behavior: null = no namespace, "" = auto-generate, "name" = use specified |
+| `force` | `boolean` | No | `false` | If true, replace existing namespace contents; if false, merge |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | `boolean` | Whether the import succeeded |
+| `file_path` | `string` | Path of the imported file |
+| `nodes` | `string[]` | Top-level parent transforms imported |
+| `count` | `integer` | Number of top-level nodes |
+| `errors` | `string \| null` | Error message if import failed |
+
+---
+
+### `scene.export`
+
+Export scene content to a file.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `file_path` | `string` | Yes | - | Path for the exported file (.ma, .mb, .obj, .fbx, .abc, .usd, .usda, .usdc) |
+| `export_mode` | `"selected" \| "all"` | No | `"selected"` | What to export: selected nodes or entire scene |
+| `animation` | `boolean` | No | `false` | Include animation data (FBX only) |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | `boolean` | Whether the export succeeded |
+| `file_path` | `string` | Path of the exported file |
+| `nodes_exported` | `integer` | Number of nodes exported |
+| `errors` | `string \| null` | Error message if export failed |
+
+---
+
+## Curve Tools
+
+### `curve.info`
+
+Get NURBS curve information.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `node` | `string` | Yes | - | Name of the curve node (transform or shape) |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `degree` | `integer` | Curve degree |
+| `spans` | `integer` | Number of spans |
+| `form` | `string` | Curve form (open, closed, periodic) |
+| `cv_count` | `integer` | Number of CVs |
+| `knots` | `float[]` | Knot vector |
+| `length` | `float` | Arc length of the curve |
+| `bounding_box` | `object` | Bounding box with min/max |
+| `errors` | `string \| null` | Error message if query failed |
+
+---
+
+### `curve.cvs`
+
+Query CV positions from a NURBS curve with pagination.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `node` | `string` | Yes | - | Name of the curve node (transform or shape) |
+| `offset` | `integer` | No | `0` | Starting CV index (0-based) |
+| `limit` | `integer \| null` | No | `1000` | Maximum CVs to return (0 for unlimited) |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `cvs` | `float[][]` | List of CV positions as [x, y, z] arrays |
+| `cv_count` | `integer` | Total number of CVs on the curve |
+| `offset` | `integer` | Starting index used |
+| `count` | `integer` | Number of CVs returned |
+| `errors` | `string \| null` | Error message if query failed |
+
+---
+
+## Script Tools
+
+### `script.list`
+
+List available Python scripts from configured `MAYA_MCP_SCRIPT_DIRS` directories. Read-only, does not require Maya connection.
+
+**Input**: None
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `scripts` | `object[]` | List of available scripts with name and path |
+| `count` | `integer` | Number of scripts found |
+| `directories` | `string[]` | Configured script directories |
+| `errors` | `string \| null` | Error message if listing failed |
+
+---
+
+### `script.execute`
+
+Execute a Python script file in Maya from an allowed `MAYA_MCP_SCRIPT_DIRS` directory.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `file_path` | `string` | Yes | - | Absolute path to the .py script file |
+| `args` | `object \| null` | No | `null` | Optional arguments dict injected as `__args__` in the script namespace |
+| `timeout` | `integer \| null` | No | `null` | Optional timeout override in seconds |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | `boolean` | Whether execution succeeded |
+| `script` | `string` | Script file path |
+| `output` | `string` | Script output/result |
+| `errors` | `string \| null` | Error message if execution failed |
+
+---
+
+### `script.run`
+
+Execute raw Python or MEL code in Maya. Requires `MAYA_MCP_ENABLE_RAW_EXECUTION=true` environment variable. Disabled by default for security.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `code` | `string` | Yes | - | Python or MEL code to execute |
+| `language` | `"python" \| "mel"` | No | `"python"` | Code language |
+| `timeout` | `integer \| null` | No | `null` | Optional timeout override in seconds |
+
+**Output**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | `boolean` | Whether execution succeeded |
+| `output` | `string` | Code output/result |
+| `language` | `string` | Language used |
+| `errors` | `string \| null` | Error message if execution failed |
