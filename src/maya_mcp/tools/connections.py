@@ -348,13 +348,17 @@ result = {{
 }}
 
 try:
+    def _attribute_query_name(plug):
+        attr_name = plug.split(".", 1)[1]
+        return attr_name.split("[", 1)[0]
+
     # Validate source exists
     src_parts = source_plug.split(".")
     if len(src_parts) < 2:
         result["error"] = f"Invalid source plug format: '{{source_plug}}'. Expected 'node.attribute'"
     elif not cmds.objExists(src_parts[0]):
         result["error"] = f"Source node '{{src_parts[0]}}' does not exist"
-    elif not cmds.attributeQuery(src_parts[1], node=src_parts[0], exists=True):
+    elif not cmds.attributeQuery(_attribute_query_name(source_plug), node=src_parts[0], exists=True):
         result["error"] = f"Source attribute '{{src_parts[1]}}' does not exist on '{{src_parts[0]}}'"
 
     # Validate destination exists
@@ -364,7 +368,7 @@ try:
             result["error"] = f"Invalid destination plug format: '{{dest_plug}}'. Expected 'node.attribute'"
         elif not cmds.objExists(dest_parts[0]):
             result["error"] = f"Destination node '{{dest_parts[0]}}' does not exist"
-        elif not cmds.attributeQuery(dest_parts[1], node=dest_parts[0], exists=True):
+        elif not cmds.attributeQuery(_attribute_query_name(dest_plug), node=dest_parts[0], exists=True):
             result["error"] = f"Destination attribute '{{dest_parts[1]}}' does not exist on '{{dest_parts[0]}}'"
 
     # Check if destination is locked
@@ -460,6 +464,10 @@ result = {{
 }}
 
 try:
+    def _attribute_query_name(plug):
+        attr_name = plug.split(".", 1)[1]
+        return attr_name.split("[", 1)[0]
+
     if source_plug and dest_plug:
         # Disconnect specific connection
         src_parts = source_plug.split(".")
@@ -468,11 +476,11 @@ try:
         # Validate both plugs exist
         if not cmds.objExists(src_parts[0]):
             result["error"] = f"Source node '{{src_parts[0]}}' does not exist"
-        elif not cmds.attributeQuery(src_parts[1], node=src_parts[0], exists=True):
+        elif not cmds.attributeQuery(_attribute_query_name(source_plug), node=src_parts[0], exists=True):
             result["error"] = f"Source attribute '{{src_parts[1]}}' does not exist"
         elif not cmds.objExists(dest_parts[0]):
             result["error"] = f"Destination node '{{dest_parts[0]}}' does not exist"
-        elif not cmds.attributeQuery(dest_parts[1], node=dest_parts[0], exists=True):
+        elif not cmds.attributeQuery(_attribute_query_name(dest_plug), node=dest_parts[0], exists=True):
             result["error"] = f"Destination attribute '{{dest_parts[1]}}' does not exist"
         else:
             # Check if connection exists
@@ -490,7 +498,7 @@ try:
 
         if not cmds.objExists(src_parts[0]):
             result["error"] = f"Source node '{{src_parts[0]}}' does not exist"
-        elif not cmds.attributeQuery(src_parts[1], node=src_parts[0], exists=True):
+        elif not cmds.attributeQuery(_attribute_query_name(source_plug), node=src_parts[0], exists=True):
             result["error"] = f"Source attribute '{{src_parts[1]}}' does not exist"
         else:
             destinations = cmds.listConnections(source_plug, source=False, destination=True,
@@ -506,7 +514,7 @@ try:
 
         if not cmds.objExists(dest_parts[0]):
             result["error"] = f"Destination node '{{dest_parts[0]}}' does not exist"
-        elif not cmds.attributeQuery(dest_parts[1], node=dest_parts[0], exists=True):
+        elif not cmds.attributeQuery(_attribute_query_name(dest_plug), node=dest_parts[0], exists=True):
             result["error"] = f"Destination attribute '{{dest_parts[1]}}' does not exist"
         else:
             sources = cmds.listConnections(dest_plug, source=True, destination=False,
