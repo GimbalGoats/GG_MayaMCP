@@ -41,7 +41,7 @@ This document describes the security model and considerations for Maya MCP.
 | Actor | Capability | Mitigation |
 |-------|------------|------------|
 | Remote attacker | Network access | Localhost-only binding |
-| Malicious MCP client | Local access, MCP protocol | Tool allowlist, no arbitrary code |
+| Malicious MCP client | Local access, MCP protocol | Tool allowlist, validation, raw execution opt-in |
 | Compromised plugin | Maya process access | Out of scope (Maya's responsibility) |
 
 ## Security Controls
@@ -62,9 +62,11 @@ def __init__(self, host: str = DEFAULT_HOST, ...):
 
 **Rationale**: Prevents network-based attacks. Maya commandPort has no authentication, so network exposure would allow any process to execute commands.
 
-### 2. No Arbitrary Code Execution
+### 2. No Unrestricted Code Execution by Default
 
-**Control**: MCP tools execute predefined operations, not arbitrary Python/MEL strings.
+**Control**: Most MCP tools execute predefined operations. Raw execution exists only through
+`script.run`, and is disabled by default unless explicitly enabled via
+`MAYA_MCP_ENABLE_RAW_EXECUTION=true`.
 
 **Implementation**:
 
@@ -75,13 +77,15 @@ def list_nodes(node_type: str) -> list[str]:
     validated_type = validate_node_type(node_type)
     return client.execute(f"cmds.ls(type='{validated_type}')")
 
-# BAD: Never expose arbitrary code execution
+# CONTROLLED: Raw execution is opt-in and validated
 @mcp.tool
-def execute_code(code: str) -> str:  # DO NOT DO THIS
-    return client.execute(code)
+def script_run(code: str) -> dict:
+    # requires MAYA_MCP_ENABLE_RAW_EXECUTION=true
+    # validates code size and returns structured errors
+    ...
 ```
 
-**Rationale**: Arbitrary code execution would allow:
+**Rationale**: Unrestricted arbitrary code execution would allow:
 - System commands via `os.system()`, `subprocess`
 - File system access
 - Network exfiltration
@@ -180,7 +184,7 @@ cmds.commandPort(
 
 ### For Developers
 
-1. **Never add arbitrary code execution tools**
+1. **Do not add unrestricted code execution paths**
 2. **Validate all string inputs** - Assume injection attempts
 3. **Use allowlists, not blocklists** - For node types, commands, etc.
 4. **Sanitize error messages** - No paths, no stack traces
@@ -232,7 +236,7 @@ The MCP spec warns about "confused deputy" attacks where a server is tricked int
 Before deploying:
 
 - [ ] Confirm localhost-only binding
-- [ ] Verify no arbitrary code execution tools
+- [ ] Verify raw execution remains explicit opt-in and disabled by default
 - [ ] Review all string inputs for injection
 - [ ] Check error messages for info disclosure
 - [ ] Test with malformed/malicious inputs

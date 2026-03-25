@@ -3258,7 +3258,8 @@ All tools include MCP annotations to help AI clients understand their behavior a
 **For Maya MCP:**
 - All tools are `openWorldHint: false` (localhost-only, no external systems)
 - Selection tools are not idempotent (state depends on prior state)
-- No tools are destructive (Maya has undo for scene changes)
+- Some tools use `destructiveHint: true` where behavior can be risky or hard to recover
+  (for example `script.execute`, `script.run`, and `animation.delete_keyframes`).
 
 ### Tool Annotation Table
 
@@ -3269,11 +3270,13 @@ All tools include MCP annotations to help AI clients understand their behavior a
 | `maya.disconnect` | false | false | true |
 | `scene.info` | true | false | true |
 | `scene.new` | false | false | true |
-| `scene.open` | false | false | false |
-| `scene.save` | false | false | false |
-| `scene.save_as` | false | false | false |
+| `scene.open` | false | false | true |
+| `scene.save` | false | false | true |
+| `scene.save_as` | false | false | true |
 | `scene.undo` | false | false | false |
 | `scene.redo` | false | false | false |
+| `scene.import` | false | false | false |
+| `scene.export` | false | false | true |
 | `nodes.list` | true | false | true |
 | `nodes.create` | false | false | false |
 | `nodes.delete` | false | false | true |
@@ -3291,6 +3294,8 @@ All tools include MCP annotations to help AI clients understand their behavior a
 | `mesh.info` | true | false | true |
 | `mesh.vertices` | true | false | true |
 | `mesh.evaluate` | true | false | true |
+| `curve.info` | true | false | true |
+| `curve.cvs` | true | false | true |
 | `selection.get` | true | false | true |
 | `selection.set` | false | false | false |
 | `selection.clear` | false | false | true |
@@ -3321,6 +3326,15 @@ All tools include MCP annotations to help AI clients understand their behavior a
 | `skin.weights.get` | true | false | true |
 | `skin.weights.set` | false | false | false |
 | `skin.copy_weights` | false | false | false |
+| `script.list` | true | false | true |
+| `script.execute` | false | true | false |
+| `script.run` | false | true | false |
+| `animation.set_time` | false | false | true |
+| `animation.get_time_range` | true | false | true |
+| `animation.set_time_range` | false | false | true |
+| `animation.set_keyframe` | false | false | false |
+| `animation.get_keyframes` | true | false | true |
+| `animation.delete_keyframes` | false | true | false |
 
 ---
 
