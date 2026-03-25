@@ -91,7 +91,7 @@ class CommandPortClient:
 
 Establish connection to Maya commandPort.
 
-**Returns**: `True` if connected, `False` otherwise.
+**Returns**: `True` if connected.
 
 **Raises**: `MayaUnavailableError` after exhausting retries.
 

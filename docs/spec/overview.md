@@ -50,7 +50,7 @@ This document describes the high-level architecture of Maya MCP.
 ┌────────────────────────────▼────────────────────────────┐
 │                    Core Types Layer                      │
 │  maya_mcp/types.py, maya_mcp/errors.py                  │
-│  - Pydantic models for tool inputs/outputs              │
+│  - Dataclasses/enums for shared transport/tool types    │
 │  - Typed error hierarchy                                 │
 └────────────────────────────┬────────────────────────────┘
                              │
@@ -243,6 +243,6 @@ See [Security Specification](security.md) for details.
 
 Key boundaries:
 - All connections are localhost-only
-- No arbitrary code execution
+- Raw code execution is opt-in only (`script.run` requires `MAYA_MCP_ENABLE_RAW_EXECUTION=true`)
 - All tool parameters are validated
 - Errors never expose system paths or secrets
