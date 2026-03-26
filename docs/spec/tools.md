@@ -18,6 +18,7 @@ Tools use a hierarchical naming scheme:
 - `animation.*` - Keyframe animation and timeline control
 - `curve.*` - NURBS curve inspection
 - `script.*` - Python/MEL script execution
+- `viewport.*` - Viewport image capture
 
 ## Health Tools
 
@@ -1712,6 +1713,42 @@ Analyze mesh topology for issues: non-manifold edges, lamina faces, holes, and b
 
 ---
 
+## Viewport Tools
+
+### `viewport.capture`
+
+Capture a single viewport frame as inline MCP image content using Maya `playblast`.
+
+**Input**:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `format` | `"jpeg" \| "png"` | No | `"jpeg"` | Output image format |
+| `width` | `integer` | No | `1024` | Capture width in pixels (64-4096) |
+| `height` | `integer` | No | `576` | Capture height in pixels (64-4096) |
+| `quality` | `integer` | No | `85` | JPEG quality (1-100). Ignored for PNG |
+| `offscreen` | `boolean` | No | `false` | Request offscreen capture in Maya |
+| `show_ornaments` | `boolean` | No | `true` | Show viewport ornaments/gizmos |
+| `panel` | `string \| null` | No | `null` | Preferred modelPanel name |
+| `frame` | `number \| null` | No | `null` | Frame to capture (null = current time) |
+
+**Output**:
+
+- MCP `ImageContent` (inline base64 image) returned by FastMCP from `Image(data=..., format=...)`.
+
+**Behavior Notes**:
+
+- The tool performs `cmds.playblast(format="image", completeFilename=..., viewer=False, forceOverwrite=True, ...)` inside Maya.
+- The commandPort payload stays small: Maya returns only a compact JSON status/path/metadata object.
+- The MCP server reads the temp image file, converts it to inline image content, and removes temporary files.
+- Panel selection order: explicit `panel` -> focused modelPanel -> first visible modelPanel -> first available modelPanel.
+
+**Risk Level**:
+
+- Read-only. Does not modify scene data.
+
+---
+
 ## Component Selection Tools
 
 Component selection tools provide vertex, edge, and face selection operations.
@@ -3294,6 +3331,7 @@ All tools include MCP annotations to help AI clients understand their behavior a
 | `mesh.info` | true | false | true |
 | `mesh.vertices` | true | false | true |
 | `mesh.evaluate` | true | false | true |
+| `viewport.capture` | true | false | true |
 | `curve.info` | true | false | true |
 | `curve.cvs` | true | false | true |
 | `selection.get` | true | false | true |
@@ -3351,6 +3389,7 @@ Large Maya scenes can contain thousands of nodes. To prevent token budget explos
 | `connections.history` | 500 history nodes | Yes (`limit` param) |
 | `mesh.vertices` | 1000 vertices | Yes (`limit` param) |
 | `mesh.evaluate` | 500 components per check | Yes (`limit` param) |
+| `viewport.capture` | 10MB inline image cap | No |
 | `modeling.combine` | 50KB response guard | No |
 | `modeling.separate` | 50KB response guard | No |
 | `modeling.delete_history` | 50KB response guard | No |

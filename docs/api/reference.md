@@ -74,3 +74,9 @@ This page documents the Python API for Maya MCP.
 ::: maya_mcp.tools.selection
     options:
       show_root_heading: true
+
+### Viewport Tools
+
+::: maya_mcp.tools.viewport
+    options:
+      show_root_heading: true
