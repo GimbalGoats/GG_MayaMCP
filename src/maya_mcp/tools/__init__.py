@@ -40,6 +40,7 @@ from maya_mcp.tools.shading import (
     shading_create_material,
     shading_set_material_color,
 )
+from maya_mcp.tools.viewport import viewport_capture
 
 __all__ = [
     "attributes_get",
@@ -86,4 +87,5 @@ __all__ = [
     "shading_assign_material",
     "shading_create_material",
     "shading_set_material_color",
+    "viewport_capture",
 ]
