@@ -1,248 +1,178 @@
 # Architecture Overview
 
-This document describes the high-level architecture of Maya MCP.
+This document describes the runtime architecture of Maya MCP and the responsibilities of the main modules.
 
 ## System Context
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Development Environment                       │
-│                                                                      │
-│  ┌─────────────────┐                      ┌──────────────────────┐  │
-│  │   MCP Client    │                      │    Autodesk Maya     │  │
-│  │  (AI Assistant, │     MCP Protocol     │                      │  │
-│  │   IDE Plugin,   │◄───────────────────►│  ┌────────────────┐  │  │
-│  │   CLI tool)     │                      │  │  commandPort   │  │  │
-│  └────────┬────────┘                      │  │  (TCP :7001)   │  │  │
-│           │                               │  └───────▲────────┘  │  │
-│           │ stdio/http                    │          │           │  │
-│           │                               │          │           │  │
-│  ┌────────▼────────┐                      │          │           │  │
-│  │  Maya MCP       │   TCP localhost:7001 │          │           │  │
-│  │  Server         │◄─────────────────────┼──────────┘           │  │
-│  │  (FastMCP)      │                      │                      │  │
-│  └─────────────────┘                      └──────────────────────┘  │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
-```
+Maya MCP runs as a separate Python process from Autodesk Maya.
 
-## Component Architecture
+The communication path is:
 
-### Layer Diagram
+1. An MCP client talks to `maya_mcp.server` over MCP transport, usually stdio.
+2. The server dispatches a typed tool function from `src/maya_mcp/tools/`.
+3. The tool delegates to the transport layer in `src/maya_mcp/transport/commandport.py`.
+4. The transport layer sends Python or MEL commands to Maya over `localhost`.
+5. Maya executes the command inside its own process and returns the result.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                     MCP Protocol Layer                   │
-│  (FastMCP handles MCP protocol, tool dispatch, etc.)     │
-└────────────────────────────┬────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────┐
-│                      Tools Layer                         │
-│  maya_mcp/tools/                                         │
-│  ┌──────────┐ ┌────────────┐ ┌─────────┐ ┌───────────┐  │
-│  │ health   │ │ connection │ │  scene  │ │   nodes   │  │
-│  └──────────┘ └────────────┘ └─────────┘ └───────────┘  │
-│  ┌───────────┐                                           │
-│  │ selection │                                           │
-│  └───────────┘                                           │
-└────────────────────────────┬────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────┐
-│                    Core Types Layer                      │
-│  maya_mcp/types.py, maya_mcp/errors.py                  │
-│  - Dataclasses/enums for shared transport/tool types    │
-│  - Typed error hierarchy                                 │
-└────────────────────────────┬────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────┐
-│                   Transport Layer                        │
-│  maya_mcp/transport/commandport.py                      │
-│  - Socket connection to Maya                             │
-│  - Retry logic, timeouts, backoff                        │
-│  - Error translation                                     │
-└─────────────────────────────────────────────────────────┘
-```
+## Architectural Layers
+
+### MCP server layer
+
+`src/maya_mcp/server.py`
+
+- Creates the `FastMCP` server instance
+- Registers all 71 tools
+- Defines tool descriptions and annotations
+- Exposes the `main()` CLI entrypoint
+
+### Tool layer
+
+`src/maya_mcp/tools/`
+
+- Implements the MCP-facing tool functions
+- Validates and shapes tool input and output
+- Keeps tool logic thin
+- Delegates transport work to shared lower layers
+
+Major tool namespaces:
+
+- `health.*`
+- `maya.*`
+- `scene.*`
+- `nodes.*`
+- `attributes.*`
+- `selection.*`
+- `connections.*`
+- `mesh.*`
+- `viewport.*`
+- `modeling.*`
+- `shading.*`
+- `skin.*`
+- `animation.*`
+- `curve.*`
+- `script.*`
+
+### Shared types and errors
+
+`src/maya_mcp/types.py` and `src/maya_mcp/errors.py`
+
+- Shared enums and result types
+- Typed exception hierarchy
+- Stable error payloads for callers
+
+### Transport layer
+
+`src/maya_mcp/transport/commandport.py`
+
+- Owns socket lifecycle
+- Enforces localhost-only communication
+- Handles connect and command timeouts
+- Retries connection attempts with backoff
+- Translates socket and execution failures into typed errors
+
+### Utilities
+
+`src/maya_mcp/utils/`
+
+- Input validation helpers
+- Response parsing and coercion
+- Response size guards
+- Script-execution configuration and validation
+
+### Maya panel
+
+`src/maya_mcp/maya_panel/`
+
+- Runs inside Maya, not in the MCP server process
+- Provides a UI for opening and closing `commandPort`
+- Stores local panel preferences such as port and auto-start
+
+## Key Design Constraints
+
+### Transport isolation
+
+The MCP server process must not import `maya.cmds` or other Maya modules.
+
+Why:
+
+- The server must be able to run in a standard Python environment
+- Maya crashes must not take down the server process
+- Tool tests must run without a live Maya session
+
+### Localhost-only communication
+
+Maya `commandPort` has no built-in authentication, so the transport is intentionally restricted to `localhost` and `127.0.0.1`.
+
+### Thin tools
+
+Tool modules should stay close to MCP concerns:
+
+- parameter handling
+- result shaping
+- annotations
+- clear tool-level semantics
+
+Transport, parsing, and validation should live below the tool layer.
+
+### Recovery-oriented behavior
+
+Maya is an external process and may be unavailable, restarted, or mid-crash-recovery. The server is designed to detect this state, surface typed errors, and retry connection when appropriate.
 
 ## Module Responsibilities
 
-### `maya_mcp/server.py`
+| Module | Responsibility |
+|--------|----------------|
+| `maya_mcp.server` | FastMCP entrypoint and tool registration |
+| `maya_mcp.transport.commandport` | Socket transport to Maya |
+| `maya_mcp.errors` | Typed error hierarchy |
+| `maya_mcp.types` | Shared types and connection-state models |
+| `maya_mcp.tools.*` | MCP tool implementations |
+| `maya_mcp.utils.*` | Validation, parsing, coercion, response guards |
+| `maya_mcp.maya_panel.*` | In-Maya UI for commandPort control |
 
-The FastMCP server entrypoint:
+## Request Flow
 
-- Creates FastMCP server instance
-- Registers all tools from `maya_mcp.tools`
-- Provides `main()` entry point
-- Handles server lifecycle
+Typical successful call:
 
-### `maya_mcp/errors.py`
+1. Client invokes a tool such as `scene.info`.
+2. `maya_mcp.server` routes the call to the registered tool function.
+3. The tool asks the transport client for execution.
+4. The transport connects to Maya if needed.
+5. Maya executes the request through `commandPort`.
+6. The transport parses the response and returns typed data.
+7. The tool returns the MCP result to the client.
 
-Typed error hierarchy:
+Typical unavailable-Maya case:
 
-```python
-MayaMCPError              # Base class for all errors
-├── MayaUnavailableError  # Maya not connected/reachable
-├── MayaCommandError      # Command execution failed
-├── MayaTimeoutError      # Operation timed out
-└── ValidationError       # Invalid input parameters
-```
+1. A tool requests transport execution.
+2. The transport cannot connect to `localhost:7001`.
+3. Retry and backoff policy is applied.
+4. A `MayaUnavailableError` is raised with context.
+5. The next call can attempt reconnection again.
 
-### `maya_mcp/types.py`
+## Configuration Surface
 
-Shared type definitions:
+Core transport settings are environment-driven:
 
-- `ConnectionStatus`: Enum for connection states
-- `HealthCheckResult`: Response model for health.check
-- `ConnectionConfig`: Settings for commandPort client
-- Tool-specific input/output models
-
-### `maya_mcp/transport/commandport.py`
-
-Maya commandPort client:
-
-- Socket connection management
-- Connect/request timeouts
-- Exponential backoff retry
-- UTF-8 command encoding
-- Error translation to typed exceptions
-
-### `maya_mcp/tools/`
-
-MCP tool implementations:
-
-| Module | Tools | Description |
-|--------|-------|-------------|
-| `health.py` | `health.check` | Connection health status |
-| `connection.py` | `maya.connect`, `maya.disconnect` | Manual connection control |
-| `scene.py` | `scene.info` | Scene information queries |
-| `nodes.py` | `nodes.list` | Node listing/filtering |
-| `selection.py` | `selection.get`, `selection.set` | Selection management |
-
-## Design Decisions
-
-### 1. Transport Isolation
-
-The MCP server process never imports `maya.cmds` or any Maya modules. All communication happens via TCP socket to Maya's commandPort.
-
-**Rationale**:
-- MCP server can run in any Python environment
-- Maya crashes don't crash the MCP server
-- Clear separation of concerns
-- Easier testing with mocks
-
-### 2. Typed Error Model
-
-All errors are subclasses of `MayaMCPError` with structured context.
-
-**Rationale**:
-- Clients can handle errors programmatically
-- Error messages are consistent
-- No silent failures
-- Easy to extend for new error types
-
-### 3. Thin Tool Wrappers
-
-MCP tools are thin wrappers around core functions. Business logic lives in the transport layer or dedicated modules.
-
-**Rationale**:
-- Tools focus on MCP interface
-- Core logic is reusable
-- Easier to test core functions
-- Consistent tool patterns
-
-### 4. Level 1 Resilience
-
-The server detects Maya unavailability, returns typed errors, and can recover when Maya restarts.
-
-**Rationale**:
-- Maya crashes are common during development
-- Users can restart Maya without restarting MCP server
-- Clear error messages guide recovery
-- Higher resilience levels can be added later
-
-## Data Flow
-
-### Successful Command
-
-```
-Client                MCP Server              CommandPort              Maya
-   │                      │                        │                     │
-   │  call_tool("scene.info")                      │                     │
-   │─────────────────────►│                        │                     │
-   │                      │                        │                     │
-   │                      │  connect (if needed)   │                     │
-   │                      │───────────────────────►│                     │
-   │                      │◄───────────────────────│                     │
-   │                      │                        │                     │
-   │                      │  send command          │                     │
-   │                      │───────────────────────►│                     │
-   │                      │                        │  execute in Maya    │
-   │                      │                        │────────────────────►│
-   │                      │                        │◄────────────────────│
-   │                      │  receive result        │                     │
-   │                      │◄───────────────────────│                     │
-   │                      │                        │                     │
-   │  tool result         │                        │                     │
-   │◄─────────────────────│                        │                     │
-```
-
-### Maya Unavailable
-
-```
-Client                MCP Server              CommandPort
-   │                      │                        │
-   │  call_tool("scene.info")                      │
-   │─────────────────────►│                        │
-   │                      │                        │
-   │                      │  connect (retry 1)     │
-   │                      │───────────────────────►│ Connection refused
-   │                      │                        │
-   │                      │  backoff (0.5s)        │
-   │                      │  connect (retry 2)     │
-   │                      │───────────────────────►│ Connection refused
-   │                      │                        │
-   │                      │  backoff (1.0s)        │
-   │                      │  connect (retry 3)     │
-   │                      │───────────────────────►│ Connection refused
-   │                      │                        │
-   │  MayaUnavailableError│                        │
-   │◄─────────────────────│                        │
-```
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MAYA_MCP_HOST` | `localhost` | Maya commandPort host |
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `MAYA_MCP_HOST` | `localhost` | Maya host |
 | `MAYA_MCP_PORT` | `7001` | Maya commandPort port |
-| `MAYA_MCP_CONNECT_TIMEOUT` | `5.0` | Connection timeout (seconds) |
-| `MAYA_MCP_COMMAND_TIMEOUT` | `30.0` | Command timeout (seconds) |
-| `MAYA_MCP_MAX_RETRIES` | `3` | Maximum connection retries |
+| `MAYA_MCP_CONNECT_TIMEOUT` | `5.0` | Connect timeout in seconds |
+| `MAYA_MCP_COMMAND_TIMEOUT` | `30.0` | Command timeout in seconds |
+| `MAYA_MCP_MAX_RETRIES` | `3` | Max connection retries |
 
-### Programmatic Configuration
+Script tools add:
 
-```python
-from maya_mcp.transport import CommandPortClient
-from maya_mcp.types import ConnectionConfig
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `MAYA_MCP_SCRIPT_DIRS` | empty | Allowlisted script directories |
+| `MAYA_MCP_ENABLE_RAW_EXECUTION` | `false` | Enables `script.run` |
+| `MAYA_MCP_SCRIPT_TIMEOUT` | `60` | Script execution timeout |
 
-config = ConnectionConfig(
-    host="localhost",
-    port=7001,
-    connect_timeout=5.0,
-    command_timeout=30.0,
-    max_retries=3,
-)
+## Related Documents
 
-client = CommandPortClient(config)
-```
-
-## Security Boundaries
-
-See [Security Specification](security.md) for details.
-
-Key boundaries:
-- All connections are localhost-only
-- Raw code execution is opt-in only (`script.run` requires `MAYA_MCP_ENABLE_RAW_EXECUTION=true`)
-- All tool parameters are validated
-- Errors never expose system paths or secrets
+- [Transport Specification](transport.md)
+- [Security Specification](security.md)
+- [Tool Specification](tools.md)
+- [ADR-0001 CommandPort](../adr/0001-commandport.md)

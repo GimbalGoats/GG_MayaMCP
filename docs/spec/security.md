@@ -1,274 +1,174 @@
 # Security Specification
 
-This document describes the security model and considerations for Maya MCP.
+This document defines the security model for Maya MCP.
+
+## Security Posture
+
+Maya MCP is a local-development MCP server intended to communicate with a Maya instance on the same machine.
+
+The main security assumptions are:
+
+- the MCP server runs locally
+- Maya runs locally
+- communication stays on `localhost`
+- exposed tools are explicit and intentionally scoped
+
+This is not a remote multi-tenant service.
+
+## Assets to Protect
+
+| Asset | Goal |
+|-------|------|
+| Maya scene data | Prevent unintended reads or destructive writes |
+| Host system access | Prevent arbitrary code execution by default |
+| User credentials and secrets | Never expose them through logs or error messages |
+| Local filesystem | Avoid unintended file access and unsafe path handling |
 
 ## Threat Model
 
-### Assets to Protect
+Relevant threats:
 
-| Asset | Sensitivity | Protection Goal |
-|-------|-------------|-----------------|
-| Maya scene data | Medium | Prevent unauthorized access |
-| System access | High | Prevent arbitrary code execution |
-| User credentials | High | Never expose or transmit |
-| File system | High | Prevent unauthorized file access |
+- remote access if `commandPort` were exposed beyond localhost
+- malicious or careless MCP clients calling powerful tools
+- parameter injection through unsafe string inputs
+- information disclosure through raw errors, file paths, or tracebacks
 
-### Trust Boundaries
+Out of scope:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    User's Machine (Trusted)                      │
-│                                                                  │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐   │
-│  │  MCP Client  │◄──►│  MCP Server  │◄──►│      Maya        │   │
-│  │  (trusted)   │    │  (trusted)   │    │   (trusted)      │   │
-│  └──────────────┘    └──────────────┘    └──────────────────┘   │
-│         │                   │                     │              │
-│         └───────────────────┼─────────────────────┘              │
-│                             │                                    │
-│              Trust boundary: All on localhost                    │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              │ Network boundary
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    External Network (Untrusted)                  │
-└─────────────────────────────────────────────────────────────────┘
-```
+- compromise of Maya itself
+- compromise of the local operating system
+- security guarantees for user-authored scripts intentionally executed in Maya
 
-### Threat Actors
+## Core Controls
 
-| Actor | Capability | Mitigation |
-|-------|------------|------------|
-| Remote attacker | Network access | Localhost-only binding |
-| Malicious MCP client | Local access, MCP protocol | Tool allowlist, validation, raw execution opt-in |
-| Compromised plugin | Maya process access | Out of scope (Maya's responsibility) |
+### Localhost only
 
-## Security Controls
+The transport only supports `localhost` and `127.0.0.1`.
 
-### 1. Localhost-Only Connections
+Why:
 
-**Control**: The MCP server only connects to Maya on `localhost`/`127.0.0.1`.
+- Maya `commandPort` does not provide authentication
+- remote exposure would turn local tooling into a network-exposed execution path
 
-**Implementation**:
+### No arbitrary code execution by default
 
-```python
-DEFAULT_HOST = "localhost"
+Most tools expose predefined workflows only.
 
-def __init__(self, host: str = DEFAULT_HOST, ...):
-    if host not in ("localhost", "127.0.0.1"):
-        raise ValueError("Only localhost connections are supported")
+The one explicit raw-execution path is `script.run`, and it is disabled unless:
+
+```text
+MAYA_MCP_ENABLE_RAW_EXECUTION=true
 ```
 
-**Rationale**: Prevents network-based attacks. Maya commandPort has no authentication, so network exposure would allow any process to execute commands.
+`script.execute` is also constrained:
 
-### 2. No Unrestricted Code Execution by Default
+- file must be inside an allowlisted directory
+- file type must be valid
+- file size is capped
+- execution timeout is bounded
 
-**Control**: Most MCP tools execute predefined operations. Raw execution exists only through
-`script.run`, and is disabled by default unless explicitly enabled via
-`MAYA_MCP_ENABLE_RAW_EXECUTION=true`.
+### Input validation
 
-**Implementation**:
+Tool inputs must be validated before they reach Maya.
 
-```python
-# GOOD: Predefined operation with validated parameters
-@mcp.tool
-def list_nodes(node_type: str) -> list[str]:
-    validated_type = validate_node_type(node_type)
-    return client.execute(f"cmds.ls(type='{validated_type}')")
+This includes:
 
-# CONTROLLED: Raw execution is opt-in and validated
-@mcp.tool
-def script_run(code: str) -> dict:
-    # requires MAYA_MCP_ENABLE_RAW_EXECUTION=true
-    # validates code size and returns structured errors
-    ...
-```
+- node names
+- attribute names
+- file paths
+- namespace values
+- script paths
+- raw code size limits
+- list and pagination limits
 
-**Rationale**: Unrestricted arbitrary code execution would allow:
-- System commands via `os.system()`, `subprocess`
-- File system access
-- Network exfiltration
-- Maya crash/corruption
+Validation should prefer allowlists and explicit bounds over permissive free-form input.
 
-### 3. Input Validation
+### Error sanitization
 
-**Control**: All tool inputs are validated before use.
+Client-facing errors must not leak:
 
-**Implementation**:
+- secrets
+- raw stack traces
+- oversized command payloads
+- sensitive local paths when avoidable
 
-```python
-from pydantic import BaseModel, Field, validator
+Typed errors should include structured context, but only the context needed to explain and recover from the failure.
 
-class NodeListInput(BaseModel):
-    node_type: str = Field(pattern=r"^[a-zA-Z][a-zA-Z0-9]*$")
-    pattern: str = Field(max_length=256)
-    
-    @validator("pattern")
-    def validate_pattern(cls, v):
-        # Disallow shell-like patterns
-        if any(c in v for c in [";", "|", "&", "$", "`"]):
-            raise ValueError("Invalid characters in pattern")
-        return v
-```
+## Tool-Level Risk Model
 
-**Rationale**: Prevents injection attacks through tool parameters.
+Maya MCP separates read and write behavior into different tools whenever practical.
 
-### 4. Error Sanitization
+Examples:
 
-**Control**: Error messages never expose sensitive information.
+- `attributes.get` vs `attributes.set`
+- `selection.get` vs `selection.set`
+- `skin.weights.get` vs `skin.weights.set`
 
-**Implementation**:
+This supports clearer annotations and safer client behavior.
 
-```python
-class MayaMCPError(Exception):
-    def __init__(self, message: str, ...):
-        # Sanitize paths - replace user home with ~
-        sanitized = message.replace(os.path.expanduser("~"), "~")
-        # Never include raw tracebacks in client-facing errors
-        self.message = sanitized
-```
+## Script Tool Trust Model
 
-**Rationale**: Prevents information disclosure through error messages.
+Script tooling uses a three-tier model:
 
-## Maya commandPort Security
+| Tier | Tool | Default State | Purpose |
+|------|------|---------------|---------|
+| 1 | `script.list` | enabled | Discover scripts from configured directories |
+| 2 | `script.execute` | enabled when directories are configured | Execute approved `.py` files from allowlisted directories |
+| 3 | `script.run` | disabled | Execute raw Python or MEL only after explicit opt-in |
 
-### Native Security Features
+Related configuration:
 
-Maya's commandPort has limited security features:
+| Variable | Meaning |
+|----------|---------|
+| `MAYA_MCP_SCRIPT_DIRS` | Semicolon-separated allowlist of absolute directories |
+| `MAYA_MCP_ENABLE_RAW_EXECUTION` | Enables `script.run` when set to `true` or `1` |
+| `MAYA_MCP_SCRIPT_TIMEOUT` | Timeout for script execution |
 
-| Feature | Description | Our Usage |
-|---------|-------------|-----------|
-| `prefix` | Require command prefix | Not used (tools are explicit) |
-| `securityWarning` | Log security warnings | Recommended for development |
+## Maya `commandPort` Considerations
 
-### Recommended Maya Configuration
+`commandPort` itself has limited security features. Maya MCP relies primarily on locality and explicit tool design rather than on strong transport authentication.
+
+Recommended Maya-side setup during development:
 
 ```python
 import maya.cmds as cmds
 
-# Development: enable warnings
 cmds.commandPort(
     name=":7001",
     sourceType="python",
     echoOutput=True,
-    securityWarning=True,  # Log when commands are received
-)
-
-# Production: consider prefix for defense-in-depth
-cmds.commandPort(
-    name=":7001",
-    sourceType="python",
-    echoOutput=True,
-    prefix="mayamcp_",  # All commands must start with this
+    securityWarning=True,
 )
 ```
 
-### Maya commandPort Risks
+`securityWarning=True` is useful for visibility during local development.
 
-| Risk | Severity | Mitigation |
-|------|----------|------------|
-| No authentication | High | Localhost-only |
-| Any command can be executed | High | MCP tools are explicit |
-| `system()` calls possible | Critical | No arbitrary code exposure |
-| File access possible | High | Tools don't expose file paths as inputs |
+## Alignment With MCP Security Guidance
 
-## Security Best Practices
+MCP guidance for remote servers often recommends OAuth and stronger session controls. Maya MCP does not implement those patterns because:
 
-### For Users
+- it is localhost-only
+- it does not operate as a remote shared service
+- it does not broker external credentials
 
-1. **Only run Maya MCP locally** - Never expose ports to network
-2. **Trust your MCP clients** - They can invoke any exposed tool
-3. **Keep Maya updated** - Security patches apply to commandPort
-4. **Monitor commandPort activity** - Enable `securityWarning` in dev
+The main security boundary is the local machine, not an internet-facing deployment edge.
 
-### For Developers
+## Developer Requirements
 
-1. **Do not add unrestricted code execution paths**
-2. **Validate all string inputs** - Assume injection attempts
-3. **Use allowlists, not blocklists** - For node types, commands, etc.
-4. **Sanitize error messages** - No paths, no stack traces
-5. **Test with malicious inputs** - Fuzz testing recommended
+When adding or changing tools:
 
-## MCP Security Considerations
+- do not add unrestricted execution paths casually
+- validate every free-form string input
+- keep read-only and mutating tools separate where possible
+- preserve localhost-only transport behavior
+- do not suppress type or validation failures in ways that hide unsafe states
 
-This section documents how Maya MCP addresses security patterns from the [MCP Security Specification](https://modelcontextprotocol.io/specification/2025-06-18/basic/security_best_practices).
+## Release Checklist
 
-### Why OAuth Is Not Needed
+Before shipping security-sensitive doc or tool changes, confirm:
 
-The MCP spec recommends OAuth 2.1 for remote MCP servers. Maya MCP does **not** implement OAuth because:
-
-| MCP Spec Recommendation | Maya MCP Approach | Rationale |
-|-------------------------|-------------------|-----------|
-| OAuth 2.1 for auth | Not implemented | Localhost-only; no network exposure |
-| Token validation | Not needed | No tokens; single-user local process |
-| Scope-based permissions | Tool allowlist | All exposed tools are intentional |
-
-**Key principle**: Maya MCP is a **local development tool**, not a remote service. The security boundary is the local machine, not a network.
-
-### Confused Deputy Prevention
-
-The MCP spec warns about "confused deputy" attacks where a server is tricked into performing actions on behalf of an attacker.
-
-**Why this is N/A for Maya MCP:**
-- Maya MCP does not proxy requests to other services
-- Maya MCP does not use credentials from clients
-- All actions affect only the local Maya instance
-
-### Session Security
-
-| MCP Spec Pattern | Maya MCP Status |
-|------------------|-----------------|
-| Session hijacking | Low risk (localhost, stdio transport) |
-| No auth via sessions | ✅ Sessions are connection state, not auth |
-| Secure session IDs | N/A (no session IDs in transport) |
-
-### Data Handling
-
-| Pattern | Implementation |
-|---------|----------------|
-| No secrets in errors | ✅ Paths sanitized, no stack traces |
-| No credential storage | ✅ No credentials used |
-| Input validation | ✅ All inputs validated, injection blocked |
-
-## Security Checklist
-
-Before deploying:
-
-- [ ] Confirm localhost-only binding
-- [ ] Verify raw execution remains explicit opt-in and disabled by default
-- [ ] Review all string inputs for injection
-- [ ] Check error messages for info disclosure
-- [ ] Test with malformed/malicious inputs
-- [ ] Document any security assumptions
-
-## Future Considerations
-
-### v1+ Security Enhancements
-
-| Feature | Description | Priority |
-|---------|-------------|----------|
-| Command allowlist | Only permit specific Maya commands | Medium |
-| Rate limiting | Prevent DoS via rapid requests | Low |
-| Audit logging | Log all tool invocations | Medium |
-| Auth token | Require token for connection | Low (localhost negates need) |
-
-## Incident Response
-
-### If Security Issue Found
-
-1. **Do not expose details publicly**
-2. Contact maintainers via security email
-3. Provide:
-   - Description of vulnerability
-   - Steps to reproduce
-   - Potential impact
-   - Suggested fix (if any)
-
-### Known Limitations (Not Vulnerabilities)
-
-| Limitation | Status | Rationale |
-|------------|--------|-----------|
-| No encryption (plaintext TCP) | Accepted | Localhost-only, same-machine |
-| No authentication | Accepted | Localhost-only, process isolation |
-| Maya can execute system commands | Accepted | Maya's design, not MCP's exposure |
+- localhost-only behavior is still enforced
+- `script.run` remains explicit opt-in
+- path validation still blocks traversal and unsafe inputs
+- errors do not leak secrets or tracebacks
+- tests cover malformed and adversarial inputs for the changed area
