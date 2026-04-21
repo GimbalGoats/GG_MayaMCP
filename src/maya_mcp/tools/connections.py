@@ -7,7 +7,9 @@ in Maya's dependency graph, including construction/deformation history.
 from __future__ import annotations
 
 import json
-from typing import Any, Literal
+from typing import Any, Literal, cast
+
+from typing_extensions import NotRequired, TypedDict
 
 from maya_mcp.transport import get_client
 from maya_mcp.utils.parsing import parse_json_response
@@ -19,12 +21,105 @@ from maya_mcp.utils.validation import validate_plug_name as _validate_plug_name
 DEFAULT_CONNECTIONS_LIMIT = 500
 
 
+class _GuardedOutput(TypedDict, total=False):
+    """Metadata added when response size guards truncate a payload."""
+
+    truncated: bool
+    total_count: int
+    _size_warning: str
+    _original_size: int
+    _truncated_size: int
+
+
+class ConnectionEntry(TypedDict):
+    """A single dependency-graph connection."""
+
+    source: str
+    destination: str
+    direction: Literal["incoming", "outgoing"]
+    source_node: NotRequired[str]
+    source_type: NotRequired[str]
+    destination_node: NotRequired[str]
+    destination_type: NotRequired[str]
+
+
+class ConnectionsListOutput(_GuardedOutput):
+    """Return payload for the connections.list tool."""
+
+    node: str
+    connections: list[ConnectionEntry]
+    count: int
+    errors: dict[str, str] | None
+
+
+class ConnectionAttributeInfo(TypedDict):
+    """Connection details for a single attribute."""
+
+    attribute: str
+    connected: bool
+    connections: list[ConnectionEntry]
+    locked: bool
+    type: str
+
+
+class ConnectionsGetOutput(TypedDict):
+    """Return payload for the connections.get tool."""
+
+    node: str
+    attributes: dict[str, ConnectionAttributeInfo]
+    count: int
+    errors: dict[str, str] | None
+
+
+class ConnectionsConnectOutput(TypedDict):
+    """Return payload for the connections.connect tool."""
+
+    connected: bool
+    source: str
+    destination: str
+    disconnected: list[str]
+    error: str | None
+
+
+class ConnectionPair(TypedDict):
+    """A disconnected source/destination pair."""
+
+    source: str
+    destination: str
+
+
+class ConnectionsDisconnectOutput(TypedDict):
+    """Return payload for the connections.disconnect tool."""
+
+    disconnected: list[ConnectionPair]
+    count: int
+    error: str | None
+
+
+class ConnectionHistoryEntry(TypedDict):
+    """A single history node discovered during traversal."""
+
+    name: str
+    type: str
+    depth: int
+    direction: Literal["input", "output"]
+
+
+class ConnectionsHistoryOutput(_GuardedOutput):
+    """Return payload for the connections.history tool."""
+
+    node: str
+    history: list[ConnectionHistoryEntry]
+    count: int
+    errors: dict[str, str] | None
+
+
 def connections_list(
     node: str,
     direction: Literal["incoming", "outgoing", "both"] = "both",
     connections_type: str | None = None,
     limit: int | None = DEFAULT_CONNECTIONS_LIMIT,
-) -> dict[str, Any]:
+) -> ConnectionsListOutput:
     """List connections on a Maya node.
 
     Args:
@@ -158,13 +253,13 @@ print(json.dumps(result))
 
     parsed = guard_response_size(parsed, list_key="connections")
 
-    return parsed
+    return cast("ConnectionsListOutput", parsed)
 
 
 def connections_get(
     node: str,
     attributes: list[str] | None = None,
-) -> dict[str, Any]:
+) -> ConnectionsGetOutput:
     """Get detailed connection information for specific attributes.
 
     Returns connection details for each specified attribute, including
@@ -285,14 +380,14 @@ print(json.dumps(result))
 
     parsed["errors"] = errors if errors else None
 
-    return parsed
+    return cast("ConnectionsGetOutput", parsed)
 
 
 def connections_connect(
     source: str,
     destination: str,
     force: bool = False,
-) -> dict[str, Any]:
+) -> ConnectionsConnectOutput:
     """Connect two attributes in Maya.
 
     Creates a connection from the source attribute to the destination attribute.
@@ -403,13 +498,13 @@ print(json.dumps(result))
     response = client.execute(command)
     parsed: dict[str, Any] = parse_json_response(response)
 
-    return parsed
+    return cast("ConnectionsConnectOutput", parsed)
 
 
 def connections_disconnect(
     source: str | None = None,
     destination: str | None = None,
-) -> dict[str, Any]:
+) -> ConnectionsDisconnectOutput:
     """Disconnect attributes in Maya.
 
     If both source and destination are provided, disconnects that specific connection.
@@ -533,7 +628,7 @@ print(json.dumps(result))
     response = client.execute(command)
     parsed: dict[str, Any] = parse_json_response(response)
 
-    return parsed
+    return cast("ConnectionsDisconnectOutput", parsed)
 
 
 def connections_history(
@@ -541,7 +636,7 @@ def connections_history(
     direction: Literal["input", "output", "both"] = "input",
     depth: int = 10,
     limit: int | None = DEFAULT_CONNECTIONS_LIMIT,
-) -> dict[str, Any]:
+) -> ConnectionsHistoryOutput:
     """List construction/deformation history on a node.
 
     Traverses the dependency graph to find upstream (input) or downstream (output)
@@ -654,4 +749,4 @@ print(json.dumps(result))
 
     parsed = guard_response_size(parsed, list_key="history")
 
-    return parsed
+    return cast("ConnectionsHistoryOutput", parsed)

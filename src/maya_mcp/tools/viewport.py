@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Literal
 
 from fastmcp.utilities.types import Image
+from typing_extensions import TypedDict
 
 from maya_mcp.errors import MayaCommandError, ValidationError
 from maya_mcp.transport import get_client
@@ -21,6 +22,19 @@ from maya_mcp.utils.parsing import parse_json_response
 from maya_mcp.utils.validation import FORBIDDEN_NODE_CHARS
 
 ViewportFormat = Literal["jpeg", "png"]
+
+
+class ViewportCaptureOutput(TypedDict):
+    """Structured metadata returned alongside viewport image content."""
+
+    format: ViewportFormat
+    mime_type: Literal["image/jpeg", "image/png"]
+    width: int
+    height: int
+    frame: float | None
+    panel: str | None
+    size_bytes: int
+
 
 _MIN_CAPTURE_DIMENSION = 64
 _MAX_CAPTURE_DIMENSION = 4096
@@ -41,11 +55,37 @@ def viewport_capture(
     panel: str | None = None,
     frame: float | None = None,
 ) -> Image:
+    """Capture the Maya viewport as an inline MCP image."""
+    image, _ = _capture_viewport_image(
+        format=format,
+        width=width,
+        height=height,
+        quality=quality,
+        offscreen=offscreen,
+        show_ornaments=show_ornaments,
+        panel=panel,
+        frame=frame,
+    )
+    return image
+
+
+def _capture_viewport_image(
+    *,
+    format: ViewportFormat,
+    width: int,
+    height: int,
+    quality: int,
+    offscreen: bool,
+    show_ornaments: bool,
+    panel: str | None,
+    frame: float | None,
+) -> tuple[Image, ViewportCaptureOutput]:
     """Capture the Maya viewport as an inline MCP image.
 
     The Maya command executes playblast server-side and returns only a compact
     JSON payload over commandPort. The image file is then read in the MCP
-    server process and returned as ``fastmcp.utilities.types.Image``.
+    server process and returned as ``fastmcp.utilities.types.Image`` together
+    with structured capture metadata for the MCP server wrapper.
 
     Args:
         format: Image format, either ``"jpeg"`` or ``"png"``.
@@ -58,8 +98,10 @@ def viewport_capture(
         frame: Optional frame to capture. Defaults to current time when omitted.
 
     Returns:
-        ``Image`` instance with inline bytes for FastMCP conversion to
-        ``ImageContent``.
+        Tuple of:
+            - ``Image`` instance with inline bytes for FastMCP conversion to
+              ``ImageContent``
+            - structured capture metadata for MCP ``outputSchema``
 
     Raises:
         ValidationError: If tool inputs are invalid.
@@ -146,7 +188,23 @@ def viewport_capture(
                 constraint=f"<= {_MAX_CAPTURE_BYTES}",
             )
 
-        return Image(data=image_bytes, format=format)
+        image = Image(data=image_bytes, format=format)
+        payload_metadata = payload.get("metadata")
+        metadata = payload_metadata if isinstance(payload_metadata, dict) else {}
+        frame_value = metadata.get("frame")
+        panel_value = metadata.get("panel")
+
+        result: ViewportCaptureOutput = {
+            "format": format,
+            "mime_type": "image/jpeg" if format == "jpeg" else "image/png",
+            "width": int(metadata.get("width", width)),
+            "height": int(metadata.get("height", height)),
+            "frame": float(frame_value) if isinstance(frame_value, int | float) else frame,
+            "panel": panel_value if isinstance(panel_value, str) else panel,
+            "size_bytes": len(image_bytes),
+        }
+
+        return image, result
     finally:
         with contextlib.suppress(OSError):
             shutil.rmtree(temp_dir, ignore_errors=True)

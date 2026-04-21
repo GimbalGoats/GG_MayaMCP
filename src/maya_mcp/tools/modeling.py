@@ -8,7 +8,9 @@ component manipulation, and cleanup operations.
 from __future__ import annotations
 
 import json
-from typing import Any, Literal
+from typing import Any, Literal, cast
+
+from typing_extensions import NotRequired, TypedDict
 
 from maya_mcp.transport import get_client
 from maya_mcp.utils.parsing import parse_json_response
@@ -19,6 +21,157 @@ from maya_mcp.utils.validation import validate_node_name as _validate_node_name
 VALID_PRIMITIVES = {"cube", "sphere", "cylinder", "cone", "torus", "plane"}
 
 VALID_AXES = {"x", "y", "z"}
+
+
+class _GuardedOutput(TypedDict, total=False):
+    """Metadata added when response size guards truncate a payload."""
+
+    truncated: bool
+    total_count: int
+    _size_warning: str
+    _original_size: int
+    _truncated_size: int
+
+
+class ModelingCreatePolygonPrimitiveOutput(TypedDict):
+    """Return payload for the modeling.create_polygon_primitive tool."""
+
+    transform: str | None
+    shape: str | None
+    constructor_node: str | None
+    primitive_type: Literal["cube", "sphere", "cylinder", "cone", "torus", "plane"]
+    vertex_count: int
+    face_count: int
+    errors: dict[str, str] | None
+
+
+class ModelingExtrudeFacesOutput(TypedDict):
+    """Return payload for the modeling.extrude_faces tool."""
+
+    node: str | None
+    faces_extruded: int
+    new_face_count: int
+    errors: dict[str, str] | None
+
+
+class ModelingBooleanOutput(TypedDict):
+    """Return payload for the modeling.boolean tool."""
+
+    result_mesh: str | None
+    operation: Literal["union", "difference", "intersection"]
+    vertex_count: int
+    face_count: int
+    errors: dict[str, str] | None
+
+
+class ModelingCombineOutput(TypedDict):
+    """Return payload for the modeling.combine tool."""
+
+    result_mesh: str | None
+    source_meshes: list[str]
+    vertex_count: int
+    face_count: int
+    errors: dict[str, str] | None
+
+
+class ModelingSeparateOutput(_GuardedOutput):
+    """Return payload for the modeling.separate tool."""
+
+    source_mesh: str
+    result_meshes: list[str]
+    count: int
+    errors: dict[str, str] | None
+
+
+class ModelingMergeVerticesOutput(TypedDict):
+    """Return payload for the modeling.merge_vertices tool."""
+
+    mesh: str
+    vertices_merged: int
+    vertex_count_before: int
+    vertex_count_after: int
+    errors: dict[str, str] | None
+
+
+class ModelingDeleteHistoryOutput(_GuardedOutput):
+    """Return payload for the modeling.delete_history tool."""
+
+    cleaned: list[str]
+    count: int
+    errors: dict[str, str] | None
+
+
+class ModelingFreezeTransformsOutput(TypedDict):
+    """Return payload for the modeling.freeze_transforms tool."""
+
+    frozen: list[str]
+    count: int
+    errors: dict[str, str] | None
+
+
+class ModelingCenterPivotOutput(TypedDict):
+    """Return payload for the modeling.center_pivot tool."""
+
+    centered: list[str]
+    count: int
+    pivot_positions: dict[str, list[float]]
+    errors: dict[str, str] | None
+
+
+class ModelingSetPivotOutput(TypedDict):
+    """Return payload for the modeling.set_pivot tool."""
+
+    node: str
+    pivot: list[float]
+    world_space: bool
+    errors: dict[str, str] | None
+
+
+class ModelingMoveComponentsOutput(TypedDict):
+    """Return payload for the modeling.move_components tool."""
+
+    components_moved: int
+    world_space: bool
+    errors: dict[str, str] | None
+    translate: NotRequired[list[float]]
+    absolute: NotRequired[list[float]]
+
+
+class ModelingBevelOutput(TypedDict):
+    """Return payload for the modeling.bevel tool."""
+
+    node: str | None
+    components_beveled: int
+    new_vertex_count: int
+    new_face_count: int
+    errors: dict[str, str] | None
+
+
+class ModelingBridgeOutput(TypedDict):
+    """Return payload for the modeling.bridge tool."""
+
+    node: str | None
+    new_face_count: int
+    errors: dict[str, str] | None
+
+
+class ModelingInsertEdgeLoopOutput(TypedDict):
+    """Return payload for the modeling.insert_edge_loop tool."""
+
+    node: str | None
+    edge: str
+    new_edge_count: int
+    new_vertex_count: int
+    errors: dict[str, str] | None
+
+
+class ModelingDeleteFacesOutput(TypedDict):
+    """Return payload for the modeling.delete_faces tool."""
+
+    faces_deleted: int
+    mesh: str | None
+    remaining_face_count: int
+    errors: dict[str, str] | None
 
 
 def modeling_create_polygon_primitive(
@@ -33,7 +186,7 @@ def modeling_create_polygon_primitive(
     subdivisions_depth: int | None = None,
     subdivisions_axis: int | None = None,
     axis: Literal["x", "y", "z"] = "y",
-) -> dict[str, Any]:
+) -> ModelingCreatePolygonPrimitiveOutput:
     """Create a polygon primitive.
 
     Args:
@@ -167,7 +320,7 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("ModelingCreatePolygonPrimitiveOutput", parsed)
 
 
 def modeling_extrude_faces(
@@ -178,7 +331,7 @@ def modeling_extrude_faces(
     offset: float | None = None,
     divisions: int = 1,
     keep_faces_together: bool = True,
-) -> dict[str, Any]:
+) -> ModelingExtrudeFacesOutput:
     """Extrude polygon faces.
 
     Args:
@@ -257,14 +410,14 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("ModelingExtrudeFacesOutput", parsed)
 
 
 def modeling_boolean(
     mesh_a: str,
     mesh_b: str,
     operation: Literal["union", "difference", "intersection"] = "union",
-) -> dict[str, Any]:
+) -> ModelingBooleanOutput:
     """Perform a boolean operation on two meshes.
 
     Args:
@@ -333,13 +486,13 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("ModelingBooleanOutput", parsed)
 
 
 def modeling_combine(
     meshes: list[str],
     name: str | None = None,
-) -> dict[str, Any]:
+) -> ModelingCombineOutput:
     """Combine multiple meshes into one.
 
     Args:
@@ -400,12 +553,12 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("ModelingCombineOutput", parsed)
 
 
 def modeling_separate(
     mesh: str,
-) -> dict[str, Any]:
+) -> ModelingSeparateOutput:
     """Separate a combined mesh into individual meshes.
 
     Args:
@@ -455,14 +608,14 @@ print(json.dumps(result))
     if "result_meshes" in parsed:
         parsed = guard_response_size(parsed, list_key="result_meshes")
 
-    return parsed
+    return cast("ModelingSeparateOutput", parsed)
 
 
 def modeling_merge_vertices(
     mesh: str,
     threshold: float = 0.001,
     vertices: list[str] | None = None,
-) -> dict[str, Any]:
+) -> ModelingMergeVerticesOutput:
     """Merge vertices on a mesh within a distance threshold.
 
     Args:
@@ -523,13 +676,13 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("ModelingMergeVerticesOutput", parsed)
 
 
 def modeling_delete_history(
     nodes: list[str] | None = None,
     all_nodes: bool = False,
-) -> dict[str, Any]:
+) -> ModelingDeleteHistoryOutput:
     """Delete construction history from nodes.
 
     Args:
@@ -600,7 +753,7 @@ print(json.dumps(result))
     if "cleaned" in parsed:
         parsed = guard_response_size(parsed, list_key="cleaned")
 
-    return parsed
+    return cast("ModelingDeleteHistoryOutput", parsed)
 
 
 def modeling_freeze_transforms(
@@ -608,7 +761,7 @@ def modeling_freeze_transforms(
     translate: bool = True,
     rotate: bool = True,
     scale: bool = True,
-) -> dict[str, Any]:
+) -> ModelingFreezeTransformsOutput:
     """Freeze (reset) transforms on nodes.
 
     Applies the current transform values as the identity and resets
@@ -669,12 +822,12 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("ModelingFreezeTransformsOutput", parsed)
 
 
 def modeling_center_pivot(
     nodes: list[str],
-) -> dict[str, Any]:
+) -> ModelingCenterPivotOutput:
     """Center the pivot point on nodes.
 
     Args:
@@ -726,14 +879,14 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("ModelingCenterPivotOutput", parsed)
 
 
 def modeling_set_pivot(
     node: str,
     position: list[float],
     world_space: bool = True,
-) -> dict[str, Any]:
+) -> ModelingSetPivotOutput:
     """Set the pivot point of a node to an explicit position.
 
     Args:
@@ -788,7 +941,7 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("ModelingSetPivotOutput", parsed)
 
 
 def modeling_move_components(
@@ -796,7 +949,7 @@ def modeling_move_components(
     translate: list[float] | None = None,
     absolute: list[float] | None = None,
     world_space: bool = True,
-) -> dict[str, Any]:
+) -> ModelingMoveComponentsOutput:
     """Move mesh components (vertices, edges, faces).
 
     Exactly one of translate (relative) or absolute must be provided.
@@ -879,7 +1032,7 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("ModelingMoveComponentsOutput", parsed)
 
 
 def modeling_bevel(
@@ -887,7 +1040,7 @@ def modeling_bevel(
     offset: float = 0.5,
     segments: int = 1,
     fraction: float = 0.5,
-) -> dict[str, Any]:
+) -> ModelingBevelOutput:
     """Bevel edges or vertices.
 
     Args:
@@ -948,7 +1101,7 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("ModelingBevelOutput", parsed)
 
 
 def modeling_bridge(
@@ -956,7 +1109,7 @@ def modeling_bridge(
     divisions: int = 0,
     twist: int = 0,
     taper: float = 1.0,
-) -> dict[str, Any]:
+) -> ModelingBridgeOutput:
     """Bridge between edge loops.
 
     Args:
@@ -1015,14 +1168,14 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("ModelingBridgeOutput", parsed)
 
 
 def modeling_insert_edge_loop(
     edge: str,
     divisions: int = 1,
     weight: float = 0.5,
-) -> dict[str, Any]:
+) -> ModelingInsertEdgeLoopOutput:
     """Insert an edge loop at the specified edge.
 
     Args:
@@ -1076,12 +1229,12 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("ModelingInsertEdgeLoopOutput", parsed)
 
 
 def modeling_delete_faces(
     faces: list[str],
-) -> dict[str, Any]:
+) -> ModelingDeleteFacesOutput:
     """Delete polygon faces from a mesh.
 
     Args:
@@ -1131,4 +1284,4 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("ModelingDeleteFacesOutput", parsed)

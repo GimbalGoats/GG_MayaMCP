@@ -200,3 +200,18 @@ class TestViewportServerRegistration:
         assert annotations.destructiveHint is False
         assert annotations.idempotentHint is True
         assert annotations.openWorldHint is False
+
+    def test_viewport_capture_exposes_structured_output_schema(self) -> None:
+        """Viewport capture publishes metadata schema alongside image content."""
+        from maya_mcp.server import mcp
+
+        tool = asyncio.run(mcp.get_tool("viewport.capture"))
+        assert tool is not None
+
+        schema = tool.to_mcp_tool().outputSchema
+        assert schema is not None
+        assert schema["type"] == "object"
+        properties = schema["properties"]
+
+        for field in ("format", "mime_type", "width", "height", "frame", "panel", "size_bytes"):
+            assert field in properties

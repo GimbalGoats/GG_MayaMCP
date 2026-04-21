@@ -9,18 +9,41 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from typing import get_type_hints
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from maya_mcp.errors import ValidationError
-from maya_mcp.tools.scripts import script_execute, script_list, script_run
+from maya_mcp.tools.scripts import (
+    ScriptExecuteOutput,
+    ScriptListOutput,
+    ScriptRunOutput,
+    script_execute,
+    script_list,
+    script_run,
+)
 from maya_mcp.utils.script_config import (
     ScriptConfig,
     load_script_config,
     reset_script_config,
 )
 from maya_mcp.utils.script_validation import validate_raw_code, validate_script_path
+
+
+class TestScriptOutputTypes:
+    """Tests for public script TypedDict return annotations."""
+
+    def test_script_tools_use_typed_outputs(self) -> None:
+        """Script tools expose typed output models."""
+        assert get_type_hints(script_list)["return"] is ScriptListOutput
+        assert get_type_hints(script_execute)["return"] is ScriptExecuteOutput
+        assert get_type_hints(script_run)["return"] is ScriptRunOutput
+
+    def test_script_list_marks_truncation_optional(self) -> None:
+        """Script listing payloads preserve optional guard metadata."""
+        assert "truncated" in ScriptListOutput.__optional_keys__
+        assert "_size_warning" in ScriptListOutput.__optional_keys__
 
 
 class TestScriptConfig:

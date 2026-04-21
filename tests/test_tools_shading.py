@@ -7,15 +7,29 @@ and color setting work correctly with mocked transport.
 from __future__ import annotations
 
 import json
+from typing import get_type_hints
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from maya_mcp.tools.shading import (
+    ShadingAssignMaterialOutput,
+    ShadingCreateMaterialOutput,
+    ShadingSetMaterialColorOutput,
     shading_assign_material,
     shading_create_material,
     shading_set_material_color,
 )
+
+
+class TestShadingOutputTypes:
+    """Tests for public shading TypedDict return annotations."""
+
+    def test_shading_tools_use_typed_outputs(self) -> None:
+        """Shading tools expose typed output models."""
+        assert get_type_hints(shading_create_material)["return"] is ShadingCreateMaterialOutput
+        assert get_type_hints(shading_assign_material)["return"] is ShadingAssignMaterialOutput
+        assert get_type_hints(shading_set_material_color)["return"] is ShadingSetMaterialColorOutput
 
 
 class TestShadingCreateMaterial:

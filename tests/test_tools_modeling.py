@@ -7,11 +7,28 @@ with mocked transport. No running Maya instance is required.
 from __future__ import annotations
 
 import json
+from typing import get_origin, get_type_hints
 from unittest.mock import MagicMock, patch
 
 import pytest
+from typing_extensions import NotRequired
 
 from maya_mcp.tools.modeling import (
+    ModelingBevelOutput,
+    ModelingBooleanOutput,
+    ModelingBridgeOutput,
+    ModelingCenterPivotOutput,
+    ModelingCombineOutput,
+    ModelingCreatePolygonPrimitiveOutput,
+    ModelingDeleteFacesOutput,
+    ModelingDeleteHistoryOutput,
+    ModelingExtrudeFacesOutput,
+    ModelingFreezeTransformsOutput,
+    ModelingInsertEdgeLoopOutput,
+    ModelingMergeVerticesOutput,
+    ModelingMoveComponentsOutput,
+    ModelingSeparateOutput,
+    ModelingSetPivotOutput,
     modeling_bevel,
     modeling_boolean,
     modeling_bridge,
@@ -28,6 +45,41 @@ from maya_mcp.tools.modeling import (
     modeling_separate,
     modeling_set_pivot,
 )
+
+
+class TestModelingOutputTypes:
+    """Tests for public modeling TypedDict return annotations."""
+
+    def test_modeling_tools_use_typed_outputs(self) -> None:
+        """Modeling tools expose typed output models."""
+        assert (
+            get_type_hints(modeling_create_polygon_primitive)["return"]
+            is ModelingCreatePolygonPrimitiveOutput
+        )
+        assert get_type_hints(modeling_extrude_faces)["return"] is ModelingExtrudeFacesOutput
+        assert get_type_hints(modeling_boolean)["return"] is ModelingBooleanOutput
+        assert get_type_hints(modeling_combine)["return"] is ModelingCombineOutput
+        assert get_type_hints(modeling_separate)["return"] is ModelingSeparateOutput
+        assert get_type_hints(modeling_merge_vertices)["return"] is ModelingMergeVerticesOutput
+        assert get_type_hints(modeling_bevel)["return"] is ModelingBevelOutput
+        assert get_type_hints(modeling_bridge)["return"] is ModelingBridgeOutput
+        assert get_type_hints(modeling_insert_edge_loop)["return"] is ModelingInsertEdgeLoopOutput
+        assert get_type_hints(modeling_delete_faces)["return"] is ModelingDeleteFacesOutput
+        assert get_type_hints(modeling_move_components)["return"] is ModelingMoveComponentsOutput
+        assert (
+            get_type_hints(modeling_freeze_transforms)["return"] is ModelingFreezeTransformsOutput
+        )
+        assert get_type_hints(modeling_delete_history)["return"] is ModelingDeleteHistoryOutput
+        assert get_type_hints(modeling_center_pivot)["return"] is ModelingCenterPivotOutput
+        assert get_type_hints(modeling_set_pivot)["return"] is ModelingSetPivotOutput
+
+    def test_modeling_outputs_mark_optional_and_guarded_fields(self) -> None:
+        """Modeling payloads model conditional fields precisely."""
+        hints = get_type_hints(ModelingMoveComponentsOutput, include_extras=True)
+        assert get_origin(hints["translate"]) is NotRequired
+        assert get_origin(hints["absolute"]) is NotRequired
+        assert "truncated" in ModelingSeparateOutput.__optional_keys__
+        assert "_size_warning" in ModelingDeleteHistoryOutput.__optional_keys__
 
 
 class TestModelingCreatePolygonPrimitive:

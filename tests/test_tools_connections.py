@@ -7,17 +7,45 @@ work correctly with mocked transport.
 from __future__ import annotations
 
 import json
+from typing import get_origin, get_type_hints
 from unittest.mock import MagicMock, patch
 
 import pytest
+from typing_extensions import NotRequired
 
 from maya_mcp.tools.connections import (
+    ConnectionEntry,
+    ConnectionsConnectOutput,
+    ConnectionsDisconnectOutput,
+    ConnectionsGetOutput,
+    ConnectionsHistoryOutput,
+    ConnectionsListOutput,
     connections_connect,
     connections_disconnect,
     connections_get,
     connections_history,
     connections_list,
 )
+
+
+class TestConnectionsOutputTypes:
+    """Tests for public connections TypedDict return annotations."""
+
+    def test_connections_tools_use_typed_outputs(self) -> None:
+        """Connections tools expose typed output models."""
+        assert get_type_hints(connections_list)["return"] is ConnectionsListOutput
+        assert get_type_hints(connections_get)["return"] is ConnectionsGetOutput
+        assert get_type_hints(connections_connect)["return"] is ConnectionsConnectOutput
+        assert get_type_hints(connections_disconnect)["return"] is ConnectionsDisconnectOutput
+        assert get_type_hints(connections_history)["return"] is ConnectionsHistoryOutput
+
+    def test_connections_outputs_model_optional_fields_precisely(self) -> None:
+        """Nested connection payloads preserve optional metadata fields."""
+        hints = get_type_hints(ConnectionEntry, include_extras=True)
+        assert get_origin(hints["source_node"]) is NotRequired
+        assert get_origin(hints["destination_type"]) is NotRequired
+        assert "truncated" in ConnectionsListOutput.__optional_keys__
+        assert "_size_warning" in ConnectionsHistoryOutput.__optional_keys__
 
 
 class TestConnectionsList:

@@ -1741,7 +1741,19 @@ Capture a single viewport frame as inline MCP image content using Maya `playblas
 
 **Output**:
 
-- MCP `ImageContent` (inline base64 image) returned by FastMCP from `Image(data=..., format=...)`.
+- Structured output schema fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `format` | `"jpeg" \| "png"` | Returned image format |
+| `mime_type` | `string` | MIME type for the inline image content |
+| `width` | `integer` | Captured image width in pixels |
+| `height` | `integer` | Captured image height in pixels |
+| `frame` | `number \| null` | Captured frame number when known |
+| `panel` | `string \| null` | Model panel used for the capture when known |
+| `size_bytes` | `integer` | Final inline image byte size |
+
+- Plus MCP `ImageContent` (inline base64 image) returned alongside the structured metadata.
 
 **Behavior Notes**:
 
