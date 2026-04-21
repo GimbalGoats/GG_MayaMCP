@@ -3457,7 +3457,7 @@ Import a file into the current Maya scene.
 | `file_path` | `string` | Path of the imported file |
 | `nodes` | `string[]` | Top-level parent transforms imported |
 | `count` | `integer` | Number of top-level nodes |
-| `errors` | `string \| null` | Error message if import failed |
+| `error` | `string \| null` | Error message if import failed |
 
 ---
 
@@ -3480,7 +3480,7 @@ Export scene content to a file.
 | `success` | `boolean` | Whether the export succeeded |
 | `file_path` | `string` | Path of the exported file |
 | `nodes_exported` | `integer` | Number of nodes exported |
-| `errors` | `string \| null` | Error message if export failed |
+| `error` | `string \| null` | Error message if export failed |
 
 ---
 

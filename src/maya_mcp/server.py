@@ -137,7 +137,15 @@ from maya_mcp.tools.nodes import (
     nodes_rename,
 )
 from maya_mcp.tools.scene import (
+    SceneExportOutput,
+    SceneImportOutput,
     SceneInfoOutput,
+    SceneNewOutput,
+    SceneOpenOutput,
+    SceneRedoOutput,
+    SceneSaveAsOutput,
+    SceneSaveOutput,
+    SceneUndoOutput,
     scene_export,
     scene_import,
     scene_info,
@@ -317,7 +325,7 @@ def tool_scene_new(
         bool,
         "If True, discard unsaved changes. If False (default), refuse when scene has unsaved changes.",
     ] = False,
-) -> dict[str, Any]:
+) -> SceneNewOutput:
     """Create a new empty Maya scene.
 
     Args:
@@ -341,7 +349,7 @@ def tool_scene_new(
         openWorldHint=False,
     ),
 )
-def tool_scene_save() -> dict[str, Any]:
+def tool_scene_save() -> SceneSaveOutput:
     """Save the current Maya scene.
 
     Returns:
@@ -366,7 +374,7 @@ def tool_scene_save_as(
         str,
         "Absolute or relative path to save the scene to (.ma or .mb)",
     ],
-) -> dict[str, Any]:
+) -> SceneSaveAsOutput:
     """Save the scene to a new file path.
 
     Args:
@@ -400,7 +408,7 @@ def tool_scene_open(
         bool,
         "If True, discard unsaved changes. If False (default), refuse when scene has unsaved changes.",
     ] = False,
-) -> dict[str, Any]:
+) -> SceneOpenOutput:
     """Open a Maya scene file.
 
     Args:
@@ -424,7 +432,7 @@ def tool_scene_open(
         openWorldHint=False,
     ),
 )
-def tool_scene_undo() -> dict[str, Any]:
+def tool_scene_undo() -> SceneUndoOutput:
     """Undo the last Maya operation.
 
     Returns success status, description of undone action, and availability
@@ -443,7 +451,7 @@ def tool_scene_undo() -> dict[str, Any]:
         openWorldHint=False,
     ),
 )
-def tool_scene_redo() -> dict[str, Any]:
+def tool_scene_redo() -> SceneRedoOutput:
     """Redo the last undone Maya operation.
 
     Returns success status, description of redone action, and availability
@@ -477,7 +485,7 @@ def tool_scene_import(
         bool,
         "If True, replace existing namespace contents. If False (default), merge.",
     ] = False,
-) -> dict[str, Any]:
+) -> SceneImportOutput:
     """Import a file into the current Maya scene.
 
     Args:
@@ -520,7 +528,7 @@ def tool_scene_export(
         bool,
         "If True, include animation data (FBX only). If False (default), export static.",
     ] = False,
-) -> dict[str, Any]:
+) -> SceneExportOutput:
     """Export scene content to a file.
 
     Args:
