@@ -101,11 +101,11 @@ def load_code_mode_config(environ: Mapping[str, str] | None = None) -> CodeModeC
     return CodeModeConfig(enabled=is_code_mode_enabled(environ))
 
 
-def require_code_mode(config: CodeModeConfig | None = None) -> CodeModeConfig:
+def require_code_mode(environ: Mapping[str, str] | None = None) -> CodeModeConfig:
     """Require Code Mode to be explicitly enabled.
 
     Args:
-        config: Optional preloaded Code Mode configuration.
+        environ: Optional environment mapping. Defaults to ``os.environ``.
 
     Returns:
         The enabled configuration.
@@ -114,7 +114,7 @@ def require_code_mode(config: CodeModeConfig | None = None) -> CodeModeConfig:
         ValidationError: If Code Mode is not enabled.
     """
 
-    active_config = load_code_mode_config() if config is None else config
+    active_config = load_code_mode_config(environ)
     if not active_config.enabled:
         raise ValidationError(
             message=f"Code Mode is disabled. Set {CODE_MODE_ENV_VAR}=1 to enable.",
@@ -155,7 +155,7 @@ def validate_code_mode_execution(
     code: str,
     language: str = "python",
     timeout: int | None = None,
-    config: CodeModeConfig | None = None,
+    environ: Mapping[str, str] | None = None,
 ) -> CodeModeExecutionRequest:
     """Validate a Code Mode execution request against the prototype limits.
 
@@ -163,7 +163,7 @@ def validate_code_mode_execution(
         code: Python code payload.
         language: Requested execution language.
         timeout: Optional timeout in seconds.
-        config: Optional preloaded Code Mode configuration.
+        environ: Optional environment mapping. Defaults to ``os.environ``.
 
     Returns:
         A validated execution request.
@@ -173,7 +173,7 @@ def validate_code_mode_execution(
             exceeded.
     """
 
-    active_config = require_code_mode(config)
+    active_config = require_code_mode(environ)
     limits = active_config.sandbox
 
     if language not in limits.allowed_languages:
@@ -204,20 +204,18 @@ def validate_code_mode_execution(
     )
 
 
-def truncate_code_mode_output(output: str, config: CodeModeConfig | None = None) -> str:
+def truncate_code_mode_output(output: str) -> str:
     """Truncate text output to the Code Mode output budget.
 
     Args:
         output: Text output returned by execution.
-        config: Optional Code Mode configuration. When omitted, fixed default
-            limits are used without requiring the mode to be enabled.
 
     Returns:
         The original output if it fits, otherwise a UTF-8-safe truncated string
         with a short truncation marker.
     """
 
-    limits = CodeModeSandboxLimits() if config is None else config.sandbox
+    limits = CodeModeSandboxLimits()
     output_bytes = output.encode("utf-8")
     if len(output_bytes) <= limits.max_output_bytes:
         return output

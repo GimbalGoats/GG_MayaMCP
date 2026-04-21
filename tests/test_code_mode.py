@@ -6,7 +6,6 @@ import pytest
 
 from maya_mcp.code_mode import (
     CODE_MODE_ENV_VAR,
-    CodeModeConfig,
     create_env_gated_server,
     is_code_mode_enabled,
     load_code_mode_config,
@@ -33,11 +32,11 @@ def test_code_mode_requires_exact_one() -> None:
     assert is_code_mode_enabled({CODE_MODE_ENV_VAR: "0"}) is False
 
 
-def test_require_code_mode_rejects_disabled_config() -> None:
+def test_require_code_mode_rejects_disabled_environment() -> None:
     """The explicit gate raises before Code Mode validation proceeds."""
 
     with pytest.raises(ValidationError, match="Code Mode is disabled"):
-        require_code_mode(CodeModeConfig(enabled=False))
+        require_code_mode({})
 
 
 def test_create_env_gated_server_uses_default_factory_when_disabled() -> None:
@@ -69,7 +68,7 @@ def test_validate_code_mode_execution_accepts_python_with_defaults() -> None:
 
     request = validate_code_mode_execution(
         "print('ok')",
-        config=CodeModeConfig(enabled=True),
+        environ={CODE_MODE_ENV_VAR: "1"},
     )
 
     assert request.code == "print('ok')"
@@ -84,7 +83,7 @@ def test_validate_code_mode_execution_rejects_mel() -> None:
         validate_code_mode_execution(
             "print `sphere`",
             language="mel",
-            config=CodeModeConfig(enabled=True),
+            environ={CODE_MODE_ENV_VAR: "1"},
         )
 
 
@@ -94,7 +93,7 @@ def test_validate_code_mode_execution_rejects_oversized_code() -> None:
     oversized_code = "x" * 16_385
 
     with pytest.raises(ValidationError, match="Code exceeds maximum size"):
-        validate_code_mode_execution(oversized_code, config=CodeModeConfig(enabled=True))
+        validate_code_mode_execution(oversized_code, environ={CODE_MODE_ENV_VAR: "1"})
 
 
 def test_validate_code_mode_execution_rejects_timeout_over_limit() -> None:
@@ -104,7 +103,7 @@ def test_validate_code_mode_execution_rejects_timeout_over_limit() -> None:
         validate_code_mode_execution(
             "print('ok')",
             timeout=11,
-            config=CodeModeConfig(enabled=True),
+            environ={CODE_MODE_ENV_VAR: "1"},
         )
 
 
