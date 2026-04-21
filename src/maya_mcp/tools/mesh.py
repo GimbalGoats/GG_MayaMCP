@@ -6,7 +6,9 @@ This module provides tools for querying mesh geometry and topology analysis.
 from __future__ import annotations
 
 import json
-from typing import Any, Literal
+from typing import Any, Literal, cast
+
+from typing_extensions import NotRequired, TypedDict
 
 from maya_mcp.transport import get_client
 from maya_mcp.utils.parsing import parse_json_response
@@ -18,7 +20,70 @@ DEFAULT_VERTEX_LIMIT = 1000
 DEFAULT_TOPOLOGY_LIMIT = 500
 
 
-def mesh_info(node: str) -> dict[str, Any]:
+class _GuardedOutput(TypedDict, total=False):
+    """Metadata added when response size guards truncate a payload."""
+
+    truncated: bool
+    total_count: int
+    _size_warning: str
+    _original_size: int
+    _truncated_size: int
+
+
+class MeshInfoOutput(TypedDict):
+    """Return payload for the mesh.info tool."""
+
+    node: str
+    exists: bool
+    is_mesh: bool
+    errors: dict[str, Any] | None
+    shape: NotRequired[str]
+    vertex_count: NotRequired[int]
+    face_count: NotRequired[int]
+    edge_count: NotRequired[int]
+    uv_count: NotRequired[int]
+    has_uvs: NotRequired[bool]
+    uv_sets: NotRequired[list[str]]
+    bounding_box: NotRequired[list[float]]
+
+
+class MeshVerticesOutput(_GuardedOutput):
+    """Return payload for the mesh.vertices tool."""
+
+    node: str
+    exists: bool
+    is_mesh: bool
+    errors: dict[str, Any] | None
+    shape: NotRequired[str]
+    vertex_count: NotRequired[int]
+    vertices: NotRequired[list[list[float]]]
+    offset: NotRequired[int]
+    count: NotRequired[int]
+
+
+class MeshEvaluateOutput(_GuardedOutput):
+    """Return payload for the mesh.evaluate tool.
+
+    Check-specific component fields are present only when requested.
+    """
+
+    node: str
+    exists: bool
+    is_mesh: bool
+    is_clean: bool
+    errors: dict[str, Any] | None
+    shape: NotRequired[str]
+    non_manifold_edges: NotRequired[list[str]]
+    non_manifold_count: NotRequired[int]
+    lamina_faces: NotRequired[list[str]]
+    lamina_count: NotRequired[int]
+    holes: NotRequired[list[str]]
+    hole_count: NotRequired[int]
+    border_edges: NotRequired[list[str]]
+    border_count: NotRequired[int]
+
+
+def mesh_info(node: str) -> MeshInfoOutput:
     """Get mesh statistics for a polygon mesh.
 
     Returns vertex count, face count, edge count, bounding box,
@@ -109,14 +174,14 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("MeshInfoOutput", parsed)
 
 
 def mesh_vertices(
     node: str,
     offset: int = 0,
     limit: int | None = DEFAULT_VERTEX_LIMIT,
-) -> dict[str, Any]:
+) -> MeshVerticesOutput:
     """Query vertex positions from a mesh with pagination.
 
     Returns vertex positions as [x, y, z] tuples. Use offset/limit
@@ -228,14 +293,14 @@ print(json.dumps(result))
     if "vertices" in parsed:
         parsed = guard_response_size(parsed, list_key="vertices")
 
-    return parsed
+    return cast("MeshVerticesOutput", parsed)
 
 
 def mesh_evaluate(
     node: str,
     checks: list[Literal["non_manifold", "lamina", "holes", "border"]] | None = None,
     limit: int | None = DEFAULT_TOPOLOGY_LIMIT,
-) -> dict[str, Any]:
+) -> MeshEvaluateOutput:
     """Analyze mesh topology for issues.
 
     Performs topology analysis to find non-manifold edges, lamina faces,
@@ -447,4 +512,4 @@ print(json.dumps(result))
         if key in parsed:
             parsed = guard_response_size(parsed, list_key=key)
 
-    return parsed
+    return cast("MeshEvaluateOutput", parsed)

@@ -44,6 +44,34 @@ MCP JSON response shapes or error conventions.
 | `maya_mcp.tools.selection.SelectionComponentsOutput` | `selection.get_components` |
 | `maya_mcp.tools.selection.SelectionConvertComponentsOutput` | `selection.convert_components` |
 
+### Mesh
+
+| Model | Backing tools |
+|-------|---------------|
+| `maya_mcp.tools.mesh.MeshInfoOutput` | `mesh.info` |
+| `maya_mcp.tools.mesh.MeshVerticesOutput` | `mesh.vertices` |
+| `maya_mcp.tools.mesh.MeshEvaluateOutput` | `mesh.evaluate` |
+
+### Curves
+
+| Model | Backing tools |
+|-------|---------------|
+| `maya_mcp.tools.curve.CurveInfoOutput` | `curve.info` |
+| `maya_mcp.tools.curve.CurveCvsOutput` | `curve.cvs` |
+
+### Skinning
+
+| Model | Backing tools |
+|-------|---------------|
+| `maya_mcp.tools.skin.SkinBindOutput` | `skin.bind` |
+| `maya_mcp.tools.skin.SkinUnbindOutput` | `skin.unbind` |
+| `maya_mcp.tools.skin.SkinInfluenceEntry` | `skin.influences` |
+| `maya_mcp.tools.skin.SkinInfluencesOutput` | `skin.influences` |
+| `maya_mcp.tools.skin.SkinWeightEntry` | `skin.weights.get` |
+| `maya_mcp.tools.skin.SkinWeightsGetOutput` | `skin.weights.get` |
+| `maya_mcp.tools.skin.SkinWeightsSetOutput` | `skin.weights.set` |
+| `maya_mcp.tools.skin.SkinCopyWeightsOutput` | `skin.copy_weights` |
+
 ## Package
 
 ::: maya_mcp

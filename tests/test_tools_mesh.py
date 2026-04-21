@@ -7,11 +7,16 @@ and component-level selection work correctly with mocked transport.
 from __future__ import annotations
 
 import json
+from typing import get_origin, get_type_hints
 from unittest.mock import MagicMock, patch
 
 import pytest
+from typing_extensions import NotRequired
 
 from maya_mcp.tools.mesh import (
+    MeshEvaluateOutput,
+    MeshInfoOutput,
+    MeshVerticesOutput,
     mesh_evaluate,
     mesh_info,
     mesh_vertices,
@@ -21,6 +26,25 @@ from maya_mcp.tools.selection import (
     selection_get_components,
     selection_set_components,
 )
+
+
+class TestMeshOutputTypes:
+    """Tests for public mesh TypedDict return annotations."""
+
+    def test_mesh_tools_use_typed_outputs(self) -> None:
+        """Mesh tools expose typed output models."""
+        assert get_type_hints(mesh_info)["return"] is MeshInfoOutput
+        assert get_type_hints(mesh_vertices)["return"] is MeshVerticesOutput
+        assert get_type_hints(mesh_evaluate)["return"] is MeshEvaluateOutput
+
+    def test_mesh_paginated_outputs_mark_truncation_optional(self) -> None:
+        """Paginated mesh payloads model optional truncation metadata."""
+        assert "truncated" in MeshVerticesOutput.__optional_keys__
+        assert "total_count" in MeshVerticesOutput.__optional_keys__
+        assert "_size_warning" in MeshVerticesOutput.__optional_keys__
+        hints = get_type_hints(MeshEvaluateOutput, include_extras=True)
+        assert get_origin(hints["non_manifold_edges"]) is NotRequired
+        assert get_origin(hints["border_edges"]) is NotRequired
 
 
 class TestMeshInfo:

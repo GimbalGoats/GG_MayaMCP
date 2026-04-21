@@ -54,8 +54,16 @@ from maya_mcp.tools.connections import (
     connections_history,
     connections_list,
 )
+from maya_mcp.tools.curve import CurveCvsOutput, CurveInfoOutput  # noqa: TC001
 from maya_mcp.tools.health import HealthCheckOutput, health_check
-from maya_mcp.tools.mesh import mesh_evaluate, mesh_info, mesh_vertices
+from maya_mcp.tools.mesh import (
+    MeshEvaluateOutput,
+    MeshInfoOutput,
+    MeshVerticesOutput,
+    mesh_evaluate,
+    mesh_info,
+    mesh_vertices,
+)
 from maya_mcp.tools.modeling import (
     modeling_bevel,
     modeling_boolean,
@@ -119,6 +127,12 @@ from maya_mcp.tools.shading import (
     shading_set_material_color,
 )
 from maya_mcp.tools.skin import (
+    SkinBindOutput,
+    SkinCopyWeightsOutput,
+    SkinInfluencesOutput,
+    SkinUnbindOutput,
+    SkinWeightsGetOutput,
+    SkinWeightsSetOutput,
     skin_bind,
     skin_copy_weights,
     skin_influences,
@@ -1016,7 +1030,7 @@ def tool_selection_clear() -> SelectionOutput:
 )
 def tool_mesh_info(
     node: Annotated[str, "Name of the mesh node (transform or shape)"],
-) -> dict[str, Any]:
+) -> MeshInfoOutput:
     """Get mesh statistics.
 
     Args:
@@ -1047,7 +1061,7 @@ def tool_mesh_vertices(
         int | None,
         "Maximum vertices to return (default 1000, use 0 for unlimited)",
     ] = 1000,
-) -> dict[str, Any]:
+) -> MeshVerticesOutput:
     """Query vertex positions from a mesh.
 
     Args:
@@ -1082,7 +1096,7 @@ def tool_mesh_evaluate(
         int | None,
         "Max components per check (default 500)",
     ] = 500,
-) -> dict[str, Any]:
+) -> MeshEvaluateOutput:
     """Analyze mesh topology.
 
     Args:
@@ -1167,7 +1181,7 @@ def tool_viewport_capture(
 )
 def tool_curve_info(
     node: Annotated[str, "Name of the curve node (transform or shape)"],
-) -> dict[str, Any]:
+) -> CurveInfoOutput:
     """Get NURBS curve information.
 
     Args:
@@ -1200,7 +1214,7 @@ def tool_curve_cvs(
         int | None,
         "Maximum CVs to return (default 1000, use 0 for unlimited)",
     ] = 1000,
-) -> dict[str, Any]:
+) -> CurveCvsOutput:
     """Query CV positions from a NURBS curve.
 
     Args:
@@ -1931,7 +1945,7 @@ def tool_skin_bind(
         Literal["closestDistance", "heatMap", "geodesicVoxel"],
         "Binding algorithm: closestDistance (default), heatMap, or geodesicVoxel",
     ] = "closestDistance",
-) -> dict[str, Any]:
+) -> SkinBindOutput:
     """Bind mesh to skeleton.
 
     Args:
@@ -1963,7 +1977,7 @@ def tool_skin_bind(
 )
 def tool_skin_unbind(
     mesh: Annotated[str, "Name of the mesh to unbind"],
-) -> dict[str, Any]:
+) -> SkinUnbindOutput:
     """Unbind skin cluster from mesh.
 
     Args:
@@ -1987,7 +2001,7 @@ def tool_skin_unbind(
 )
 def tool_skin_influences(
     skin_cluster: Annotated[str, "Name of the skinCluster node"],
-) -> dict[str, Any]:
+) -> SkinInfluencesOutput:
     """List influences on a skin cluster.
 
     Args:
@@ -2018,7 +2032,7 @@ def tool_skin_weights_get(
         int | None,
         "Maximum vertices to return (default 100, use 0 for unlimited)",
     ] = 100,
-) -> dict[str, Any]:
+) -> SkinWeightsGetOutput:
     """Get skin weights with pagination.
 
     Args:
@@ -2051,7 +2065,7 @@ def tool_skin_weights_set(
         "List of {vertex_id: int, weights: {joint: weight}} entries",
     ],
     normalize: Annotated[bool, "Normalize weights after setting (default True)"] = True,
-) -> dict[str, Any]:
+) -> SkinWeightsSetOutput:
     """Set skin weights on vertices.
 
     Args:
@@ -2091,7 +2105,7 @@ def tool_skin_copy_weights(
         Literal["closestJoint", "closestBone", "oneToOne", "name", "label"],
         "Influence matching method (default: closestJoint)",
     ] = "closestJoint",
-) -> dict[str, Any]:
+) -> SkinCopyWeightsOutput:
     """Copy skin weights between meshes.
 
     Args:

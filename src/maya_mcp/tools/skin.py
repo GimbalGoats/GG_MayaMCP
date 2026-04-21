@@ -7,7 +7,9 @@ and weight transfer for character rigging workflows.
 from __future__ import annotations
 
 import json
-from typing import Any, Literal
+from typing import Any, Literal, cast
+
+from typing_extensions import NotRequired, TypedDict
 
 from maya_mcp.transport import get_client
 from maya_mcp.utils.parsing import parse_json_response
@@ -25,12 +27,98 @@ BIND_METHOD_MAP = {
 }
 
 
+class _GuardedOutput(TypedDict, total=False):
+    """Metadata added when response size guards truncate a payload."""
+
+    truncated: bool
+    total_count: int
+    _size_warning: str
+    _original_size: int
+    _truncated_size: int
+
+
+class SkinBindOutput(TypedDict):
+    """Return payload for the skin.bind tool."""
+
+    mesh: str
+    skin_cluster: str | None
+    influences: list[str]
+    influence_count: int
+    errors: dict[str, Any] | None
+
+
+class SkinUnbindOutput(TypedDict):
+    """Return payload for the skin.unbind tool."""
+
+    mesh: str
+    unbound: bool
+    skin_cluster: str | None
+    errors: dict[str, Any] | None
+
+
+class SkinInfluenceEntry(TypedDict):
+    """Influence entry returned by skin.influences."""
+
+    name: str
+    index: int
+
+
+class SkinInfluencesOutput(TypedDict):
+    """Return payload for the skin.influences tool."""
+
+    skin_cluster: str
+    influences: list[SkinInfluenceEntry]
+    count: int
+    errors: dict[str, Any] | None
+
+
+class SkinWeightEntry(TypedDict):
+    """Per-component weights returned by skin.weights.get."""
+
+    vertex_id: int
+    weights: dict[str, float]
+
+
+class SkinWeightsGetOutput(_GuardedOutput):
+    """Return payload for the skin.weights.get tool."""
+
+    skin_cluster: str
+    mesh: str | None
+    vertex_count: int
+    influence_count: int
+    influences: list[str]
+    vertices: list[SkinWeightEntry]
+    offset: int
+    count: int
+    errors: dict[str, Any] | None
+    geometry_type: NotRequired[str]
+
+
+class SkinWeightsSetOutput(TypedDict):
+    """Return payload for the skin.weights.set tool."""
+
+    skin_cluster: str
+    set_count: int
+    errors: dict[str, Any] | None
+
+
+class SkinCopyWeightsOutput(TypedDict):
+    """Return payload for the skin.copy_weights tool."""
+
+    source_mesh: str
+    target_mesh: str
+    source_skin_cluster: str | None
+    target_skin_cluster: str | None
+    success: bool
+    errors: dict[str, Any] | None
+
+
 def skin_bind(
     mesh: str,
     joints: list[str],
     max_influences: int = 4,
     bind_method: Literal["closestDistance", "heatMap", "geodesicVoxel"] = "closestDistance",
-) -> dict[str, Any]:
+) -> SkinBindOutput:
     """Bind a mesh to a skeleton using a skin cluster.
 
     Creates a skinCluster binding the mesh to the specified joints
@@ -122,10 +210,10 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("SkinBindOutput", parsed)
 
 
-def skin_unbind(mesh: str) -> dict[str, Any]:
+def skin_unbind(mesh: str) -> SkinUnbindOutput:
     """Unbind (detach) a skin cluster from a mesh.
 
     Finds the skinCluster on the mesh and unbinds it, removing
@@ -185,10 +273,10 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("SkinUnbindOutput", parsed)
 
 
-def skin_influences(skin_cluster: str) -> dict[str, Any]:
+def skin_influences(skin_cluster: str) -> SkinInfluencesOutput:
     """List influences on a skin cluster.
 
     Returns the list of joints/transforms influencing the skin cluster,
@@ -245,14 +333,14 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("SkinInfluencesOutput", parsed)
 
 
 def skin_weights_get(
     skin_cluster: str,
     offset: int = 0,
     limit: int | None = DEFAULT_WEIGHT_LIMIT,
-) -> dict[str, Any]:
+) -> SkinWeightsGetOutput:
     """Get skin weights with pagination.
 
     Returns per-vertex weight data for the specified range of vertices.
@@ -383,14 +471,14 @@ print(json.dumps(result))
     if "vertices" in parsed:
         parsed = guard_response_size(parsed, list_key="vertices")
 
-    return parsed
+    return cast("SkinWeightsGetOutput", parsed)
 
 
 def skin_weights_set(
     skin_cluster: str,
     weights: list[dict[str, Any]],
     normalize: bool = True,
-) -> dict[str, Any]:
+) -> SkinWeightsSetOutput:
     """Set skin weights on vertices.
 
     Sets per-vertex skin weights on the specified skin cluster.
@@ -496,7 +584,7 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("SkinWeightsSetOutput", parsed)
 
 
 def skin_copy_weights(
@@ -506,7 +594,7 @@ def skin_copy_weights(
     influence_association: Literal[
         "closestJoint", "closestBone", "oneToOne", "name", "label"
     ] = "closestJoint",
-) -> dict[str, Any]:
+) -> SkinCopyWeightsOutput:
     """Copy skin weights from one mesh to another.
 
     Transfers skin weights between two meshes using surface
@@ -623,4 +711,4 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("SkinCopyWeightsOutput", parsed)

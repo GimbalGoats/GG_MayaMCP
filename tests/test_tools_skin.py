@@ -7,11 +7,19 @@ and weight transfer work correctly with mocked transport.
 from __future__ import annotations
 
 import json
+from typing import get_origin, get_type_hints
 from unittest.mock import MagicMock, patch
 
 import pytest
+from typing_extensions import NotRequired
 
 from maya_mcp.tools.skin import (
+    SkinBindOutput,
+    SkinCopyWeightsOutput,
+    SkinInfluencesOutput,
+    SkinUnbindOutput,
+    SkinWeightsGetOutput,
+    SkinWeightsSetOutput,
     skin_bind,
     skin_copy_weights,
     skin_influences,
@@ -19,6 +27,27 @@ from maya_mcp.tools.skin import (
     skin_weights_get,
     skin_weights_set,
 )
+
+
+class TestSkinOutputTypes:
+    """Tests for public skinning TypedDict return annotations."""
+
+    def test_skin_tools_use_typed_outputs(self) -> None:
+        """Skin tools expose typed output models."""
+        assert get_type_hints(skin_bind)["return"] is SkinBindOutput
+        assert get_type_hints(skin_unbind)["return"] is SkinUnbindOutput
+        assert get_type_hints(skin_influences)["return"] is SkinInfluencesOutput
+        assert get_type_hints(skin_weights_get)["return"] is SkinWeightsGetOutput
+        assert get_type_hints(skin_weights_set)["return"] is SkinWeightsSetOutput
+        assert get_type_hints(skin_copy_weights)["return"] is SkinCopyWeightsOutput
+
+    def test_skin_weights_get_marks_truncation_and_geometry_type_optional(self) -> None:
+        """Dense skin weight payloads model optional truncation metadata."""
+        assert "truncated" in SkinWeightsGetOutput.__optional_keys__
+        assert "total_count" in SkinWeightsGetOutput.__optional_keys__
+        assert "_size_warning" in SkinWeightsGetOutput.__optional_keys__
+        hints = get_type_hints(SkinWeightsGetOutput, include_extras=True)
+        assert get_origin(hints["geometry_type"]) is NotRequired
 
 
 class TestSkinBind:
