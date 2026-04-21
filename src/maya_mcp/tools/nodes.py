@@ -7,7 +7,9 @@ comprehensive information about Maya nodes.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, cast
+
+from typing_extensions import TypedDict
 
 from maya_mcp.transport import get_client
 from maya_mcp.utils.parsing import parse_json_response
@@ -19,12 +21,112 @@ from maya_mcp.utils.validation import validate_pattern as _validate_pattern
 DEFAULT_NODE_LIMIT = 500
 
 
+class _GuardedOutput(TypedDict, total=False):
+    """Metadata added when response size guards truncate a payload."""
+
+    truncated: bool
+    total_count: int
+    _size_warning: str
+    _original_size: int
+    _truncated_size: int
+
+
+class NodesListOutput(_GuardedOutput):
+    """Return payload for the nodes.list tool."""
+
+    nodes: list[str]
+    count: int
+
+
+class NodesCreateOutput(TypedDict):
+    """Return payload for the nodes.create tool."""
+
+    node: str | None
+    node_type: str | None
+    parent: str | None
+    attributes_set: list[str]
+    attribute_errors: dict[str, str] | None
+
+
+class NodesInfoOutput(TypedDict, total=False):
+    """Return payload for the nodes.info tool.
+
+    Category-specific fields are present only for the requested info category.
+    """
+
+    node: str
+    info_category: str
+    exists: bool
+    node_type: str
+    errors: dict[str, Any] | None
+    parent: str | None
+    children_count: int
+    translateX: float
+    translateY: float
+    translateZ: float
+    rotateX: float
+    rotateY: float
+    rotateZ: float
+    scaleX: float
+    scaleY: float
+    scaleZ: float
+    visibility: bool
+    translate: list[float]
+    rotate: list[float]
+    scale: list[float]
+    children: list[str]
+    full_path: str
+    parent_full_path: str | None
+    keyable_attributes: dict[str, Any]
+    keyable_count: int
+    keyable_truncated: bool
+    keyable_total_count: int
+    shapes: list[dict[str, Any]]
+    shape_count: int
+    truncated: bool
+    total_count: int
+    _size_warning: str
+    _original_size: int
+    _truncated_size: int
+
+
+class NodesDeleteOutput(TypedDict):
+    """Return payload for the nodes.delete tool."""
+
+    deleted: list[str]
+    count: int
+    errors: dict[str, str] | None
+
+
+class NodesRenameOutput(TypedDict):
+    """Return payload for the nodes.rename tool."""
+
+    renamed: dict[str, str]
+    errors: dict[str, str] | None
+
+
+class NodesParentOutput(TypedDict):
+    """Return payload for the nodes.parent tool."""
+
+    parented: list[str]
+    count: int
+    errors: dict[str, str] | None
+
+
+class NodesDuplicateOutput(TypedDict):
+    """Return payload for the nodes.duplicate tool."""
+
+    duplicated: dict[str, str]
+    count: int
+    errors: dict[str, str] | None
+
+
 def nodes_list(
     node_type: str | None = None,
     pattern: str = "*",
     long_names: bool = False,
     limit: int | None = DEFAULT_NODE_LIMIT,
-) -> dict[str, Any]:
+) -> NodesListOutput:
     """List nodes in the Maya scene.
 
     Returns a list of nodes, optionally filtered by type and/or name pattern.
@@ -113,9 +215,7 @@ print(json.dumps(nodes))
         result["total_count"] = total_count
 
     # Apply response size guard to prevent token budget explosion
-    result = guard_response_size(result, list_key="nodes")
-
-    return result
+    return cast("NodesListOutput", guard_response_size(result, list_key="nodes"))
 
 
 def nodes_create(
@@ -123,7 +223,7 @@ def nodes_create(
     name: str | None = None,
     parent: str | None = None,
     attributes: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+) -> NodesCreateOutput:
     """Create a new node in Maya.
 
     Creates a node of the specified type with optional name, parent, and
@@ -256,7 +356,7 @@ print(json.dumps(result))
     else:
         result["attribute_errors"] = None
 
-    return result
+    return cast("NodesCreateOutput", result)
 
 
 _VALID_INFO_CATEGORIES = frozenset(
@@ -396,7 +496,7 @@ print(json.dumps(result))
 def nodes_info(
     node: str,
     info_category: str = "summary",
-) -> dict[str, Any]:
+) -> NodesInfoOutput:
     """Get comprehensive information about a Maya node in a single call.
 
     Consolidates what would otherwise require multiple attributes.get and
@@ -463,13 +563,13 @@ def nodes_info(
             if key in parsed:
                 parsed = guard_response_size(parsed, list_key=key)
 
-    return parsed
+    return cast("NodesInfoOutput", parsed)
 
 
 def nodes_delete(
     nodes: list[str],
     hierarchy: bool = False,
-) -> dict[str, Any]:
+) -> NodesDeleteOutput:
     """Delete one or more nodes from the Maya scene.
 
     Args:
@@ -543,10 +643,10 @@ print(json.dumps(result))
     else:
         result["errors"] = None
 
-    return result
+    return cast("NodesDeleteOutput", result)
 
 
-def nodes_rename(mapping: dict[str, str]) -> dict[str, Any]:
+def nodes_rename(mapping: dict[str, str]) -> NodesRenameOutput:
     """Rename one or more nodes in the Maya scene.
 
     Args:
@@ -615,14 +715,14 @@ print(json.dumps(result))
         "errors": errors if errors else None,
     }
 
-    return result
+    return cast("NodesRenameOutput", result)
 
 
 def nodes_parent(
     nodes: list[str],
     parent: str | None = None,
     relative: bool = False,
-) -> dict[str, Any]:
+) -> NodesParentOutput:
     """Reparent one or more nodes in the Maya hierarchy.
 
     Args:
@@ -711,7 +811,7 @@ print(json.dumps(result))
         "count": len(parented),
         "errors": errors if errors else None,
     }
-    return result
+    return cast("NodesParentOutput", result)
 
 
 def nodes_duplicate(
@@ -720,7 +820,7 @@ def nodes_duplicate(
     input_connections: bool = False,
     upstream_nodes: bool = False,
     parent_only: bool = False,
-) -> dict[str, Any]:
+) -> NodesDuplicateOutput:
     """Duplicate one or more nodes.
 
     Args:
@@ -806,4 +906,4 @@ print(json.dumps(result))
         "count": len(duplicated),
         "errors": errors if errors else None,
     }
-    return result
+    return cast("NodesDuplicateOutput", result)

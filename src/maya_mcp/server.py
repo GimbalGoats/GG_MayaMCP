@@ -35,7 +35,12 @@ from maya_mcp.tools.animation import (
     animation_set_time,
     animation_set_time_range,
 )
-from maya_mcp.tools.attributes import attributes_get, attributes_set
+from maya_mcp.tools.attributes import (
+    AttributesGetOutput,
+    AttributesSetOutput,
+    attributes_get,
+    attributes_set,
+)
 from maya_mcp.tools.connection import (
     MayaConnectOutput,
     MayaDisconnectOutput,
@@ -69,6 +74,13 @@ from maya_mcp.tools.modeling import (
     modeling_set_pivot,
 )
 from maya_mcp.tools.nodes import (
+    NodesCreateOutput,
+    NodesDeleteOutput,
+    NodesDuplicateOutput,
+    NodesInfoOutput,
+    NodesListOutput,
+    NodesParentOutput,
+    NodesRenameOutput,
     nodes_create,
     nodes_delete,
     nodes_duplicate,
@@ -90,6 +102,10 @@ from maya_mcp.tools.scene import (
     scene_undo,
 )
 from maya_mcp.tools.selection import (
+    SelectionComponentsOutput,
+    SelectionConvertComponentsOutput,
+    SelectionOutput,
+    SelectionWithErrorsOutput,
     selection_clear,
     selection_convert_components,
     selection_get,
@@ -476,7 +492,7 @@ def tool_nodes_list(
         int | None,
         "Max nodes to return (default 500, use 0 for unlimited)",
     ] = 500,
-) -> dict[str, Any]:
+) -> NodesListOutput:
     """List Maya nodes.
 
     Args:
@@ -510,7 +526,7 @@ def tool_nodes_create(
         dict[str, Any] | None,
         "Initial attribute values to set after creation",
     ] = None,
-) -> dict[str, Any]:
+) -> NodesCreateOutput:
     """Create a new Maya node.
 
     Args:
@@ -541,7 +557,7 @@ def tool_nodes_create(
 def tool_nodes_delete(
     nodes: Annotated[list[str], "Node names to delete"],
     hierarchy: Annotated[bool, "Delete entire hierarchy below each node"] = False,
-) -> dict[str, Any]:
+) -> NodesDeleteOutput:
     """Delete Maya nodes.
 
     Args:
@@ -566,7 +582,7 @@ def tool_nodes_delete(
 )
 def tool_nodes_rename(
     mapping: Annotated[dict[str, str], "Map of current node name to new name"],
-) -> dict[str, Any]:
+) -> NodesRenameOutput:
     """Rename Maya nodes.
 
     Args:
@@ -592,7 +608,7 @@ def tool_nodes_parent(
     nodes: Annotated[list[str], "Nodes to reparent"],
     parent: Annotated[str | None, "New parent node. If None, unparent (parent to world)."] = None,
     relative: Annotated[bool, "Preserve existing local transformations"] = False,
-) -> dict[str, Any]:
+) -> NodesParentOutput:
     """Reparent Maya nodes.
 
     Args:
@@ -624,7 +640,7 @@ def tool_nodes_duplicate(
     input_connections: Annotated[bool, "Duplicate input connections"] = False,
     upstream_nodes: Annotated[bool, "Duplicate upstream nodes"] = False,
     parent_only: Annotated[bool, "Duplicate only the specified node, not its children"] = False,
-) -> dict[str, Any]:
+) -> NodesDuplicateOutput:
     """Duplicate Maya nodes.
 
     Args:
@@ -664,7 +680,7 @@ def tool_nodes_info(
         Literal["summary", "transform", "hierarchy", "attributes", "shape", "all"],
         "Category of information to retrieve",
     ] = "summary",
-) -> dict[str, Any]:
+) -> NodesInfoOutput:
     """Get comprehensive information about a Maya node.
 
     Args:
@@ -698,7 +714,7 @@ def tool_nodes_info(
 def tool_attributes_get(
     node: Annotated[str, "Node name to query"],
     attributes: Annotated[list[str], "Attribute names to get (e.g., ['translateX', 'visibility'])"],
-) -> dict[str, Any]:
+) -> AttributesGetOutput:
     """Get attribute values from a Maya node.
 
     Args:
@@ -726,7 +742,7 @@ def tool_attributes_get(
 def tool_attributes_set(
     node: Annotated[str, "Node name to modify"],
     attributes: Annotated[dict[str, Any], "Map of attribute name to value"],
-) -> dict[str, Any]:
+) -> AttributesSetOutput:
     """Set attribute values on a Maya node.
 
     Args:
@@ -929,7 +945,7 @@ def tool_connections_history(
         openWorldHint=False,
     ),
 )
-def tool_selection_get() -> dict[str, Any]:
+def tool_selection_get() -> SelectionOutput:
     """Get current Maya selection.
 
     Returns:
@@ -952,7 +968,7 @@ def tool_selection_set(
     nodes: Annotated[list[str], "Node names to select"],
     add: Annotated[bool, "Add to existing selection"] = False,
     deselect: Annotated[bool, "Remove from selection"] = False,
-) -> dict[str, Any]:
+) -> SelectionOutput:
     """Set Maya selection.
 
     Args:
@@ -976,7 +992,7 @@ def tool_selection_set(
         openWorldHint=False,
     ),
 )
-def tool_selection_clear() -> dict[str, Any]:
+def tool_selection_clear() -> SelectionOutput:
     """Clear Maya selection.
 
     Deselects all currently selected nodes.
@@ -1219,7 +1235,7 @@ def tool_selection_set_components(
     ],
     add: Annotated[bool, "Add to existing selection"] = False,
     deselect: Annotated[bool, "Remove from selection"] = False,
-) -> dict[str, Any]:
+) -> SelectionWithErrorsOutput:
     """Select mesh components.
 
     Args:
@@ -1247,7 +1263,7 @@ def tool_selection_set_components(
         openWorldHint=False,
     ),
 )
-def tool_selection_get_components() -> dict[str, Any]:
+def tool_selection_get_components() -> SelectionComponentsOutput:
     """Get selected mesh components.
 
     Returns:
@@ -1276,7 +1292,7 @@ def tool_selection_convert_components(
         list[str] | None,
         "Nodes to convert (None = use current selection)",
     ] = None,
-) -> dict[str, Any]:
+) -> SelectionConvertComponentsOutput:
     """Convert selection to different component type.
 
     Args:
