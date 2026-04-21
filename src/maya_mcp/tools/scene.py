@@ -6,7 +6,7 @@ This module provides tools for querying and manipulating Maya scenes.
 from __future__ import annotations
 
 import json
-from typing import Any, Literal
+from typing import Literal, cast
 
 from typing_extensions import TypedDict
 
@@ -105,6 +105,88 @@ class SceneInfoOutput(TypedDict):
     up_axis: Literal["y", "z"]
 
 
+class _GuardedOutput(TypedDict, total=False):
+    """Metadata added when response size guards truncate a payload."""
+
+    truncated: bool
+    total_count: int
+    _size_warning: str
+    _original_size: int
+    _truncated_size: int
+
+
+class SceneNewOutput(TypedDict):
+    """Return payload for the scene.new tool."""
+
+    success: bool
+    previous_file: str | None
+    was_modified: bool
+    error: str | None
+
+
+class SceneOpenOutput(TypedDict):
+    """Return payload for the scene.open tool."""
+
+    success: bool
+    file_path: str | None
+    previous_file: str | None
+    was_modified: bool
+    error: str | None
+
+
+class SceneUndoOutput(TypedDict):
+    """Return payload for the scene.undo tool."""
+
+    success: bool
+    undone: str | None
+    can_undo: bool
+    can_redo: bool
+
+
+class SceneRedoOutput(TypedDict):
+    """Return payload for the scene.redo tool."""
+
+    success: bool
+    redone: str | None
+    can_undo: bool
+    can_redo: bool
+
+
+class SceneSaveOutput(TypedDict):
+    """Return payload for the scene.save tool."""
+
+    success: bool
+    file_path: str | None
+    error: str | None
+
+
+class SceneSaveAsOutput(TypedDict):
+    """Return payload for the scene.save_as tool."""
+
+    success: bool
+    file_path: str | None
+    error: str | None
+
+
+class SceneImportOutput(_GuardedOutput):
+    """Return payload for the scene.import tool."""
+
+    success: bool
+    file_path: str | None
+    nodes: list[str]
+    count: int
+    error: str | None
+
+
+class SceneExportOutput(TypedDict):
+    """Return payload for the scene.export tool."""
+
+    success: bool
+    file_path: str | None
+    nodes_exported: int
+    error: str | None
+
+
 def scene_info() -> SceneInfoOutput:
     """Get information about the current Maya scene.
 
@@ -171,7 +253,7 @@ print(json.dumps(result))
     }
 
 
-def scene_undo() -> dict[str, Any]:
+def scene_undo() -> SceneUndoOutput:
     """Undo the last operation in Maya.
 
     Critical for LLM error recovery - allows reverting mistakes made
@@ -233,7 +315,7 @@ print(json.dumps(result))
     }
 
 
-def scene_new(force: bool = False) -> dict[str, Any]:
+def scene_new(force: bool = False) -> SceneNewOutput:
     """Create a new, empty Maya scene.
 
     Checks whether the current scene has unsaved changes before proceeding.
@@ -305,7 +387,7 @@ print(json.dumps(result))
     }
 
 
-def scene_open(file_path: str, force: bool = False) -> dict[str, Any]:
+def scene_open(file_path: str, force: bool = False) -> SceneOpenOutput:
     """Open a Maya scene file.
 
     Loads the specified scene file into Maya.  Checks whether the current scene
@@ -405,7 +487,7 @@ print(json.dumps(result))
     }
 
 
-def scene_redo() -> dict[str, Any]:
+def scene_redo() -> SceneRedoOutput:
     """Redo the last undone operation in Maya.
 
     Allows re-applying an operation that was previously undone.
@@ -466,7 +548,7 @@ print(json.dumps(result))
     }
 
 
-def scene_save() -> dict[str, Any]:
+def scene_save() -> SceneSaveOutput:
     """Save the current Maya scene.
 
     Saves the currently open scene file. If the scene is untitled (never saved),
@@ -522,7 +604,7 @@ print(json.dumps(result))
     }
 
 
-def scene_save_as(file_path: str) -> dict[str, Any]:
+def scene_save_as(file_path: str) -> SceneSaveAsOutput:
     """Save the current scene to a new file path.
 
     Renames the current scene and saves it to the specified path.
@@ -650,7 +732,7 @@ def scene_import(
     file_path: str,
     namespace: str | None = None,
     force: bool = False,
-) -> dict[str, Any]:
+) -> SceneImportOutput:
     """Import a file into the current Maya scene.
 
     Imports geometry, animation, or other scene data from an external file.
@@ -771,14 +853,14 @@ else:
 
     result = guard_response_size(result, list_key="nodes")
 
-    return result
+    return cast("SceneImportOutput", result)
 
 
 def scene_export(
     file_path: str,
     export_mode: str = "selected",
     animation: bool = False,
-) -> dict[str, Any]:
+) -> SceneExportOutput:
     """Export scene content to a file.
 
     Exports the current selection or the entire scene to an external file format.

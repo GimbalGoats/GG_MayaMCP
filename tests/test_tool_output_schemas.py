@@ -10,6 +10,14 @@ def test_remaining_tools_expose_specific_output_schemas() -> None:
     from maya_mcp.server import mcp
 
     expected_fields = {
+        "scene.new": {"success", "previous_file", "was_modified", "error"},
+        "scene.save": {"success", "file_path", "error"},
+        "scene.save_as": {"success", "file_path", "error"},
+        "scene.open": {"success", "file_path", "previous_file", "was_modified", "error"},
+        "scene.undo": {"success", "undone", "can_undo", "can_redo"},
+        "scene.redo": {"success", "redone", "can_undo", "can_redo"},
+        "scene.import": {"success", "file_path", "nodes", "count", "error"},
+        "scene.export": {"success", "file_path", "nodes_exported", "error"},
         "connections.list": {"node", "connections", "count", "errors"},
         "connections.get": {"node", "attributes", "count", "errors"},
         "connections.connect": {"connected", "source", "destination", "disconnected", "error"},
