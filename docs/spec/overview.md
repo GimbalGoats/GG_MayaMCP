@@ -16,10 +16,11 @@ Maya MCP runs as a separate Python process from Autodesk Maya.
 The communication path is:
 
 1. An MCP client talks to `maya_mcp.server` over MCP transport, usually stdio.
-2. The server dispatches a typed tool function from `src/maya_mcp/tools/`.
-3. The tool delegates to the transport layer in `src/maya_mcp/transport/commandport.py`.
-4. The transport layer sends Python or MEL commands to Maya over `localhost`.
-5. Maya executes the command inside its own process and returns the result.
+2. The server dispatches a registered MCP wrapper from `src/maya_mcp/registrars/`.
+3. The wrapper delegates to the tool implementation in `src/maya_mcp/tools/`.
+4. The tool delegates to the transport layer in `src/maya_mcp/transport/commandport.py`.
+5. The transport layer sends Python or MEL commands to Maya over `localhost`.
+6. Maya executes the command inside its own process and returns the result.
 
 ## Architectural Layers
 
@@ -28,17 +29,25 @@ The communication path is:
 `src/maya_mcp/server.py`
 
 - Creates the `FastMCP` server instance
-- Registers all 71 tools
-- Defines tool descriptions and annotations
+- Calls the central registrar entrypoint
 - Exposes the `main()` CLI entrypoint
 - Supports packaged CLI launch, module launch, and direct script launch for
   local source checkouts
+
+### Registration layer
+
+`src/maya_mcp/registrars/`
+
+- Groups MCP wrapper functions by tool namespace
+- Defines tool descriptions, annotations, and schema-sensitive wrapper signatures
+- Registers wrappers onto the `FastMCP` server instance
+- Keeps `server.py` small so new tool families do not turn it into a merge hotspot
 
 ### Tool layer
 
 `src/maya_mcp/tools/`
 
-- Implements the MCP-facing tool functions
+- Implements the underlying tool functions used by the MCP wrapper layer
 - Validates and shapes tool input and output
 - Keeps tool logic thin
 - Delegates transport work to shared lower layers
@@ -141,7 +150,8 @@ Maya is an external process and may be unavailable, restarted, or mid-crash-reco
 
 | Module | Responsibility |
 |--------|----------------|
-| `maya_mcp.server` | FastMCP entrypoint and tool registration |
+| `maya_mcp.server` | FastMCP entrypoint and server factory |
+| `maya_mcp.registrars.*` | MCP wrapper registration and tool metadata |
 | `maya_mcp.transport.commandport` | Socket transport to Maya |
 | `maya_mcp.errors` | Typed error hierarchy |
 | `maya_mcp.types` | Shared types and connection-state models |
@@ -154,12 +164,13 @@ Maya is an external process and may be unavailable, restarted, or mid-crash-reco
 Typical successful call:
 
 1. Client invokes a tool such as `scene.info`.
-2. `maya_mcp.server` routes the call to the registered tool function.
-3. The tool asks the transport client for execution.
-4. The transport connects to Maya if needed.
-5. Maya executes the request through `commandPort`.
-6. The transport parses the response and returns typed data.
-7. The tool returns the MCP result to the client.
+2. `maya_mcp.server` routes the call to a registered wrapper from `maya_mcp.registrars.*`.
+3. The wrapper delegates to the corresponding function in `maya_mcp.tools.*`.
+4. The tool asks the transport client for execution.
+5. The transport connects to Maya if needed.
+6. Maya executes the request through `commandPort`.
+7. The transport parses the response and returns typed data.
+8. The wrapper returns the MCP result to the client.
 
 Typical unavailable-Maya case:
 

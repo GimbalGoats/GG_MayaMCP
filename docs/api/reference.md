@@ -153,6 +153,7 @@ MCP JSON response shapes or error conventions.
     options:
       show_root_heading: true
       members:
+        - create_server
         - mcp
         - main
 
