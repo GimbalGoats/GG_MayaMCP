@@ -94,6 +94,16 @@ Major tool namespaces:
 - Provides a UI for opening and closing `commandPort`
 - Stores local panel preferences such as port and auto-start
 
+### Code Mode prototype
+
+`src/maya_mcp/code_mode.py`
+
+- Defines an experimental Code Mode gate for future server profiles
+- Enables only when `MAYA_MCP_CODE_MODE=1`
+- Keeps Code Mode factory selection separate from default server registration
+- Applies fixed prototype sandbox limits before any code execution path uses it
+- Does not change the default MCP server or make arbitrary code execution default
+
 ## Key Design Constraints
 
 ### Transport isolation
@@ -176,6 +186,21 @@ Script tools add:
 | `MAYA_MCP_SCRIPT_DIRS` | empty | Allowlisted script directories |
 | `MAYA_MCP_ENABLE_RAW_EXECUTION` | `false` | Enables `script.run` |
 | `MAYA_MCP_SCRIPT_TIMEOUT` | `60` | Script execution timeout |
+
+Code Mode prototype adds:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `MAYA_MCP_CODE_MODE` | unset | Enables experimental Code Mode only when exactly `1` |
+
+Current Code Mode sandbox limits are fixed in code:
+
+| Limit | Value |
+|-------|-------|
+| Language | Python only |
+| Code payload | 16 KB |
+| Execution timeout | 10 seconds |
+| Text output | 50 KB |
 
 ## Related Documents
 
