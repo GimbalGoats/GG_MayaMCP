@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import re
@@ -191,8 +192,8 @@ class TestViewportServerRegistration:
         """Tool exists with expected annotation hints."""
         from maya_mcp.server import mcp
 
-        assert "viewport.capture" in mcp._tool_manager._tools
-        tool = mcp._tool_manager._tools["viewport.capture"]
+        tool = asyncio.run(mcp.get_tool("viewport.capture"))
+        assert tool is not None
         annotations = tool.annotations
 
         assert annotations.readOnlyHint is True
