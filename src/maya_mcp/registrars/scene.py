@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Annotated, Literal
 
 from mcp.types import ToolAnnotations
 
+from maya_mcp.registrars._progress import report_progress
 from maya_mcp.tools.scene import (
     SceneExportOutput,
     SceneImportOutput,
@@ -28,7 +30,11 @@ from maya_mcp.tools.scene import (
 )
 
 if TYPE_CHECKING:
-    from fastmcp import FastMCP
+    from fastmcp import Context, FastMCP
+else:
+    from importlib import import_module
+
+    Context = import_module("fastmcp").Context
 
 
 def tool_scene_info() -> SceneInfoOutput:
@@ -155,7 +161,7 @@ def tool_scene_import(
     return scene_import(file_path=file_path, namespace=namespace, force=force)
 
 
-def tool_scene_export(
+async def tool_scene_export(
     file_path: Annotated[
         str,
         "Path for the exported file (.ma, .mb, .obj, .fbx, .abc, .usd, .usda, .usdc)",
@@ -168,6 +174,7 @@ def tool_scene_export(
         bool,
         "If True, include animation data (FBX only). If False (default), export static.",
     ] = False,
+    ctx: Context | None = None,
 ) -> SceneExportOutput:
     """Export scene content to a file.
 
@@ -175,11 +182,26 @@ def tool_scene_export(
         file_path: Path for the exported file.
         export_mode: 'selected' to export selection, 'all' for entire scene.
         animation: Include animation data (FBX only).
+        ctx: FastMCP request context, used for progress notifications.
 
     Returns:
         Dictionary with success, file_path, nodes_exported, and error.
     """
-    return scene_export(file_path=file_path, export_mode=export_mode, animation=animation)
+    await report_progress(ctx, 0, 100, "Preparing export request")
+    await report_progress(ctx, 50, 100, "Executing export in Maya")
+    result = await asyncio.to_thread(
+        scene_export,
+        file_path=file_path,
+        export_mode=export_mode,
+        animation=animation,
+    )
+    await report_progress(
+        ctx,
+        100,
+        100,
+        "Export complete" if result["success"] else "Export finished with an error",
+    )
+    return result
 
 
 def register_scene_tools(mcp: FastMCP) -> None:
