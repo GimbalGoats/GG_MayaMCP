@@ -66,6 +66,12 @@ Or:
 python -m maya_mcp.server
 ```
 
+From a local source checkout, direct script launch also works:
+
+```bash
+python src/maya_mcp/server.py
+```
+
 ### 4. Configure your MCP client
 
 Example stdio configuration:
