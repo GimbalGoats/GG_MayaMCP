@@ -2882,7 +2882,7 @@ List influences (joints) on a skin cluster with index mapping.
 
 Get per-vertex skin weights with offset/limit pagination.
 
-When the MCP client supplies a progress token, the server may emit progress notifications at the start of the request and while paginating through the requested vertex range. The JSON response shape does not change.
+When the MCP client supplies a progress token, the server may emit progress notifications at the start of the request and, for paginated requests, while traversing the requested vertex range. The JSON response shape does not change.
 
 **Input**:
 
