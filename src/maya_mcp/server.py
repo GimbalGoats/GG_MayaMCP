@@ -25,6 +25,7 @@ from typing import Annotated, Any, Literal
 from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
+from maya_mcp import __version__
 from maya_mcp.tools.animation import (
     TangentType,
     animation_delete_keyframes,
@@ -105,119 +106,19 @@ from maya_mcp.tools.skin import (
 )
 from maya_mcp.utils.coercion import coerce_dict, coerce_list
 
+SERVER_VERSION = __version__
+SERVER_WEBSITE_URL = "https://github.com/GimbalGoats/GG_MayaMCP"
+SERVER_INSTRUCTIONS = """Maya MCP exposes typed tools for controlling a local Autodesk Maya session through
+localhost commandPort. Use the tool descriptions and schemas as the source of truth,
+keep read-only inspection separate from mutating actions, and enable raw script
+execution only with the explicit MAYA_MCP_ENABLE_RAW_EXECUTION opt-in."""
+
 # Create the FastMCP server instance
 mcp = FastMCP(
     name="Maya MCP",
-    instructions="""Maya MCP provides tools for controlling Autodesk Maya.
-
-Available tools:
-- health.check: Check connection status to Maya
-- maya.connect: Connect to Maya commandPort
-- maya.disconnect: Disconnect from Maya
-- scene.info: Get current scene information (file path, FPS, frame range, etc.)
-- scene.new: Create a new empty scene (checks for unsaved changes first)
-- scene.open: Open a scene file (validates path and checks for unsaved changes)
-- scene.save: Save the current scene (fails if untitled)
-- scene.save_as: Save scene to a new path (.ma or .mb)
-- scene.import: Import a file into the current scene (.ma, .mb, .obj, .fbx, .abc, .usd)
-- scene.export: Export selection or entire scene to a file
-- scene.undo: Undo the last operation (critical for error recovery)
-- scene.redo: Redo the last undone operation
-- nodes.list: List nodes by type or pattern
-- nodes.create: Create a new node with optional name, parent, and attributes
-- nodes.delete: Delete one or more nodes (with optional hierarchy deletion)
-- nodes.rename: Rename one or more nodes (batch supported)
-- nodes.parent: Reparent nodes in hierarchy (or unparent to world)
-- nodes.duplicate: Duplicate nodes with optional hierarchy and connections
-- nodes.info: Get comprehensive node information in one call (summary, transform,
-  hierarchy, attributes, shape, or all) - use this instead of multiple attribute queries
-- attributes.get: Get attribute values from a node (batch supported)
-- attributes.set: Set attribute values on a node (batch supported)
-- connections.list: List connections on a node with direction/type filters
-- connections.get: Get detailed connection info for specific attributes
-- connections.connect: Connect two attributes (with optional force disconnect)
-- connections.disconnect: Disconnect attributes (specific or all incoming/outgoing)
-- connections.history: List construction/deformation history on a node
-- mesh.info: Get mesh statistics (vertex/face/edge counts, bounding box, UV status)
-- mesh.vertices: Query vertex positions with offset/limit pagination
-- mesh.evaluate: Analyze mesh topology (non-manifold edges, lamina faces, holes, borders)
-- selection.get: Get current selection
-- selection.set: Set selection (replace, add, or deselect)
-- selection.clear: Clear the selection (deselect all)
-- selection.set_components: Select mesh components (vertices, edges, faces)
-- selection.get_components: Get selected components grouped by type
-- selection.convert_components: Convert selection between vertex/edge/face
-- modeling.create_polygon_primitive: Create polygon primitives (cube, sphere, cylinder, cone, torus, plane)
-- modeling.extrude_faces: Extrude polygon faces with translation and offset options
-- modeling.boolean: Boolean operations (union, difference, intersection) on two meshes
-- modeling.combine: Combine multiple meshes into one
-- modeling.separate: Separate a combined mesh into individual meshes
-- modeling.merge_vertices: Merge vertices within a distance threshold
-- modeling.bevel: Bevel edges or vertices with offset and segments
-- modeling.bridge: Bridge between edge loops
-- modeling.insert_edge_loop: Insert edge loop at an edge using polySplitRing
-- modeling.delete_faces: Delete polygon faces from a mesh
-- modeling.move_components: Move vertices, edges, or faces (relative or absolute)
-- modeling.freeze_transforms: Freeze (reset) transforms to identity
-- modeling.delete_history: Delete construction history from nodes
-- modeling.center_pivot: Center pivot point on nodes
-- modeling.set_pivot: Set pivot point to an explicit position
-- shading.create_material: Create a material (lambert, blinn, phong, standardSurface) with shading group
-- shading.assign_material: Assign a material to meshes or face components
-- shading.set_material_color: Set a color attribute on a material
-- skin.bind: Bind mesh to skeleton with influence options
-- skin.unbind: Detach skin cluster from mesh
-- skin.influences: List influences on a skin cluster
-- skin.weights.get: Get skin weights with offset/limit pagination
-- skin.weights.set: Set skin weights with normalization
-- skin.copy_weights: Copy weights between meshes
-- curve.info: Get NURBS curve information (degree, spans, form, CV count, knots, length, bbox)
-- curve.cvs: Query CV positions from a NURBS curve with offset/limit pagination
-- script.list: List available Python scripts from configured directories
-- script.execute: Execute a Python script file from an allowed directory in Maya
-- script.run: Execute raw Python or MEL code in Maya (requires opt-in env var)
-- animation.set_time: Set the current time (go to a specific frame)
-- animation.get_time_range: Get playback range, animation range, and current time
-- animation.set_time_range: Set the playback and animation range
-- animation.set_keyframe: Set keyframe on attribute(s) at current or specified time
-- animation.get_keyframes: Query keyframes for attribute(s) in time range
-- animation.delete_keyframes: Delete keyframes in range for attribute(s)
-
-Workflow tips:
-- Use nodes.info for a quick overview of any node before making changes
-- Use nodes.info(info_category="transform") instead of multiple attributes.get calls
-- Use nodes.info(info_category="all") to get everything about a node at once
-- Use connections.history(direction="input") to find upstream deformers
-- Use connections.connect(force=True) for safe disconnect-before-reconnect pattern
-- Use scene.new(force=True) to discard unsaved changes, or check the error message first
-- Use scene.import with namespace to organize imported assets
-- Use scene.export(export_mode="all") to export the entire scene
-- Use mesh.evaluate() to check mesh topology before rigging or exporting
-- Use selection.set_components() for precise vertex/edge/face selection
-- Use modeling.create_polygon_primitive() to create geometry, then extrude/bevel/bridge to edit
-- Use modeling.freeze_transforms() and modeling.delete_history() to clean up before export
-- Use modeling.merge_vertices() after modeling.combine() to weld shared borders
-- Use modeling.boolean() for CSG-style geometry creation (union/difference/intersection)
-- Use shading.create_material() then shading.assign_material() to apply materials to meshes
-- Use shading.assign_material() with face components for per-face material assignment
-- Use skin.bind() to bind a mesh to joints, then skin.weights.get() to inspect
-- Use skin.weights.get() with offset/limit for large meshes (weights data is dense)
-- Use skin.copy_weights() to transfer weights between similar meshes
-- Use curve.info() to inspect curve properties before modifying
-- Use curve.cvs() with offset/limit for curves with many CVs
-- Use script.list() to discover available scripts before executing
-- Use script.execute() with args dict to pass parameters to scripts
-- Use script.run() for ad-hoc Python/MEL (requires MAYA_MCP_ENABLE_RAW_EXECUTION=true)
-- Use animation.set_time() to navigate to a specific frame before inspecting or modifying
-- Use animation.get_time_range() to check current playback settings before animating
-- Use animation.set_keyframe() with attributes list for precise control over which channels to key
-- Use animation.get_keyframes() to inspect existing animation before modifying
-- Use animation.delete_keyframes() with time range to clear animation in a specific section
-
-Before using Maya tools, ensure Maya is running with commandPort enabled:
-    import maya.cmds as cmds
-    cmds.commandPort(name=":7001", sourceType="python", echoOutput=True)
-""",
+    instructions=SERVER_INSTRUCTIONS,
+    version=SERVER_VERSION,
+    website_url=SERVER_WEBSITE_URL,
 )
 
 
