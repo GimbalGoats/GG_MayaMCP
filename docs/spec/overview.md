@@ -1,3 +1,10 @@
+---
+summary: "Architecture overview covering runtime flow, module responsibilities, constraints, and configuration surface."
+read_when:
+  - When changing architecture, module boundaries, tool layering, shared utilities, or server registration.
+  - When orienting to how MCP clients, the server, transport, Maya, and the Maya panel interact.
+---
+
 # Architecture Overview
 
 This document describes the runtime architecture of Maya MCP and the responsibilities of the main modules.

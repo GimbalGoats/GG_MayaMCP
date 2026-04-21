@@ -1,3 +1,10 @@
+---
+summary: "Canonical MCP tool contracts, schemas, examples, annotations, defaults, limits, and response behavior."
+read_when:
+  - When adding, changing, or removing MCP tools, tool schemas, defaults, limits, risk annotations, or read/write behavior.
+  - When validating tool output shapes, error responses, pagination, or token-budget behavior.
+---
+
 # Tool Specifications
 
 This document specifies all MCP tools provided by Maya MCP.

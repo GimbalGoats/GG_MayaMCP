@@ -1,3 +1,10 @@
+---
+summary: "Generated API reference index for public Python modules, errors, types, transport, tool modules, and Maya panel APIs."
+read_when:
+  - When changing public Python API symbols, API-facing docstrings, exported modules, or generated API documentation.
+  - When adding or removing public tool modules, transport APIs, errors, types, or Maya panel APIs.
+---
+
 # API Reference
 
 This page documents the public Python surface and the tool modules that back the MCP server.

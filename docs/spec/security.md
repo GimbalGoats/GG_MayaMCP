@@ -1,3 +1,10 @@
+---
+summary: "Security model for localhost-only Maya control, script execution trust levels, validation, and error sanitization."
+read_when:
+  - When changing security-sensitive behavior, validation, path handling, script execution, logging, or error payloads.
+  - When assessing whether a new tool or workflow preserves localhost-only and explicit-risk boundaries.
+---
+
 # Security Specification
 
 This document defines the security model for Maya MCP.

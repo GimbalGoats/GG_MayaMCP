@@ -1,3 +1,10 @@
+---
+summary: "User guide for the dockable Maya control panel, commandPort management, preferences, auto-start, and troubleshooting."
+read_when:
+  - When working on Maya panel UX, commandPort panel workflows, preferences, auto-start, or panel troubleshooting.
+  - When changing Maya-side setup instructions or the relationship between the panel and external MCP server.
+---
+
 # Maya MCP Control Panel
 
 The Maya control panel is a dockable widget that runs inside Maya and manages the Maya-side `commandPort` used by Maya MCP.

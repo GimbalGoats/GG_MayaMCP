@@ -1,3 +1,10 @@
+---
+summary: "Documentation entrypoint with quick start, tool coverage, and links to canonical project docs."
+read_when:
+  - When first orienting to Maya MCP or deciding which project doc to read next.
+  - When updating quick-start setup, client configuration, or the high-level tool coverage table.
+---
+
 # Maya MCP
 
 Maya MCP is an MCP server for controlling Autodesk Maya through `commandPort`.
