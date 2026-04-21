@@ -104,6 +104,7 @@ from maya_mcp.tools.skin import (
     skin_weights_get,
     skin_weights_set,
 )
+from maya_mcp.tools.viewport import ViewportFormat, viewport_capture
 from maya_mcp.utils.coercion import coerce_dict, coerce_list
 
 SERVER_VERSION = __version__
@@ -1072,6 +1073,63 @@ def tool_mesh_evaluate(
         Dictionary with topology analysis results and is_clean flag.
     """
     return mesh_evaluate(node=node, checks=coerce_list(checks), limit=limit)
+
+
+@mcp.tool(
+    name="viewport.capture",
+    description="Capture a single viewport frame as inline image content using Maya playblast. "
+    "Read-only: does not modify scene data.",
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def tool_viewport_capture(
+    format: Annotated[
+        ViewportFormat,
+        "Image format: 'jpeg' (default) or 'png'",
+    ] = "jpeg",
+    width: Annotated[int, "Capture width in pixels (64-4096)"] = 1024,
+    height: Annotated[int, "Capture height in pixels (64-4096)"] = 576,
+    quality: Annotated[
+        int,
+        "JPEG quality 1-100 (used when format='jpeg')",
+    ] = 85,
+    offscreen: Annotated[bool, "Use offscreen capture when available (default False)"] = False,
+    show_ornaments: Annotated[bool, "Show viewport ornaments/gizmos (default True)"] = True,
+    panel: Annotated[str | None, "Optional preferred modelPanel name"] = None,
+    frame: Annotated[
+        float | None,
+        "Optional frame to capture (defaults to current time)",
+    ] = None,
+) -> Any:
+    """Capture viewport image via Maya playblast.
+
+    Args:
+        format: Output image format.
+        width: Capture width.
+        height: Capture height.
+        quality: JPEG quality.
+        offscreen: Offscreen capture flag.
+        show_ornaments: Show viewport ornaments flag.
+        panel: Optional preferred modelPanel.
+        frame: Optional frame number.
+
+    Returns:
+        FastMCP Image helper object (auto-converted to MCP ImageContent).
+    """
+    return viewport_capture(
+        format=format,
+        width=width,
+        height=height,
+        quality=quality,
+        offscreen=offscreen,
+        show_ornaments=show_ornaments,
+        panel=panel,
+        frame=frame,
+    )
 
 
 # Register curve tools

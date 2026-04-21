@@ -1,8 +1,14 @@
 # API Reference
 
-This page documents the Python API for Maya MCP.
+This page documents the public Python surface and the tool modules that back the MCP server.
 
-## Server Module
+## Package
+
+::: maya_mcp
+    options:
+      show_root_heading: true
+
+## Server
 
 ::: maya_mcp.server
     options:
@@ -11,7 +17,7 @@ This page documents the Python API for Maya MCP.
         - mcp
         - main
 
-## Error Classes
+## Errors
 
 ::: maya_mcp.errors
     options:
@@ -23,54 +29,124 @@ This page documents the Python API for Maya MCP.
         - MayaTimeoutError
         - ValidationError
 
-## Type Definitions
+## Types
 
 ::: maya_mcp.types
     options:
       show_root_heading: true
-      members:
-        - ConnectionStatus
-        - HealthCheckResult
-        - ConnectionConfig
-        - ConnectResult
-        - DisconnectResult
 
-## Transport Layer
+## Transport
+
+::: maya_mcp.transport
+    options:
+      show_root_heading: true
 
 ::: maya_mcp.transport.commandport
     options:
       show_root_heading: true
-      members:
-        - CommandPortClient
 
-## Tools
+## Tool Modules
 
-### Health Tools
+### Health
 
 ::: maya_mcp.tools.health
     options:
       show_root_heading: true
 
-### Connection Tools
+### Connection
 
 ::: maya_mcp.tools.connection
     options:
       show_root_heading: true
 
-### Scene Tools
+### Scene
 
 ::: maya_mcp.tools.scene
     options:
       show_root_heading: true
 
-### Node Tools
+### Nodes
 
 ::: maya_mcp.tools.nodes
     options:
       show_root_heading: true
 
-### Selection Tools
+### Attributes
+
+::: maya_mcp.tools.attributes
+    options:
+      show_root_heading: true
+
+### Selection
 
 ::: maya_mcp.tools.selection
+    options:
+      show_root_heading: true
+
+### Connections
+
+::: maya_mcp.tools.connections
+    options:
+      show_root_heading: true
+
+### Mesh
+
+::: maya_mcp.tools.mesh
+    options:
+      show_root_heading: true
+
+### Viewport
+
+::: maya_mcp.tools.viewport
+    options:
+      show_root_heading: true
+
+### Modeling
+
+::: maya_mcp.tools.modeling
+    options:
+      show_root_heading: true
+
+### Shading
+
+::: maya_mcp.tools.shading
+    options:
+      show_root_heading: true
+
+### Skinning
+
+::: maya_mcp.tools.skin
+    options:
+      show_root_heading: true
+
+### Animation
+
+::: maya_mcp.tools.animation
+    options:
+      show_root_heading: true
+
+### Curves
+
+::: maya_mcp.tools.curve
+    options:
+      show_root_heading: true
+
+### Scripts
+
+::: maya_mcp.tools.scripts
+    options:
+      show_root_heading: true
+
+## Maya Panel
+
+::: maya_mcp.maya_panel
+    options:
+      show_root_heading: true
+
+::: maya_mcp.maya_panel.controller
+    options:
+      show_root_heading: true
+
+::: maya_mcp.maya_panel.preferences
     options:
       show_root_heading: true

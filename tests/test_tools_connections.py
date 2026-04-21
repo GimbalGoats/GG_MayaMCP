@@ -394,6 +394,28 @@ class TestConnectionsConnect:
         with pytest.raises(ValueError, match="Invalid characters"):
             connections_connect("node;rm.out", "lambert1.color")
 
+    def test_connections_connect_indexed_attributes_strip_index_for_query(self) -> None:
+        """Connect strips array indices before attributeQuery validation."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "connected": True,
+                "source": "decomposeMatrix1.worldMatrix[0]",
+                "destination": "multMatrix1.matrixIn[0]",
+                "disconnected": [],
+                "error": None,
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.connections.get_client", return_value=mock_client):
+            connections_connect("decomposeMatrix1.worldMatrix[0]", "multMatrix1.matrixIn[0]")
+
+        cmd = mock_client.execute.call_args[0][0]
+        assert 'attr_name.split("[", 1)[0]' in cmd
+        assert "cmds.attributeQuery(_attribute_query_name(source_plug)" in cmd
+        assert "cmds.attributeQuery(_attribute_query_name(dest_plug)" in cmd
+
 
 class TestConnectionsDisconnect:
     """Tests for the connections.disconnect tool."""
@@ -477,6 +499,31 @@ class TestConnectionsDisconnect:
         """Disconnect raises ValueError when neither source nor destination provided."""
         with pytest.raises(ValueError, match="At least one"):
             connections_disconnect()
+
+    def test_connections_disconnect_indexed_attributes_strip_index_for_query(self) -> None:
+        """Disconnect strips array indices before attributeQuery validation."""
+        mock_client = MagicMock()
+        mock_response = json.dumps(
+            {
+                "disconnected": [
+                    {
+                        "source": "decomposeMatrix1.worldMatrix[0]",
+                        "destination": "multMatrix1.matrixIn[0]",
+                    }
+                ],
+                "count": 1,
+                "error": None,
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.connections.get_client", return_value=mock_client):
+            connections_disconnect("decomposeMatrix1.worldMatrix[0]", "multMatrix1.matrixIn[0]")
+
+        cmd = mock_client.execute.call_args[0][0]
+        assert 'attr_name.split("[", 1)[0]' in cmd
+        assert "cmds.attributeQuery(_attribute_query_name(source_plug)" in cmd
+        assert "cmds.attributeQuery(_attribute_query_name(dest_plug)" in cmd
 
 
 class TestConnectionsHistory:

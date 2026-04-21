@@ -1,357 +1,155 @@
 # Transport Layer Specification
 
-This document specifies the transport layer that connects Maya MCP to Maya's commandPort.
+This document defines the transport layer that connects Maya MCP to Autodesk Maya through `commandPort`.
 
-## Overview
+## Purpose
 
-The transport layer provides a typed Python client for communicating with Maya via its `commandPort` socket interface. It handles:
+The transport layer is responsible for all communication between the MCP server process and Maya.
 
-- TCP socket connection management
-- Command encoding (UTF-8)
-- Response parsing
-- Timeout enforcement
-- Retry with exponential backoff
-- Error translation to typed exceptions
+It handles:
 
-## Maya commandPort Background
+- socket connection management
+- localhost-only host validation
+- command submission and response retrieval
+- timeout enforcement
+- connection retry with exponential backoff
+- translation of low-level failures into typed Maya MCP errors
 
-Maya's `commandPort` is a built-in feature that opens a TCP socket to receive commands from external processes.
+## Why `commandPort`
 
-### Opening a commandPort in Maya
+Maya MCP uses Maya's built-in `commandPort` because it:
+
+- is available without extra plugins
+- works across Windows, macOS, and Linux
+- executes inside Maya's process
+- supports both Python and MEL
+
+This decision is recorded in [ADR-0001](../adr/0001-commandport.md).
+
+## Opening `commandPort` in Maya
 
 ```python
 import maya.cmds as cmds
 
-# Close existing port (if any)
 try:
     cmds.commandPort(name=":7001", close=True)
-except:
+except RuntimeError:
     pass
 
-# Open Python commandPort
 cmds.commandPort(
-    name=":7001",           # Port number (: prefix = INET socket)
-    sourceType="python",    # Command interpreter
-    echoOutput=True,        # Send output back to client
+    name=":7001",
+    sourceType="python",
+    echoOutput=True,
 )
 ```
 
-### Port Naming Conventions
+Maya MCP uses INET sockets such as `:7001`, not Unix-domain sockets.
 
-| Format | Type | Example |
-|--------|------|---------|
-| `:7001` | INET (TCP) | TCP socket on port 7001 |
-| `/tmp/maya` | UNIX domain | Local socket file (Unix/macOS only) |
+## Main Entry Point
 
-Maya MCP uses INET sockets for cross-platform compatibility.
+The main transport class is `maya_mcp.transport.commandport.CommandPortClient`.
 
-## CommandPortClient
+Its responsibilities are:
 
-### Class Definition
+- maintain connection state
+- connect and disconnect from Maya
+- execute commands
+- enforce retry and timeout policy
+- expose health and status information
 
-```python
-class CommandPortClient:
-    """Client for communicating with Maya via commandPort.
-    
-    This client manages socket connections to Maya's commandPort,
-    handles timeouts and retries, and translates errors to typed
-    exceptions.
-    
-    The client is designed for Level 1 resilience:
-    - Detects when Maya is unavailable
-    - Returns typed errors
-    - Automatically reconnects on next call when Maya restarts
-    """
-    
-    def __init__(
-        self,
-        host: str = "localhost",
-        port: int = 7001,
-        connect_timeout: float = 5.0,
-        command_timeout: float = 30.0,
-        max_retries: int = 3,
-        retry_base_delay: float = 0.5,
-    ) -> None: ...
-```
+## Configuration
 
-### Configuration Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `host` | `str` | `"localhost"` | Target host (localhost only in v0) |
-| `port` | `int` | `7001` | Target port number |
-| `connect_timeout` | `float` | `5.0` | Connection timeout in seconds |
-| `command_timeout` | `float` | `30.0` | Command execution timeout in seconds |
-| `max_retries` | `int` | `3` | Maximum retry attempts |
-| `retry_base_delay` | `float` | `0.5` | Base delay for exponential backoff |
-
-### Public Methods
-
-#### `connect() -> bool`
-
-Establish connection to Maya commandPort.
-
-**Returns**: `True` if connected.
-
-**Raises**: `MayaUnavailableError` after exhausting retries.
-
-```python
-client = CommandPortClient()
-try:
-    if client.connect():
-        print("Connected to Maya")
-except MayaUnavailableError as e:
-    print(f"Cannot connect: {e}")
-```
-
-#### `disconnect() -> bool`
-
-Close the connection to Maya.
-
-**Returns**: `True` if disconnected, `False` if wasn't connected.
-
-```python
-client.disconnect()
-```
-
-#### `execute(command: str) -> str`
-
-Execute a Python command in Maya and return the result.
-
-**Parameters**:
-- `command`: Python code to execute in Maya
-
-**Returns**: Command output as string.
-
-**Raises**:
-- `MayaUnavailableError`: Cannot connect to Maya
-- `MayaCommandError`: Command execution failed
-- `MayaTimeoutError`: Command timed out
-
-```python
-result = client.execute("cmds.ls(selection=True)")
-print(f"Selection: {result}")
-```
-
-#### `is_connected() -> bool`
-
-Check if currently connected to Maya.
-
-**Returns**: Connection status.
-
-#### `get_status() -> ConnectionStatus`
-
-Get detailed connection status.
-
-**Returns**: `ConnectionStatus` enum value.
-
-```python
-from maya_mcp.types import ConnectionStatus
-
-status = client.get_status()
-if status == ConnectionStatus.OK:
-    print("Connected and healthy")
-elif status == ConnectionStatus.OFFLINE:
-    print("Not connected")
-elif status == ConnectionStatus.RECONNECTING:
-    print("Attempting to reconnect")
-```
+| Setting | Default | Description |
+|---------|---------|-------------|
+| host | `localhost` | Maya host. Only `localhost` and `127.0.0.1` are allowed. |
+| port | `7001` | Maya commandPort port |
+| connect timeout | `5.0` seconds | Maximum wait while connecting |
+| command timeout | `30.0` seconds | Maximum wait for command completion |
+| max retries | `3` | Number of connection attempts before failing |
+| retry base delay | `0.5` seconds | Base for exponential backoff |
 
 ## Connection Lifecycle
 
-### State Machine
+The transport tracks connection state through `ConnectionStatus`.
 
-```
-                    ┌──────────────┐
-                    │              │
-        ┌──────────►│   OFFLINE    │◄──────────┐
-        │           │              │           │
-        │           └──────┬───────┘           │
-        │                  │                   │
-        │           connect()                  │
-        │                  │                   │
-        │                  ▼                   │
-        │           ┌──────────────┐           │
-        │           │              │           │
-disconnect()        │ RECONNECTING │           │ max retries
-        │           │              │           │ exceeded
-        │           └──────┬───────┘           │
-        │                  │                   │
-        │           success│                   │
-        │                  │                   │
-        │                  ▼                   │
-        │           ┌──────────────┐           │
-        │           │              │           │
-        └───────────│      OK      ├───────────┘
-                    │              │  socket error
-                    └──────────────┘
-```
+Expected states:
 
-### Level 1 Resilience Behavior
+- `OFFLINE`: not connected
+- `RECONNECTING`: currently retrying connection
+- `OK`: connected and responsive
 
-1. **Detection**: Socket errors trigger state transition to `OFFLINE`
-2. **Error Reporting**: `MayaUnavailableError` returned to caller with context
-3. **Recovery**: Next call attempts reconnection (state: `RECONNECTING`)
-4. **Backoff**: Retries use exponential backoff to avoid overwhelming Maya
+Typical lifecycle:
+
+1. A tool requests a command.
+2. The client connects if no healthy socket is available.
+3. If connect succeeds, state becomes `OK`.
+4. If the socket fails, state drops to `OFFLINE`.
+5. The next command may trigger reconnect attempts and `RECONNECTING`.
 
 ## Timeout Behavior
 
-### Connect Timeout
+### Connect timeout
 
-Applied when establishing the TCP connection:
+Applied during socket connection establishment.
 
-```python
-socket.settimeout(connect_timeout)
-socket.connect((host, port))  # Raises socket.timeout
-```
+If exceeded, the transport treats Maya as unavailable.
 
-### Command Timeout
+### Command timeout
 
-Applied when waiting for command response:
+Applied while waiting for Maya to return a response after command submission.
 
-```python
-socket.settimeout(command_timeout)
-response = socket.recv(BUFFER_SIZE)  # Raises socket.timeout
-```
+If exceeded, the transport raises `MayaTimeoutError`.
 
-### Timeout Translation
+## Retry Policy
 
-| Socket Exception | Maya MCP Exception |
-|------------------|-------------------|
-| `socket.timeout` on connect | `MayaUnavailableError` |
-| `socket.timeout` on recv | `MayaTimeoutError` |
+Connection retries use exponential backoff.
 
-## Retry Strategy
+With the default base delay of `0.5`, the delays are:
 
-### Exponential Backoff
+| Attempt | Delay |
+|---------|-------|
+| 1 | `0.5s` |
+| 2 | `1.0s` |
+| 3 | `2.0s` |
 
-Delays between retry attempts:
+Retries are appropriate for transient connection failures such as:
 
-| Attempt | Delay (with base=0.5s) |
-|---------|------------------------|
-| 1 | 0.5s |
-| 2 | 1.0s |
-| 3 | 2.0s |
+- connection refused
+- connection reset
+- temporary network/socket errors on localhost
 
-Formula: `delay = retry_base_delay * (2 ** attempt)`
+Retries are not used for command-level execution failures such as invalid Maya commands or structured command errors returned by Maya.
 
-### Retry Triggers
+## Error Translation
 
-Retries are attempted for:
-- Connection refused
-- Connection reset
-- Network unreachable
+The transport should translate low-level failures into typed errors from `maya_mcp.errors`.
 
-Retries are NOT attempted for:
-- Command execution errors (bug in command)
-- Timeout after connection established
-- Invalid responses
+| Situation | Error |
+|-----------|-------|
+| Maya cannot be reached | `MayaUnavailableError` |
+| Maya command fails | `MayaCommandError` |
+| Maya does not respond before timeout | `MayaTimeoutError` |
+| Input/config validation fails | `ValidationError` |
 
-## Protocol Details
+These errors include structured `details` so clients can react programmatically.
 
-### Command Encoding
+## Protocol Notes
 
-Commands are sent as UTF-8 encoded strings:
+- Commands are encoded as UTF-8 strings.
+- Responses are decoded from UTF-8.
+- The transport owns response parsing boundaries before data is returned to tool modules.
+- The tool layer should not implement its own socket policy.
 
-```python
-command_bytes = command.encode("utf-8")
-socket.sendall(command_bytes)
-```
+## Threading
 
-### Response Handling
+The current transport is not designed as a general-purpose concurrent client. Tool callers should assume single-client, request-at-a-time behavior unless the transport is explicitly redesigned.
 
-Maya's commandPort with `echoOutput=True` sends back command results:
+## Security Constraints
 
-```python
-BUFFER_SIZE = 4096
-response = socket.recv(BUFFER_SIZE)
-result = response.decode("utf-8")
-```
+The transport must enforce these constraints:
 
-### Multi-line Commands
+- no remote host support
+- no secrets in error payloads
+- no server-side Maya imports outside the command payload sent to Maya
 
-For multi-line Python code, wrap in exec():
-
-```python
-code = '''
-import maya.cmds as cmds
-result = cmds.ls(type="mesh")
-print(result)
-'''
-client.execute(code)
-```
-
-## Error Handling
-
-### Exception Hierarchy
-
-```
-MayaMCPError
-├── MayaUnavailableError
-│   └── Raised when Maya cannot be reached
-├── MayaCommandError
-│   └── Raised when command execution fails
-└── MayaTimeoutError
-    └── Raised when command times out
-```
-
-### Error Context
-
-All exceptions include context for debugging:
-
-```python
-class MayaUnavailableError(MayaMCPError):
-    def __init__(
-        self,
-        message: str,
-        host: str,
-        port: int,
-        attempts: int,
-        last_error: str | None = None,
-    ) -> None: ...
-```
-
-## Thread Safety
-
-The current implementation is NOT thread-safe. For concurrent access:
-
-1. Use a single client per thread
-2. Or implement external synchronization
-3. Concurrent request handling is out of scope for v0
-
-## Example Usage
-
-```python
-from maya_mcp.transport import CommandPortClient
-from maya_mcp.errors import MayaUnavailableError, MayaCommandError
-
-# Create client with custom config
-client = CommandPortClient(
-    host="localhost",
-    port=7001,
-    connect_timeout=5.0,
-    command_timeout=30.0,
-)
-
-try:
-    # Connect (optional - execute() auto-connects)
-    client.connect()
-    
-    # Execute commands
-    selection = client.execute("cmds.ls(selection=True)")
-    print(f"Current selection: {selection}")
-    
-    # Scene info
-    scene_name = client.execute("cmds.file(query=True, sceneName=True)")
-    print(f"Scene: {scene_name}")
-    
-except MayaUnavailableError as e:
-    print(f"Maya not available: {e.message}")
-    print(f"Tried {e.attempts} times to connect to {e.host}:{e.port}")
-    
-except MayaCommandError as e:
-    print(f"Command failed: {e.message}")
-    
-finally:
-    client.disconnect()
-```
+For the wider threat model, see [Security Specification](security.md).
