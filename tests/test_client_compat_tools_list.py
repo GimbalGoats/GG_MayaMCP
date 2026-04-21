@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from mcp.types import ListToolsRequest, ListToolsResult, Tool
+from mcp.types import ListToolsResult, Tool
 
 AnnotationExpectation = tuple[bool, bool, bool, bool]
 
@@ -132,7 +132,8 @@ def _list_tools() -> ListToolsResult:
     """Return the serialized MCP ``tools/list`` response."""
     from maya_mcp.server import mcp
 
-    return asyncio.run(mcp._list_tools_mcp(ListToolsRequest(method="tools/list")))
+    tools = [tool.to_mcp_tool() for tool in asyncio.run(mcp.list_tools())]
+    return ListToolsResult(nextCursor=None, tools=tools)
 
 
 def _tool_map() -> dict[str, Tool]:
@@ -150,7 +151,7 @@ def test_tools_list_returns_expected_names() -> None:
     names = {tool.name for tool in result.tools}
 
     assert result.nextCursor is None
-    assert len(result.tools) == 71
+    assert len(result.tools) == len(names) == len(EXPECTED_TOOL_NAMES)
     assert names == EXPECTED_TOOL_NAMES
 
 

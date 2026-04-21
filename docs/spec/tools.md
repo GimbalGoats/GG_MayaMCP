@@ -3295,7 +3295,7 @@ All tools may return errors in a consistent format:
 
 All tools include MCP annotations to help AI clients understand their behavior and make safe decisions.
 
-## MCP `tools/list` Metadata Contract
+### MCP `tools/list` Metadata Contract
 
 Maya MCP treats the serialized MCP `tools/list` response as part of its client-facing contract.
 
