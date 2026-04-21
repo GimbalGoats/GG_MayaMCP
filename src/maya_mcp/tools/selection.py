@@ -7,7 +7,9 @@ including component-level selection (vertices, edges, faces).
 from __future__ import annotations
 
 import json
-from typing import Any, Literal
+from typing import Any, Literal, cast
+
+from typing_extensions import NotRequired, TypedDict
 
 from maya_mcp.transport import get_client
 from maya_mcp.utils.parsing import parse_json_response
@@ -16,7 +18,51 @@ from maya_mcp.utils.validation import validate_component_name as _validate_compo
 from maya_mcp.utils.validation import validate_node_name as _validate_node_name
 
 
-def selection_get() -> dict[str, Any]:
+class _GuardedOutput(TypedDict, total=False):
+    """Metadata added when response size guards truncate a payload."""
+
+    truncated: bool
+    _size_warning: str
+    _original_size: int
+    _truncated_size: int
+
+
+class SelectionOutput(TypedDict):
+    """Return payload for node selection state tools."""
+
+    selection: list[str]
+    count: int
+
+
+class SelectionWithErrorsOutput(SelectionOutput, _GuardedOutput):
+    """Return payload for selection operations that may partially fail."""
+
+    errors: dict[str, str] | None
+    total_count: NotRequired[int]
+
+
+class SelectionComponentsOutput(_GuardedOutput):
+    """Return payload for the selection.get_components tool."""
+
+    selection: list[str]
+    vertices: list[str]
+    edges: list[str]
+    faces: list[str]
+    vertex_count: int
+    edge_count: int
+    face_count: int
+    total_count: int
+    has_components: bool
+    error: NotRequired[str]
+
+
+class SelectionConvertComponentsOutput(SelectionWithErrorsOutput):
+    """Return payload for the selection.convert_components tool."""
+
+    to_type: Literal["vertex", "edge", "face"]
+
+
+def selection_get() -> SelectionOutput:
     """Get the current selection in Maya.
 
     Returns the list of currently selected nodes.
@@ -63,7 +109,7 @@ def selection_set_components(
     components: list[str],
     add: bool = False,
     deselect: bool = False,
-) -> dict[str, Any]:
+) -> SelectionWithErrorsOutput:
     """Select mesh components (vertices, edges, or faces).
 
     Selects components specified by Maya component notation
@@ -157,12 +203,10 @@ print(json.dumps(result))
     else:
         result["errors"] = None
 
-    result = guard_response_size(result, list_key="selection")
-
-    return result
+    return cast("SelectionWithErrorsOutput", guard_response_size(result, list_key="selection"))
 
 
-def selection_get_components() -> dict[str, Any]:
+def selection_get_components() -> SelectionComponentsOutput:
     """Get the currently selected mesh components.
 
     Returns the selected components grouped by type (vertex, edge, face)
@@ -235,15 +279,13 @@ print(json.dumps(result))
     response = client.execute(command)
     parsed: dict[str, Any] = parse_json_response(response)
 
-    parsed = guard_response_size(parsed, list_key="selection")
-
-    return parsed
+    return cast("SelectionComponentsOutput", guard_response_size(parsed, list_key="selection"))
 
 
 def selection_convert_components(
     to_type: Literal["vertex", "edge", "face"],
     nodes: list[str] | None = None,
-) -> dict[str, Any]:
+) -> SelectionConvertComponentsOutput:
     """Convert the current selection to a different component type.
 
     Converts selected components (or specified nodes) to vertices,
@@ -341,12 +383,12 @@ print(json.dumps(result))
     else:
         result["errors"] = None
 
-    result = guard_response_size(result, list_key="selection")
+    return cast(
+        "SelectionConvertComponentsOutput", guard_response_size(result, list_key="selection")
+    )
 
-    return result
 
-
-def selection_clear() -> dict[str, Any]:
+def selection_clear() -> SelectionOutput:
     """Clear the Maya selection.
 
     Deselects all currently selected nodes.
@@ -393,7 +435,7 @@ def selection_set(
     nodes: list[str],
     add: bool = False,
     deselect: bool = False,
-) -> dict[str, Any]:
+) -> SelectionOutput:
     """Set the Maya selection.
 
     Modifies the current selection by selecting, adding to, or

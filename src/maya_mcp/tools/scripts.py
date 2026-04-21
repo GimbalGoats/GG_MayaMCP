@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import contextlib
 import json
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
+
+from typing_extensions import TypedDict
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -33,6 +35,52 @@ from maya_mcp.utils.script_validation import validate_raw_code, validate_script_
 _MAX_SCRIPT_SCAN = 500
 
 
+class _GuardedOutput(TypedDict, total=False):
+    """Metadata added when response size guards truncate a payload."""
+
+    truncated: bool
+    total_count: int
+    _size_warning: str
+    _original_size: int
+    _truncated_size: int
+
+
+class ScriptListEntry(TypedDict):
+    """A discovered script file."""
+
+    name: str
+    path: str
+    size_bytes: int
+    relative_path: str
+
+
+class ScriptListOutput(_GuardedOutput):
+    """Return payload for the script.list tool."""
+
+    scripts: list[ScriptListEntry]
+    count: int
+    directories: list[str]
+    errors: dict[str, str] | None
+
+
+class ScriptExecuteOutput(TypedDict):
+    """Return payload for the script.execute tool."""
+
+    success: bool
+    script: str
+    output: str
+    errors: dict[str, str] | None
+
+
+class ScriptRunOutput(TypedDict):
+    """Return payload for the script.run tool."""
+
+    success: bool
+    output: str
+    language: Literal["python", "mel"]
+    errors: dict[str, str] | None
+
+
 @contextlib.contextmanager
 def _override_timeout(client: CommandPortClient, timeout: float) -> Iterator[CommandPortClient]:
     """Temporarily override a client's command timeout."""
@@ -46,7 +94,7 @@ def _override_timeout(client: CommandPortClient, timeout: float) -> Iterator[Com
             client.config.command_timeout = original
 
 
-def script_list() -> dict[str, Any]:
+def script_list() -> ScriptListOutput:
     """List available Python scripts from configured directories.
 
     Scans MAYA_MCP_SCRIPT_DIRS for .py files, excluding underscore-prefixed
@@ -73,7 +121,7 @@ def script_list() -> dict[str, Any]:
         result["errors"] = {
             "_config": "No script directories configured (set MAYA_MCP_SCRIPT_DIRS)"
         }
-        return result
+        return cast("ScriptListOutput", result)
 
     scripts: list[dict[str, Any]] = []
     scan_errors: dict[str, str] = {}
@@ -112,14 +160,14 @@ def script_list() -> dict[str, Any]:
     if scan_errors:
         result["errors"] = scan_errors
 
-    return guard_response_size(result, list_key="scripts")
+    return cast("ScriptListOutput", guard_response_size(result, list_key="scripts"))
 
 
 def script_execute(
     file_path: str,
     args: dict[str, Any] | None = None,
     timeout: int | None = None,
-) -> dict[str, Any]:
+) -> ScriptExecuteOutput:
     """Execute a Python script file in Maya.
 
     The script must be within a configured MAYA_MCP_SCRIPT_DIRS directory.
@@ -202,14 +250,14 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("ScriptExecuteOutput", parsed)
 
 
 def script_run(
     code: str,
     language: Literal["python", "mel"] = "python",
     timeout: int | None = None,
-) -> dict[str, Any]:
+) -> ScriptRunOutput:
     """Execute raw Python or MEL code in Maya.
 
     This tool requires MAYA_MCP_ENABLE_RAW_EXECUTION=true to be set.
@@ -318,4 +366,4 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("ScriptRunOutput", parsed)

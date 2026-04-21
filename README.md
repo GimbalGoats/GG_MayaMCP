@@ -1,6 +1,6 @@
 # Maya MCP
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10.1+](https://img.shields.io/badge/python-3.10.1%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Maya MCP is a Model Context Protocol (MCP) server for controlling Autodesk Maya through Maya's `commandPort` socket interface.
@@ -42,6 +42,10 @@ cmds.commandPort(
 pip install maya-mcp
 ```
 
+Use Python 3.10.1 or newer. Python 3.10.0 is excluded because its stdlib
+`dataclasses.make_dataclass()` implementation lacks the `kw_only` support
+expected by current FastMCP structured-output parsing.
+
 From source:
 
 ```bash
@@ -60,6 +64,12 @@ Or:
 
 ```bash
 python -m maya_mcp.server
+```
+
+From a local source checkout, direct script launch also works:
+
+```bash
+python src/maya_mcp/server.py
 ```
 
 ### 4. Configure your MCP client

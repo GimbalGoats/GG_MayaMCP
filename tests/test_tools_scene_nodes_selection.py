@@ -74,11 +74,19 @@ class TestSceneInfo:
         assert result["frame_range"] == [0.0, 100.0]
         assert result["up_axis"] == "z"
 
-    def test_scene_info_ignores_prefixed_plugin_output(self) -> None:
-        """Scene info tolerates extra non-JSON output before the payload."""
+    @pytest.mark.parametrize(
+        "prefix_line",
+        [
+            "AbcExport v1.0 using Alembic 1.8.5 (built Sep 19 2024 05:23:41)",
+            "True",
+        ],
+    )
+    def test_scene_info_ignores_prefixed_plugin_output(self, prefix_line: str) -> None:
+        """Scene info tolerates extra output before the JSON payload."""
         mock_client = MagicMock()
         mock_client.execute.return_value = (
-            "AbcExport v1.0 using Alembic 1.8.5 (built Sep 19 2024 05:23:41)\n"
+            prefix_line
+            + "\n"
             + json.dumps(
                 {
                     "scene_name": None,

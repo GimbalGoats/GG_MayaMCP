@@ -18,9 +18,6 @@ def _response_candidates(response: str) -> list[str]:
 
     candidates: list[str] = [stripped]
     parts = [part.strip() for part in stripped.replace("\x00", "\n").splitlines() if part.strip()]
-    for part in parts:
-        if part not in candidates:
-            candidates.append(part)
     for part in reversed(parts):
         if part.startswith(("{", "[")) and part not in candidates:
             candidates.append(part)
@@ -32,6 +29,10 @@ def _response_candidates(response: str) -> list[str]:
             candidate = stripped[start : end + 1].strip()
             if candidate and candidate not in candidates:
                 candidates.append(candidate)
+
+    for part in parts:
+        if part not in candidates:
+            candidates.append(part)
     return candidates
 
 
@@ -59,6 +60,8 @@ def parse_json_response(response: str) -> Any:
             return json.loads(candidate)
         except (ValueError, json.JSONDecodeError) as exc:
             last_error = exc
+        if not candidate.startswith(("{", "[")):
+            continue
         try:
             return ast.literal_eval(candidate)
         except (ValueError, SyntaxError) as exc:

@@ -6,17 +6,35 @@ to Maya's commandPort. These are optional debugging controls.
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
+
+from typing_extensions import TypedDict
 
 from maya_mcp.errors import MayaUnavailableError
 from maya_mcp.transport import get_client
+
+
+class MayaConnectOutput(TypedDict):
+    """Return payload for the maya.connect tool."""
+
+    connected: bool
+    host: str
+    port: int
+    error: str | None
+
+
+class MayaDisconnectOutput(TypedDict):
+    """Return payload for the maya.disconnect tool."""
+
+    disconnected: bool
+    was_connected: bool
 
 
 def maya_connect(
     host: str = "localhost",
     port: int = 7001,
     source_type: Literal["python", "mel"] = "python",  # noqa: ARG001
-) -> dict[str, Any]:
+) -> MayaConnectOutput:
     """Establish a connection to Maya's commandPort.
 
     Attempts to connect to Maya at the specified host and port.
@@ -63,7 +81,7 @@ def maya_connect(
         }
 
 
-def maya_disconnect() -> dict[str, Any]:
+def maya_disconnect() -> MayaDisconnectOutput:
     """Close the connection to Maya.
 
     Disconnects from Maya's commandPort and moves the client state

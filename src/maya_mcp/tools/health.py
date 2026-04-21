@@ -6,7 +6,9 @@ status between Maya MCP and Maya.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Literal
+
+from typing_extensions import TypedDict
 
 from maya_mcp.transport import get_client
 
@@ -14,7 +16,17 @@ if TYPE_CHECKING:
     from maya_mcp.types import HealthCheckResult
 
 
-def health_check() -> dict[str, Any]:
+class HealthCheckOutput(TypedDict):
+    """Return payload for the health.check tool."""
+
+    status: Literal["ok", "offline", "reconnecting"]
+    last_error: str | None
+    last_contact: str | None
+    host: str
+    port: int
+
+
+def health_check() -> HealthCheckOutput:
     """Check the health status of the Maya connection.
 
     Returns current connection status, last error (if any), last successful

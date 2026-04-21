@@ -1,3 +1,10 @@
+---
+summary: "CommandPort transport specification covering configuration, lifecycle, retries, timeouts, errors, and security constraints."
+read_when:
+  - When changing commandPort transport behavior, connection lifecycle, retries, timeouts, or host validation.
+  - When touching architecture boundaries between MCP tools, transport code, and Maya execution.
+---
+
 # Transport Layer Specification
 
 This document defines the transport layer that connects Maya MCP to Autodesk Maya through `commandPort`.

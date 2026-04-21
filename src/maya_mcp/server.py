@@ -20,13 +20,32 @@ Example:
 
 from __future__ import annotations
 
+import os
+import sys
+
+if __name__ == "__main__" and (__package__ is None or __package__ == ""):
+    _package_dir = os.path.dirname(os.path.abspath(__file__))  # noqa: PTH100,PTH120
+    _src_dir = os.path.dirname(_package_dir)  # noqa: PTH120
+    if sys.path and os.path.abspath(sys.path[0]) == _package_dir:  # noqa: PTH100
+        sys.path.pop(0)
+    if _src_dir not in sys.path:
+        sys.path.insert(0, _src_dir)
+    __package__ = "maya_mcp"
 from typing import Annotated, Any, Literal
 
 from fastmcp import FastMCP
+from fastmcp.tools import ToolResult
 from mcp.types import ToolAnnotations
+from pydantic import TypeAdapter
 
 from maya_mcp import __version__
 from maya_mcp.tools.animation import (
+    AnimationDeleteKeyframesOutput,
+    AnimationGetKeyframesOutput,
+    AnimationGetTimeRangeOutput,
+    AnimationSetKeyframeOutput,
+    AnimationSetTimeOutput,
+    AnimationSetTimeRangeOutput,
     TangentType,
     animation_delete_keyframes,
     animation_get_keyframes,
@@ -35,18 +54,56 @@ from maya_mcp.tools.animation import (
     animation_set_time,
     animation_set_time_range,
 )
-from maya_mcp.tools.attributes import attributes_get, attributes_set
-from maya_mcp.tools.connection import maya_connect, maya_disconnect
+from maya_mcp.tools.attributes import (
+    AttributesGetOutput,
+    AttributesSetOutput,
+    attributes_get,
+    attributes_set,
+)
+from maya_mcp.tools.connection import (
+    MayaConnectOutput,
+    MayaDisconnectOutput,
+    maya_connect,
+    maya_disconnect,
+)
 from maya_mcp.tools.connections import (
+    ConnectionsConnectOutput,
+    ConnectionsDisconnectOutput,
+    ConnectionsGetOutput,
+    ConnectionsHistoryOutput,
+    ConnectionsListOutput,
     connections_connect,
     connections_disconnect,
     connections_get,
     connections_history,
     connections_list,
 )
-from maya_mcp.tools.health import health_check
-from maya_mcp.tools.mesh import mesh_evaluate, mesh_info, mesh_vertices
+from maya_mcp.tools.curve import CurveCvsOutput, CurveInfoOutput  # noqa: TC001
+from maya_mcp.tools.health import HealthCheckOutput, health_check
+from maya_mcp.tools.mesh import (
+    MeshEvaluateOutput,
+    MeshInfoOutput,
+    MeshVerticesOutput,
+    mesh_evaluate,
+    mesh_info,
+    mesh_vertices,
+)
 from maya_mcp.tools.modeling import (
+    ModelingBevelOutput,
+    ModelingBooleanOutput,
+    ModelingBridgeOutput,
+    ModelingCenterPivotOutput,
+    ModelingCombineOutput,
+    ModelingCreatePolygonPrimitiveOutput,
+    ModelingDeleteFacesOutput,
+    ModelingDeleteHistoryOutput,
+    ModelingExtrudeFacesOutput,
+    ModelingFreezeTransformsOutput,
+    ModelingInsertEdgeLoopOutput,
+    ModelingMergeVerticesOutput,
+    ModelingMoveComponentsOutput,
+    ModelingSeparateOutput,
+    ModelingSetPivotOutput,
     modeling_bevel,
     modeling_boolean,
     modeling_bridge,
@@ -64,6 +121,13 @@ from maya_mcp.tools.modeling import (
     modeling_set_pivot,
 )
 from maya_mcp.tools.nodes import (
+    NodesCreateOutput,
+    NodesDeleteOutput,
+    NodesDuplicateOutput,
+    NodesInfoOutput,
+    NodesListOutput,
+    NodesParentOutput,
+    NodesRenameOutput,
     nodes_create,
     nodes_delete,
     nodes_duplicate,
@@ -73,6 +137,7 @@ from maya_mcp.tools.nodes import (
     nodes_rename,
 )
 from maya_mcp.tools.scene import (
+    SceneInfoOutput,
     scene_export,
     scene_import,
     scene_info,
@@ -83,7 +148,16 @@ from maya_mcp.tools.scene import (
     scene_save_as,
     scene_undo,
 )
+from maya_mcp.tools.scripts import (  # noqa: TC001
+    ScriptExecuteOutput,
+    ScriptListOutput,
+    ScriptRunOutput,
+)
 from maya_mcp.tools.selection import (
+    SelectionComponentsOutput,
+    SelectionConvertComponentsOutput,
+    SelectionOutput,
+    SelectionWithErrorsOutput,
     selection_clear,
     selection_convert_components,
     selection_get,
@@ -92,11 +166,20 @@ from maya_mcp.tools.selection import (
     selection_set_components,
 )
 from maya_mcp.tools.shading import (
+    ShadingAssignMaterialOutput,
+    ShadingCreateMaterialOutput,
+    ShadingSetMaterialColorOutput,
     shading_assign_material,
     shading_create_material,
     shading_set_material_color,
 )
 from maya_mcp.tools.skin import (
+    SkinBindOutput,
+    SkinCopyWeightsOutput,
+    SkinInfluencesOutput,
+    SkinUnbindOutput,
+    SkinWeightsGetOutput,
+    SkinWeightsSetOutput,
     skin_bind,
     skin_copy_weights,
     skin_influences,
@@ -104,7 +187,11 @@ from maya_mcp.tools.skin import (
     skin_weights_get,
     skin_weights_set,
 )
-from maya_mcp.tools.viewport import ViewportFormat, viewport_capture
+from maya_mcp.tools.viewport import (
+    ViewportCaptureOutput,
+    ViewportFormat,
+    _capture_viewport_image,
+)
 from maya_mcp.utils.coercion import coerce_dict, coerce_list
 
 SERVER_VERSION = __version__
@@ -134,7 +221,7 @@ mcp = FastMCP(
         openWorldHint=False,
     ),
 )
-def tool_health_check() -> dict[str, Any]:
+def tool_health_check() -> HealthCheckOutput:
     """Check Maya connection health.
 
     Returns status (ok/offline/reconnecting), last error, last contact
@@ -161,7 +248,7 @@ def tool_maya_connect(
         Literal["python", "mel"],
         "Command interpreter type",
     ] = "python",
-) -> dict[str, Any]:
+) -> MayaConnectOutput:
     """Connect to Maya commandPort.
 
     Args:
@@ -185,7 +272,7 @@ def tool_maya_connect(
         openWorldHint=False,
     ),
 )
-def tool_maya_disconnect() -> dict[str, Any]:
+def tool_maya_disconnect() -> MayaDisconnectOutput:
     """Disconnect from Maya commandPort.
 
     Returns:
@@ -205,7 +292,7 @@ def tool_maya_disconnect() -> dict[str, Any]:
         openWorldHint=False,
     ),
 )
-def tool_scene_info() -> dict[str, Any]:
+def tool_scene_info() -> SceneInfoOutput:
     """Get current scene information.
 
     Returns file path, modification status, FPS, frame range, and up axis.
@@ -470,7 +557,7 @@ def tool_nodes_list(
         int | None,
         "Max nodes to return (default 500, use 0 for unlimited)",
     ] = 500,
-) -> dict[str, Any]:
+) -> NodesListOutput:
     """List Maya nodes.
 
     Args:
@@ -504,7 +591,7 @@ def tool_nodes_create(
         dict[str, Any] | None,
         "Initial attribute values to set after creation",
     ] = None,
-) -> dict[str, Any]:
+) -> NodesCreateOutput:
     """Create a new Maya node.
 
     Args:
@@ -535,7 +622,7 @@ def tool_nodes_create(
 def tool_nodes_delete(
     nodes: Annotated[list[str], "Node names to delete"],
     hierarchy: Annotated[bool, "Delete entire hierarchy below each node"] = False,
-) -> dict[str, Any]:
+) -> NodesDeleteOutput:
     """Delete Maya nodes.
 
     Args:
@@ -560,7 +647,7 @@ def tool_nodes_delete(
 )
 def tool_nodes_rename(
     mapping: Annotated[dict[str, str], "Map of current node name to new name"],
-) -> dict[str, Any]:
+) -> NodesRenameOutput:
     """Rename Maya nodes.
 
     Args:
@@ -586,7 +673,7 @@ def tool_nodes_parent(
     nodes: Annotated[list[str], "Nodes to reparent"],
     parent: Annotated[str | None, "New parent node. If None, unparent (parent to world)."] = None,
     relative: Annotated[bool, "Preserve existing local transformations"] = False,
-) -> dict[str, Any]:
+) -> NodesParentOutput:
     """Reparent Maya nodes.
 
     Args:
@@ -618,7 +705,7 @@ def tool_nodes_duplicate(
     input_connections: Annotated[bool, "Duplicate input connections"] = False,
     upstream_nodes: Annotated[bool, "Duplicate upstream nodes"] = False,
     parent_only: Annotated[bool, "Duplicate only the specified node, not its children"] = False,
-) -> dict[str, Any]:
+) -> NodesDuplicateOutput:
     """Duplicate Maya nodes.
 
     Args:
@@ -658,7 +745,7 @@ def tool_nodes_info(
         Literal["summary", "transform", "hierarchy", "attributes", "shape", "all"],
         "Category of information to retrieve",
     ] = "summary",
-) -> dict[str, Any]:
+) -> NodesInfoOutput:
     """Get comprehensive information about a Maya node.
 
     Args:
@@ -692,7 +779,7 @@ def tool_nodes_info(
 def tool_attributes_get(
     node: Annotated[str, "Node name to query"],
     attributes: Annotated[list[str], "Attribute names to get (e.g., ['translateX', 'visibility'])"],
-) -> dict[str, Any]:
+) -> AttributesGetOutput:
     """Get attribute values from a Maya node.
 
     Args:
@@ -720,7 +807,7 @@ def tool_attributes_get(
 def tool_attributes_set(
     node: Annotated[str, "Node name to modify"],
     attributes: Annotated[dict[str, Any], "Map of attribute name to value"],
-) -> dict[str, Any]:
+) -> AttributesSetOutput:
     """Set attribute values on a Maya node.
 
     Args:
@@ -760,7 +847,7 @@ def tool_connections_list(
         int | None,
         "Max connections to return (default 500, use 0 for unlimited)",
     ] = 500,
-) -> dict[str, Any]:
+) -> ConnectionsListOutput:
     """List connections on a Maya node.
 
     Args:
@@ -796,7 +883,7 @@ def tool_connections_get(
         list[str] | None,
         "Attribute names to check for connections (None = all connectable attrs)",
     ] = None,
-) -> dict[str, Any]:
+) -> ConnectionsGetOutput:
     """Get connection details for specific attributes.
 
     Args:
@@ -827,7 +914,7 @@ def tool_connections_connect(
         bool,
         "If True, disconnect existing connections to destination first",
     ] = False,
-) -> dict[str, Any]:
+) -> ConnectionsConnectOutput:
     """Connect two attributes.
 
     Args:
@@ -862,7 +949,7 @@ def tool_connections_disconnect(
         str | None,
         "Destination plug to disconnect from (None = use source only)",
     ] = None,
-) -> dict[str, Any]:
+) -> ConnectionsDisconnectOutput:
     """Disconnect attributes.
 
     Args:
@@ -897,7 +984,7 @@ def tool_connections_history(
         int | None,
         "Max history nodes to return (default 500)",
     ] = 500,
-) -> dict[str, Any]:
+) -> ConnectionsHistoryOutput:
     """List construction/deformation history.
 
     Args:
@@ -923,7 +1010,7 @@ def tool_connections_history(
         openWorldHint=False,
     ),
 )
-def tool_selection_get() -> dict[str, Any]:
+def tool_selection_get() -> SelectionOutput:
     """Get current Maya selection.
 
     Returns:
@@ -946,7 +1033,7 @@ def tool_selection_set(
     nodes: Annotated[list[str], "Node names to select"],
     add: Annotated[bool, "Add to existing selection"] = False,
     deselect: Annotated[bool, "Remove from selection"] = False,
-) -> dict[str, Any]:
+) -> SelectionOutput:
     """Set Maya selection.
 
     Args:
@@ -970,7 +1057,7 @@ def tool_selection_set(
         openWorldHint=False,
     ),
 )
-def tool_selection_clear() -> dict[str, Any]:
+def tool_selection_clear() -> SelectionOutput:
     """Clear Maya selection.
 
     Deselects all currently selected nodes.
@@ -994,7 +1081,7 @@ def tool_selection_clear() -> dict[str, Any]:
 )
 def tool_mesh_info(
     node: Annotated[str, "Name of the mesh node (transform or shape)"],
-) -> dict[str, Any]:
+) -> MeshInfoOutput:
     """Get mesh statistics.
 
     Args:
@@ -1025,7 +1112,7 @@ def tool_mesh_vertices(
         int | None,
         "Maximum vertices to return (default 1000, use 0 for unlimited)",
     ] = 1000,
-) -> dict[str, Any]:
+) -> MeshVerticesOutput:
     """Query vertex positions from a mesh.
 
     Args:
@@ -1060,7 +1147,7 @@ def tool_mesh_evaluate(
         int | None,
         "Max components per check (default 500)",
     ] = 500,
-) -> dict[str, Any]:
+) -> MeshEvaluateOutput:
     """Analyze mesh topology.
 
     Args:
@@ -1079,6 +1166,7 @@ def tool_mesh_evaluate(
     name="viewport.capture",
     description="Capture a single viewport frame as inline image content using Maya playblast. "
     "Read-only: does not modify scene data.",
+    output_schema=TypeAdapter(ViewportCaptureOutput).json_schema(mode="serialization"),
     annotations=ToolAnnotations(
         readOnlyHint=True,
         destructiveHint=False,
@@ -1104,7 +1192,7 @@ def tool_viewport_capture(
         float | None,
         "Optional frame to capture (defaults to current time)",
     ] = None,
-) -> Any:
+) -> ToolResult:
     """Capture viewport image via Maya playblast.
 
     Args:
@@ -1118,9 +1206,9 @@ def tool_viewport_capture(
         frame: Optional frame number.
 
     Returns:
-        FastMCP Image helper object (auto-converted to MCP ImageContent).
+        Tool result containing inline image content plus structured capture metadata.
     """
-    return viewport_capture(
+    image, metadata = _capture_viewport_image(
         format=format,
         width=width,
         height=height,
@@ -1130,6 +1218,7 @@ def tool_viewport_capture(
         panel=panel,
         frame=frame,
     )
+    return ToolResult(content=image, structured_content=metadata)
 
 
 # Register curve tools
@@ -1145,7 +1234,7 @@ def tool_viewport_capture(
 )
 def tool_curve_info(
     node: Annotated[str, "Name of the curve node (transform or shape)"],
-) -> dict[str, Any]:
+) -> CurveInfoOutput:
     """Get NURBS curve information.
 
     Args:
@@ -1178,7 +1267,7 @@ def tool_curve_cvs(
         int | None,
         "Maximum CVs to return (default 1000, use 0 for unlimited)",
     ] = 1000,
-) -> dict[str, Any]:
+) -> CurveCvsOutput:
     """Query CV positions from a NURBS curve.
 
     Args:
@@ -1213,7 +1302,7 @@ def tool_selection_set_components(
     ],
     add: Annotated[bool, "Add to existing selection"] = False,
     deselect: Annotated[bool, "Remove from selection"] = False,
-) -> dict[str, Any]:
+) -> SelectionWithErrorsOutput:
     """Select mesh components.
 
     Args:
@@ -1241,7 +1330,7 @@ def tool_selection_set_components(
         openWorldHint=False,
     ),
 )
-def tool_selection_get_components() -> dict[str, Any]:
+def tool_selection_get_components() -> SelectionComponentsOutput:
     """Get selected mesh components.
 
     Returns:
@@ -1270,7 +1359,7 @@ def tool_selection_convert_components(
         list[str] | None,
         "Nodes to convert (None = use current selection)",
     ] = None,
-) -> dict[str, Any]:
+) -> SelectionConvertComponentsOutput:
     """Convert selection to different component type.
 
     Args:
@@ -1312,7 +1401,7 @@ def tool_modeling_create_polygon_primitive(
         int | None, "Axis subdivisions (sphere/cylinder/cone/torus)"
     ] = None,
     axis: Annotated[Literal["x", "y", "z"], "Up axis for the primitive"] = "y",
-) -> dict[str, Any]:
+) -> ModelingCreatePolygonPrimitiveOutput:
     """Create a polygon primitive.
 
     Args:
@@ -1367,7 +1456,7 @@ def tool_modeling_extrude_faces(
     offset: Annotated[float | None, "Offset amount for the extrusion"] = None,
     divisions: Annotated[int, "Number of extrusion divisions"] = 1,
     keep_faces_together: Annotated[bool, "Keep faces together during extrusion"] = True,
-) -> dict[str, Any]:
+) -> ModelingExtrudeFacesOutput:
     """Extrude polygon faces.
 
     Args:
@@ -1410,7 +1499,7 @@ def tool_modeling_boolean(
         Literal["union", "difference", "intersection"],
         "Boolean operation type",
     ] = "union",
-) -> dict[str, Any]:
+) -> ModelingBooleanOutput:
     """Perform a boolean operation on two meshes.
 
     Args:
@@ -1437,7 +1526,7 @@ def tool_modeling_boolean(
 def tool_modeling_combine(
     meshes: Annotated[list[str], "List of mesh names to combine (minimum 2)"],
     name: Annotated[str | None, "Optional name for the combined mesh"] = None,
-) -> dict[str, Any]:
+) -> ModelingCombineOutput:
     """Combine multiple meshes into one.
 
     Args:
@@ -1462,7 +1551,7 @@ def tool_modeling_combine(
 )
 def tool_modeling_separate(
     mesh: Annotated[str, "Name of the mesh to separate"],
-) -> dict[str, Any]:
+) -> ModelingSeparateOutput:
     """Separate a combined mesh into individual meshes.
 
     Args:
@@ -1491,7 +1580,7 @@ def tool_modeling_merge_vertices(
         list[str] | None,
         "Optional specific vertex components to merge (None = all vertices)",
     ] = None,
-) -> dict[str, Any]:
+) -> ModelingMergeVerticesOutput:
     """Merge vertices within a distance threshold.
 
     Args:
@@ -1523,7 +1612,7 @@ def tool_modeling_bevel(
     offset: Annotated[float, "Bevel offset distance (default 0.5)"] = 0.5,
     segments: Annotated[int, "Number of bevel segments (default 1)"] = 1,
     fraction: Annotated[float, "Bevel fraction (default 0.5)"] = 0.5,
-) -> dict[str, Any]:
+) -> ModelingBevelOutput:
     """Bevel edges or vertices.
 
     Args:
@@ -1559,7 +1648,7 @@ def tool_modeling_bridge(
     divisions: Annotated[int, "Number of divisions in the bridge (default 0)"] = 0,
     twist: Annotated[int, "Twist amount (default 0)"] = 0,
     taper: Annotated[float, "Taper amount (default 1.0)"] = 1.0,
-) -> dict[str, Any]:
+) -> ModelingBridgeOutput:
     """Bridge between edge loops.
 
     Args:
@@ -1593,7 +1682,7 @@ def tool_modeling_insert_edge_loop(
     edge: Annotated[str, "Single edge component (e.g., 'pCube1.e[4]')"],
     divisions: Annotated[int, "Number of edge loops to insert (default 1)"] = 1,
     weight: Annotated[float, "Position weight along the edge (0-1, default 0.5)"] = 0.5,
-) -> dict[str, Any]:
+) -> ModelingInsertEdgeLoopOutput:
     """Insert an edge loop.
 
     Args:
@@ -1619,7 +1708,7 @@ def tool_modeling_insert_edge_loop(
 )
 def tool_modeling_delete_faces(
     faces: Annotated[list[str], "Face components to delete (e.g., ['pCube1.f[0]', 'pCube1.f[3]'])"],
-) -> dict[str, Any]:
+) -> ModelingDeleteFacesOutput:
     """Delete polygon faces.
 
     Args:
@@ -1652,7 +1741,7 @@ def tool_modeling_move_components(
         "Absolute [x, y, z] position (mutually exclusive with translate)",
     ] = None,
     world_space: Annotated[bool, "Use world space coordinates (default True)"] = True,
-) -> dict[str, Any]:
+) -> ModelingMoveComponentsOutput:
     """Move mesh components.
 
     Exactly one of translate or absolute must be provided.
@@ -1689,7 +1778,7 @@ def tool_modeling_freeze_transforms(
     translate: Annotated[bool, "Freeze translation (default True)"] = True,
     rotate: Annotated[bool, "Freeze rotation (default True)"] = True,
     scale: Annotated[bool, "Freeze scale (default True)"] = True,
-) -> dict[str, Any]:
+) -> ModelingFreezeTransformsOutput:
     """Freeze transforms on nodes.
 
     Args:
@@ -1722,7 +1811,7 @@ def tool_modeling_freeze_transforms(
 def tool_modeling_delete_history(
     nodes: Annotated[list[str] | None, "Node names to delete history from"] = None,
     all_nodes: Annotated[bool, "If True, delete history from all nodes in the scene"] = False,
-) -> dict[str, Any]:
+) -> ModelingDeleteHistoryOutput:
     """Delete construction history.
 
     Args:
@@ -1747,7 +1836,7 @@ def tool_modeling_delete_history(
 )
 def tool_modeling_center_pivot(
     nodes: Annotated[list[str], "Node names to center pivots on"],
-) -> dict[str, Any]:
+) -> ModelingCenterPivotOutput:
     """Center pivot on nodes.
 
     Args:
@@ -1773,7 +1862,7 @@ def tool_modeling_set_pivot(
     node: Annotated[str, "Node name to set pivot on"],
     position: Annotated[list[float], "[x, y, z] position for the pivot"],
     world_space: Annotated[bool, "Position is in world space (default True)"] = True,
-) -> dict[str, Any]:
+) -> ModelingSetPivotOutput:
     """Set the pivot point of a node.
 
     Args:
@@ -1810,7 +1899,7 @@ def tool_shading_create_material(
     ] = "lambert",
     name: Annotated[str | None, "Optional name for the material node"] = None,
     color: Annotated[list[float] | None, "Optional [r, g, b] color (0-1 range)"] = None,
-) -> dict[str, Any]:
+) -> ShadingCreateMaterialOutput:
     """Create a new material with shading group.
 
     Args:
@@ -1838,7 +1927,7 @@ def tool_shading_create_material(
 def tool_shading_assign_material(
     targets: Annotated[list[str], "Meshes or face components to assign the material to"],
     material: Annotated[str, "Name of the material (or shading group) to assign"],
-) -> dict[str, Any]:
+) -> ShadingAssignMaterialOutput:
     """Assign a material to targets.
 
     Args:
@@ -1871,7 +1960,7 @@ def tool_shading_set_material_color(
         str,
         "Color attribute name (e.g., 'color', 'baseColor', 'transparency', 'incandescence')",
     ] = "color",
-) -> dict[str, Any]:
+) -> ShadingSetMaterialColorOutput:
     """Set a color attribute on a material.
 
     Args:
@@ -1909,7 +1998,7 @@ def tool_skin_bind(
         Literal["closestDistance", "heatMap", "geodesicVoxel"],
         "Binding algorithm: closestDistance (default), heatMap, or geodesicVoxel",
     ] = "closestDistance",
-) -> dict[str, Any]:
+) -> SkinBindOutput:
     """Bind mesh to skeleton.
 
     Args:
@@ -1941,7 +2030,7 @@ def tool_skin_bind(
 )
 def tool_skin_unbind(
     mesh: Annotated[str, "Name of the mesh to unbind"],
-) -> dict[str, Any]:
+) -> SkinUnbindOutput:
     """Unbind skin cluster from mesh.
 
     Args:
@@ -1965,7 +2054,7 @@ def tool_skin_unbind(
 )
 def tool_skin_influences(
     skin_cluster: Annotated[str, "Name of the skinCluster node"],
-) -> dict[str, Any]:
+) -> SkinInfluencesOutput:
     """List influences on a skin cluster.
 
     Args:
@@ -1996,7 +2085,7 @@ def tool_skin_weights_get(
         int | None,
         "Maximum vertices to return (default 100, use 0 for unlimited)",
     ] = 100,
-) -> dict[str, Any]:
+) -> SkinWeightsGetOutput:
     """Get skin weights with pagination.
 
     Args:
@@ -2029,7 +2118,7 @@ def tool_skin_weights_set(
         "List of {vertex_id: int, weights: {joint: weight}} entries",
     ],
     normalize: Annotated[bool, "Normalize weights after setting (default True)"] = True,
-) -> dict[str, Any]:
+) -> SkinWeightsSetOutput:
     """Set skin weights on vertices.
 
     Args:
@@ -2069,7 +2158,7 @@ def tool_skin_copy_weights(
         Literal["closestJoint", "closestBone", "oneToOne", "name", "label"],
         "Influence matching method (default: closestJoint)",
     ] = "closestJoint",
-) -> dict[str, Any]:
+) -> SkinCopyWeightsOutput:
     """Copy skin weights between meshes.
 
     Args:
@@ -2102,7 +2191,7 @@ def tool_skin_copy_weights(
         openWorldHint=False,
     ),
 )
-def tool_script_list() -> dict[str, Any]:
+def tool_script_list() -> ScriptListOutput:
     """List available scripts.
 
     Returns:
@@ -2135,7 +2224,7 @@ def tool_script_execute(
         int | None,
         "Optional timeout override in seconds (default from MAYA_MCP_SCRIPT_TIMEOUT)",
     ] = None,
-) -> dict[str, Any]:
+) -> ScriptExecuteOutput:
     """Execute a Python script file in Maya.
 
     Args:
@@ -2173,7 +2262,7 @@ def tool_script_run(
         int | None,
         "Optional timeout override in seconds (default from MAYA_MCP_SCRIPT_TIMEOUT)",
     ] = None,
-) -> dict[str, Any]:
+) -> ScriptRunOutput:
     """Execute raw Python or MEL code in Maya.
 
     Args:
@@ -2203,7 +2292,7 @@ def tool_script_run(
 def tool_animation_set_time(
     time: Annotated[float, "The frame number to set as current time"],
     update: Annotated[bool, "Whether to update the viewport (default True)"] = True,
-) -> dict[str, Any]:
+) -> AnimationSetTimeOutput:
     """Set the current time.
 
     Args:
@@ -2226,7 +2315,7 @@ def tool_animation_set_time(
         openWorldHint=False,
     ),
 )
-def tool_animation_get_time_range() -> dict[str, Any]:
+def tool_animation_get_time_range() -> AnimationGetTimeRangeOutput:
     """Get playback range, animation range, and current time.
 
     Returns:
@@ -2257,7 +2346,7 @@ def tool_animation_set_time_range(
         float | None,
         "Animation range end (defaults to max_time)",
     ] = None,
-) -> dict[str, Any]:
+) -> AnimationSetTimeRangeOutput:
     """Set the playback and animation range.
 
     Args:
@@ -2310,7 +2399,7 @@ def tool_animation_set_keyframe(
         TangentType,
         "Out-tangent type: auto, linear, flat, step, stepnext, spline, clamped, plateau, fast, slow",
     ] = "auto",
-) -> dict[str, Any]:
+) -> AnimationSetKeyframeOutput:
     """Set keyframe on attribute(s).
 
     Args:
@@ -2358,7 +2447,7 @@ def tool_animation_get_keyframes(
         float | None,
         "End of time range to query (None = all time)",
     ] = None,
-) -> dict[str, Any]:
+) -> AnimationGetKeyframesOutput:
     """Query keyframes for attribute(s).
 
     Args:
@@ -2403,7 +2492,7 @@ def tool_animation_delete_keyframes(
         float | None,
         "End of time range (None = all time)",
     ] = None,
-) -> dict[str, Any]:
+) -> AnimationDeleteKeyframesOutput:
     """Delete keyframes in a time range.
 
     Args:
@@ -2429,6 +2518,8 @@ def main() -> None:
     This is the main entry point for the server. It starts the FastMCP
     server with stdio transport (the default for MCP).
     """
+    if os.environ.get("MAYA_MCP_SKIP_RUN") == "1":
+        return
     mcp.run()
 
 

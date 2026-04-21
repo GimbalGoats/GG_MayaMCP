@@ -7,11 +7,18 @@ and playback range management work correctly with mocked transport.
 from __future__ import annotations
 
 import json
+from typing import get_type_hints
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from maya_mcp.tools.animation import (
+    AnimationDeleteKeyframesOutput,
+    AnimationGetKeyframesOutput,
+    AnimationGetTimeRangeOutput,
+    AnimationSetKeyframeOutput,
+    AnimationSetTimeOutput,
+    AnimationSetTimeRangeOutput,
     animation_delete_keyframes,
     animation_get_keyframes,
     animation_get_time_range,
@@ -19,6 +26,26 @@ from maya_mcp.tools.animation import (
     animation_set_time,
     animation_set_time_range,
 )
+
+
+class TestAnimationOutputTypes:
+    """Tests for public animation TypedDict return annotations."""
+
+    def test_animation_tools_use_typed_outputs(self) -> None:
+        """Animation tools expose typed output models."""
+        assert get_type_hints(animation_set_time)["return"] is AnimationSetTimeOutput
+        assert get_type_hints(animation_get_time_range)["return"] is AnimationGetTimeRangeOutput
+        assert get_type_hints(animation_set_time_range)["return"] is AnimationSetTimeRangeOutput
+        assert get_type_hints(animation_set_keyframe)["return"] is AnimationSetKeyframeOutput
+        assert get_type_hints(animation_get_keyframes)["return"] is AnimationGetKeyframesOutput
+        assert (
+            get_type_hints(animation_delete_keyframes)["return"] is AnimationDeleteKeyframesOutput
+        )
+
+    def test_animation_keyframe_output_marks_truncation_optional(self) -> None:
+        """Dense keyframe payloads model truncation metadata as optional."""
+        assert "truncated" in AnimationGetKeyframesOutput.__optional_keys__
+        assert "_size_warning" in AnimationGetKeyframesOutput.__optional_keys__
 
 
 class TestAnimationSetTime:

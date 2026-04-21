@@ -6,7 +6,9 @@ This module provides tools for querying NURBS curve geometry.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Literal, cast
+
+from typing_extensions import NotRequired, TypedDict
 
 from maya_mcp.transport import get_client
 from maya_mcp.utils.parsing import parse_json_response
@@ -16,7 +18,48 @@ from maya_mcp.utils.validation import validate_node_name as _validate_node_name
 DEFAULT_CV_LIMIT = 1000
 
 
-def curve_info(node: str) -> dict[str, Any]:
+class _GuardedOutput(TypedDict, total=False):
+    """Metadata added when response size guards truncate a payload."""
+
+    truncated: bool
+    total_count: int
+    _size_warning: str
+    _original_size: int
+    _truncated_size: int
+
+
+class CurveInfoOutput(TypedDict):
+    """Return payload for the curve.info tool."""
+
+    node: str
+    exists: bool
+    is_curve: bool
+    errors: dict[str, Any] | None
+    shape: NotRequired[str]
+    degree: NotRequired[int]
+    spans: NotRequired[int]
+    form: NotRequired[Literal["open", "closed", "periodic", "unknown"]]
+    cv_count: NotRequired[int]
+    knots: NotRequired[list[float]]
+    length: NotRequired[float]
+    bounding_box: NotRequired[list[float]]
+
+
+class CurveCvsOutput(_GuardedOutput):
+    """Return payload for the curve.cvs tool."""
+
+    node: str
+    exists: bool
+    is_curve: bool
+    errors: dict[str, Any] | None
+    shape: NotRequired[str]
+    cv_count: NotRequired[int]
+    cvs: NotRequired[list[list[float]]]
+    offset: NotRequired[int]
+    count: NotRequired[int]
+
+
+def curve_info(node: str) -> CurveInfoOutput:
     """Get information about a NURBS curve.
 
     Returns degree, spans, form, CV count, knots, length, and bounding box.
@@ -93,14 +136,14 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("CurveInfoOutput", parsed)
 
 
 def curve_cvs(
     node: str,
     offset: int = 0,
     limit: int | None = DEFAULT_CV_LIMIT,
-) -> dict[str, Any]:
+) -> CurveCvsOutput:
     """Query CV positions from a NURBS curve with pagination.
 
     Returns CV positions as [x, y, z] arrays in world space.
@@ -191,4 +234,4 @@ def curve_cvs(
     if "cvs" in parsed:
         parsed = guard_response_size(parsed, list_key="cvs")
 
-    return parsed
+    return cast("CurveCvsOutput", parsed)

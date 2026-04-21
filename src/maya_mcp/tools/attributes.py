@@ -7,7 +7,9 @@ Supports batch operations to reduce tool call chaining.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, cast
+
+from typing_extensions import TypedDict
 
 from maya_mcp.transport import get_client
 from maya_mcp.utils.parsing import parse_json_response
@@ -15,10 +17,28 @@ from maya_mcp.utils.validation import validate_attribute_name as _validate_attri
 from maya_mcp.utils.validation import validate_node_name as _validate_node_name
 
 
+class AttributesGetOutput(TypedDict):
+    """Return payload for the attributes.get tool."""
+
+    node: str
+    attributes: dict[str, Any]
+    count: int
+    errors: dict[str, str] | None
+
+
+class AttributesSetOutput(TypedDict):
+    """Return payload for the attributes.set tool."""
+
+    node: str
+    set: list[str]
+    count: int
+    errors: dict[str, str] | None
+
+
 def attributes_get(
     node: str,
     attributes: list[str],
-) -> dict[str, Any]:
+) -> AttributesGetOutput:
     """Get one or more attribute values from a Maya node.
 
     Supports batch attribute queries to reduce tool call chaining.
@@ -107,13 +127,13 @@ print(json.dumps(result))
     else:
         result["errors"] = None
 
-    return result
+    return cast("AttributesGetOutput", result)
 
 
 def attributes_set(
     node: str,
     attributes: dict[str, Any],
-) -> dict[str, Any]:
+) -> AttributesSetOutput:
     """Set one or more attribute values on a Maya node.
 
     Supports batch attribute setting to reduce tool call chaining.
@@ -211,4 +231,4 @@ print(json.dumps(result))
     else:
         result["errors"] = None
 
-    return result
+    return cast("AttributesSetOutput", result)

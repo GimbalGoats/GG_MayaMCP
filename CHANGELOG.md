@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     Maya's interactive "Save changes?" dialog from blocking commandPort
   - `force=True` discards unsaved changes without prompting
 - Shared `parse_json_response()` utility in `maya_mcp.utils.parsing`
+- Typed output models and explicit `outputSchema` coverage across the tool
+  surface, including core read-only tools, `attributes`, `selection`, heavy
+  data tools, and the remaining `connections`, `animation`, `modeling`,
+  `shading`, `scripts`, and `viewport` families
+- Env-gated Code Mode prototype in `maya_mcp.code_mode`
+  - Disabled by default
+  - Requires `MAYA_MCP_CODE_MODE=1` to enable
+  - Uses fixed sandbox limits
 - **M14: Polygon Modeling Tools**
   - `modeling.create_polygon_primitive` — create cube, sphere, cylinder, cone, torus, plane
   - `modeling.extrude_faces` — extrude polygon faces with local translation and offset
@@ -47,12 +55,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reserved JavaScript property name `constructor` in MCP responses replaced with
   `constructor_node` to avoid `Object.prototype.constructor` collision causing
   Zod validation failures
+- Direct `src/maya_mcp/server.py` launch no longer fails because the local
+  `src/maya_mcp/types.py` module shadows Python's standard-library `types`
+  module when the server is started as a script
 - `json.dumps(None)` producing `"null"` instead of Python `None` in Maya commands
   sent via commandPort, causing `NameError` on the Maya side
 - Dynamic code block indentation mismatch in f-string Maya command builders
+- Noisy commandPort JSON responses are now cleaned before FastMCP tool wrappers
+  consume them
 
 ### Changed
 
+- FastMCP integration updated to v3-compatible wiring
+- Supported Python runtime is now effectively 3.10.1+; Python 3.10.0 is
+  excluded because its stdlib `dataclasses.make_dataclass()` implementation
+  lacks the `kw_only` support expected by current FastMCP structured-output
+  parsing
 - Consolidated all 13 response-parsing blocks across 4 tool files into shared
   `parse_json_response()` helper, eliminating 3 inconsistent patterns
 - Transport parser (`_parse_maya_response`) now prefers last JSON-like part in

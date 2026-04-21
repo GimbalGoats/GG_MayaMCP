@@ -7,7 +7,9 @@ to meshes or face components, and setting material attributes.
 from __future__ import annotations
 
 import json
-from typing import Any, Literal
+from typing import Any, Literal, cast
+
+from typing_extensions import TypedDict
 
 from maya_mcp.transport import get_client
 from maya_mcp.utils.parsing import parse_json_response
@@ -16,11 +18,38 @@ from maya_mcp.utils.validation import validate_node_name as _validate_node_name
 VALID_MATERIAL_TYPES = {"lambert", "blinn", "phong", "standardSurface"}
 
 
+class ShadingCreateMaterialOutput(TypedDict):
+    """Return payload for the shading.create_material tool."""
+
+    material: str | None
+    shading_group: str | None
+    material_type: Literal["lambert", "blinn", "phong", "standardSurface"]
+    errors: dict[str, str] | None
+
+
+class ShadingAssignMaterialOutput(TypedDict):
+    """Return payload for the shading.assign_material tool."""
+
+    assigned: list[str]
+    material: str
+    shading_group: str | None
+    errors: dict[str, str] | None
+
+
+class ShadingSetMaterialColorOutput(TypedDict):
+    """Return payload for the shading.set_material_color tool."""
+
+    material: str
+    attribute: str
+    color: list[float]
+    errors: dict[str, str] | None
+
+
 def shading_create_material(
     material_type: Literal["lambert", "blinn", "phong", "standardSurface"] = "lambert",
     name: str | None = None,
     color: list[float] | None = None,
-) -> dict[str, Any]:
+) -> ShadingCreateMaterialOutput:
     """Create a new material with an associated shading group.
 
     Args:
@@ -94,13 +123,13 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("ShadingCreateMaterialOutput", parsed)
 
 
 def shading_assign_material(
     targets: list[str],
     material: str,
-) -> dict[str, Any]:
+) -> ShadingAssignMaterialOutput:
     """Assign a material to meshes or face components.
 
     Resolves the material's shading group automatically. Accepts
@@ -175,14 +204,14 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("ShadingAssignMaterialOutput", parsed)
 
 
 def shading_set_material_color(
     material: str,
     color: list[float],
     attribute: str = "color",
-) -> dict[str, Any]:
+) -> ShadingSetMaterialColorOutput:
     """Set a color attribute on a material.
 
     Args:
@@ -242,4 +271,4 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("ShadingSetMaterialColorOutput", parsed)

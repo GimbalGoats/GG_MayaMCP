@@ -7,11 +7,30 @@ work correctly with mocked transport.
 from __future__ import annotations
 
 import json
+from typing import get_origin, get_type_hints
 from unittest.mock import MagicMock, patch
 
 import pytest
+from typing_extensions import NotRequired
 
-from maya_mcp.tools.curve import curve_cvs, curve_info
+from maya_mcp.tools.curve import CurveCvsOutput, CurveInfoOutput, curve_cvs, curve_info
+
+
+class TestCurveOutputTypes:
+    """Tests for public curve TypedDict return annotations."""
+
+    def test_curve_tools_use_typed_outputs(self) -> None:
+        """Curve tools expose typed output models."""
+        assert get_type_hints(curve_info)["return"] is CurveInfoOutput
+        assert get_type_hints(curve_cvs)["return"] is CurveCvsOutput
+
+    def test_curve_outputs_mark_dense_and_truncated_fields_optional(self) -> None:
+        """Curve payloads model fields that only appear on successful queries."""
+        hints = get_type_hints(CurveInfoOutput, include_extras=True)
+        assert get_origin(hints["shape"]) is NotRequired
+        assert get_origin(hints["knots"]) is NotRequired
+        assert "truncated" in CurveCvsOutput.__optional_keys__
+        assert "_size_warning" in CurveCvsOutput.__optional_keys__
 
 
 class TestCurveInfo:

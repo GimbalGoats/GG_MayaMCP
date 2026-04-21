@@ -1,3 +1,10 @@
+---
+summary: "Documentation entrypoint with quick start, tool coverage, and links to canonical project docs."
+read_when:
+  - When first orienting to Maya MCP or deciding which project doc to read next.
+  - When updating quick-start setup, client configuration, or the high-level tool coverage table.
+---
+
 # Maya MCP
 
 Maya MCP is an MCP server for controlling Autodesk Maya through `commandPort`.
@@ -25,6 +32,11 @@ From source:
 ```bash
 pip install -e ".[dev]"
 ```
+
+The server targets the current FastMCP 3 line: `fastmcp>=3.2.4,<4`.
+Use Python 3.10.1 or newer. Python 3.10.0 is excluded because its stdlib
+`dataclasses.make_dataclass()` implementation is not compatible with current
+FastMCP structured-output parsing.
 
 ### Enable Maya `commandPort`
 
@@ -55,6 +67,13 @@ Or:
 
 ```bash
 python -m maya_mcp.server
+```
+
+For local development from a source checkout, direct script launch is also
+supported:
+
+```bash
+python src/maya_mcp/server.py
 ```
 
 ### Configure a client

@@ -1,3 +1,10 @@
+---
+summary: "Product requirements, scope, goals, non-goals, current milestone status, and planned direction."
+read_when:
+  - When evaluating feature scope, product goals, non-goals, or roadmap fit.
+  - When changing workflow coverage or documenting why a capability is in or out of scope.
+---
+
 # Product Requirements Document
 
 **Product**: Maya MCP  

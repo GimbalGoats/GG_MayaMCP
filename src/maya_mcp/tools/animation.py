@@ -7,7 +7,9 @@ and playback range management for animation workflows.
 from __future__ import annotations
 
 import json
-from typing import Any, Literal, get_args
+from typing import Any, Literal, cast, get_args
+
+from typing_extensions import TypedDict
 
 from maya_mcp.tools.scene import TIME_UNIT_TO_FPS
 from maya_mcp.transport import get_client
@@ -31,10 +33,86 @@ TangentType = Literal[
 VALID_TANGENT_TYPES: frozenset[str] = frozenset(get_args(TangentType))
 
 
+class _GuardedOutput(TypedDict, total=False):
+    """Metadata added when response size guards truncate a payload."""
+
+    truncated: bool
+    total_count: int
+    _size_warning: str
+    _original_size: int
+    _truncated_size: int
+
+
+class AnimationSetTimeOutput(TypedDict):
+    """Return payload for the animation.set_time tool."""
+
+    time: float | None
+    errors: dict[str, str] | None
+
+
+class AnimationGetTimeRangeOutput(TypedDict):
+    """Return payload for the animation.get_time_range tool."""
+
+    current_time: float | None
+    min_time: float | None
+    max_time: float | None
+    animation_start: float | None
+    animation_end: float | None
+    fps: float | str | None
+    errors: dict[str, str] | None
+
+
+class AnimationSetTimeRangeOutput(TypedDict):
+    """Return payload for the animation.set_time_range tool."""
+
+    min_time: float | None
+    max_time: float | None
+    animation_start: float | None
+    animation_end: float | None
+    errors: dict[str, str] | None
+
+
+class AnimationSetKeyframeOutput(TypedDict):
+    """Return payload for the animation.set_keyframe tool."""
+
+    node: str
+    attributes: list[str]
+    time: float | None
+    keyframe_count: int
+    errors: dict[str, str] | None
+
+
+class KeyframeEntry(TypedDict):
+    """A single animation keyframe."""
+
+    time: float
+    value: float
+
+
+class AnimationGetKeyframesOutput(_GuardedOutput):
+    """Return payload for the animation.get_keyframes tool."""
+
+    node: str
+    keyframes: dict[str, list[KeyframeEntry]]
+    attribute_count: int
+    total_keyframe_count: int
+    errors: dict[str, str] | None
+
+
+class AnimationDeleteKeyframesOutput(TypedDict):
+    """Return payload for the animation.delete_keyframes tool."""
+
+    node: str
+    deleted_count: int
+    attributes: list[str]
+    time_range: list[float] | Literal["all"]
+    errors: dict[str, str] | None
+
+
 def animation_set_time(
     time: float,
     update: bool = True,
-) -> dict[str, Any]:
+) -> AnimationSetTimeOutput:
     """Set the current time (go to a specific frame).
 
     Args:
@@ -72,10 +150,10 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("AnimationSetTimeOutput", parsed)
 
 
-def animation_get_time_range() -> dict[str, Any]:
+def animation_get_time_range() -> AnimationGetTimeRangeOutput:
     """Get playback range, animation range, and current time.
 
     Returns:
@@ -127,7 +205,7 @@ print(json.dumps(result))
     if parsed.get("fps") and isinstance(parsed["fps"], str):
         parsed["fps"] = TIME_UNIT_TO_FPS.get(parsed["fps"], parsed["fps"])
 
-    return parsed
+    return cast("AnimationGetTimeRangeOutput", parsed)
 
 
 def animation_set_time_range(
@@ -135,7 +213,7 @@ def animation_set_time_range(
     max_time: float,
     animation_start: float | None = None,
     animation_end: float | None = None,
-) -> dict[str, Any]:
+) -> AnimationSetTimeRangeOutput:
     """Set the playback and animation range.
 
     Args:
@@ -209,7 +287,7 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("AnimationSetTimeRangeOutput", parsed)
 
 
 def animation_set_keyframe(
@@ -219,7 +297,7 @@ def animation_set_keyframe(
     value: float | None = None,
     in_tangent_type: TangentType = "auto",
     out_tangent_type: TangentType = "auto",
-) -> dict[str, Any]:
+) -> AnimationSetKeyframeOutput:
     """Set keyframe on attribute(s) at current or specified time.
 
     Args:
@@ -311,7 +389,7 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("AnimationSetKeyframeOutput", parsed)
 
 
 def _validate_time_range(
@@ -387,7 +465,7 @@ def _validate_optional_attributes(attributes: list[str] | None) -> None:
             _validate_attribute_name(attr)
 
 
-def _guard_keyframe_response(parsed: dict[str, Any]) -> dict[str, Any]:
+def _guard_keyframe_response(parsed: dict[str, Any]) -> AnimationGetKeyframesOutput:
     """Guard keyframe response against oversized data.
 
     Flattens the nested keyframes dict for size checking, and if
@@ -396,7 +474,7 @@ def _guard_keyframe_response(parsed: dict[str, Any]) -> dict[str, Any]:
     from maya_mcp.utils.response_guard import guard_response_size
 
     if "keyframes" not in parsed or not isinstance(parsed["keyframes"], dict):
-        return parsed
+        return cast("AnimationGetKeyframesOutput", parsed)
 
     flat: list[dict[str, Any]] = []
     for attr_name, entries in parsed["keyframes"].items():
@@ -405,13 +483,13 @@ def _guard_keyframe_response(parsed: dict[str, Any]) -> dict[str, Any]:
                 flat.append({"attribute": attr_name, **entry})
 
     if not flat:
-        return parsed
+        return cast("AnimationGetKeyframesOutput", parsed)
 
     guard_data: dict[str, Any] = {**parsed, "_flat_keyframes": flat}
     guarded = guard_response_size(guard_data, list_key="_flat_keyframes")
 
     if "_size_warning" not in guarded:
-        return parsed
+        return cast("AnimationGetKeyframesOutput", parsed)
 
     parsed["_size_warning"] = guarded["_size_warning"]
     parsed["_original_size"] = guarded.get("_original_size")
@@ -424,7 +502,7 @@ def _guard_keyframe_response(parsed: dict[str, Any]) -> dict[str, Any]:
     parsed["total_keyframe_count"] = sum(len(v) for v in truncated.values())
     parsed["truncated"] = True
 
-    return parsed
+    return cast("AnimationGetKeyframesOutput", parsed)
 
 
 def animation_get_keyframes(
@@ -432,7 +510,7 @@ def animation_get_keyframes(
     attributes: list[str] | None = None,
     time_range_start: float | None = None,
     time_range_end: float | None = None,
-) -> dict[str, Any]:
+) -> AnimationGetKeyframesOutput:
     """Query keyframes for attribute(s) on a node within optional time range.
 
     Args:
@@ -523,9 +601,9 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    parsed = _guard_keyframe_response(parsed)
+    guarded = _guard_keyframe_response(parsed)
 
-    return parsed
+    return guarded
 
 
 def animation_delete_keyframes(
@@ -533,7 +611,7 @@ def animation_delete_keyframes(
     attributes: list[str] | None = None,
     time_range_start: float | None = None,
     time_range_end: float | None = None,
-) -> dict[str, Any]:
+) -> AnimationDeleteKeyframesOutput:
     """Delete keyframes in a time range for attribute(s).
 
     Args:
@@ -625,4 +703,4 @@ print(json.dumps(result))
     if not parsed.get("errors"):
         parsed["errors"] = None
 
-    return parsed
+    return cast("AnimationDeleteKeyframesOutput", parsed)

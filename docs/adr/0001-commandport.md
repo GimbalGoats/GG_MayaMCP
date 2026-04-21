@@ -1,3 +1,10 @@
+---
+summary: "Architecture decision record for using Maya commandPort as the MCP-to-Maya communication mechanism."
+read_when:
+  - When reconsidering transport architecture, commandPort alternatives, or cross-process communication decisions.
+  - When changing assumptions about localhost-only communication, Maya process isolation, or transport deployment.
+---
+
 # ADR-0001: Use Maya `commandPort` for Communication
 
 **Status**: Accepted  
