@@ -202,6 +202,46 @@ def test_skin_weights_get_reports_progress_while_chunking() -> None:
     ]
 
 
+def test_skin_weights_get_unlimited_uses_single_fetch() -> None:
+    """skin.weights.get avoids chunk aggregation for unlimited requests."""
+    from maya_mcp.registrars.skin import tool_skin_weights_get
+
+    ctx = _make_progress_ctx()
+    unlimited = {
+        "skin_cluster": "skinCluster1",
+        "mesh": "pCube1",
+        "vertex_count": 5000,
+        "influence_count": 1,
+        "influences": ["joint1"],
+        "vertices": _make_weight_vertices(0, 5000),
+        "offset": 0,
+        "count": 5000,
+        "errors": None,
+    }
+
+    with patch(
+        "maya_mcp.registrars.skin.skin_weights_get",
+        return_value=unlimited,
+    ) as mock_skin_weights_get:
+        result = asyncio.run(
+            tool_skin_weights_get(
+                skin_cluster="skinCluster1",
+                offset=0,
+                limit=0,
+                ctx=ctx,
+            )
+        )
+
+    assert result == unlimited
+    assert [call.kwargs for call in mock_skin_weights_get.call_args_list] == [
+        {"skin_cluster": "skinCluster1", "offset": 0, "limit": 0},
+    ]
+    assert [call.kwargs for call in ctx.report_progress.await_args_list] == [
+        {"progress": 0, "total": None, "message": "Fetching skin weight data"},
+        {"progress": 1, "total": 1, "message": "Fetched skin weight data"},
+    ]
+
+
 def test_skin_weights_set_reports_progress_while_batching() -> None:
     """skin.weights.set emits progress while applying batched writes."""
     from maya_mcp.registrars.skin import tool_skin_weights_set

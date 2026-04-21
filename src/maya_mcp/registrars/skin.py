@@ -121,6 +121,16 @@ async def tool_skin_weights_get(
     """
     await report_progress(ctx, 0, None, "Fetching skin weight data")
 
+    if limit is None or limit == 0:
+        result = await asyncio.to_thread(
+            skin_weights_get,
+            skin_cluster=skin_cluster,
+            offset=offset,
+            limit=limit,
+        )
+        await report_progress(ctx, 1, 1, "Fetched skin weight data")
+        return result
+
     first_limit = SKIN_WEIGHTS_GET_PROGRESS_CHUNK_SIZE
     if limit is not None and limit > 0:
         first_limit = min(first_limit, limit)
