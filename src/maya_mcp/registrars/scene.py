@@ -9,6 +9,7 @@ from mcp.types import ToolAnnotations
 
 from maya_mcp.registrars._progress import report_progress
 from maya_mcp.tools.scene import (
+    SCENE_UNSAVED_CHANGES_ERROR,
     SceneExportOutput,
     SceneImportOutput,
     SceneInfoOutput,
@@ -37,6 +38,64 @@ else:
     Context = import_module("fastmcp").Context
 
 
+def _supports_form_elicitation(ctx: Context) -> bool:
+    """Return whether the negotiated client capabilities allow form elicitation."""
+    try:
+        client_params = ctx.session.client_params
+    except RuntimeError:
+        return False
+
+    if client_params is None:
+        return False
+
+    elicitation = client_params.capabilities.elicitation
+    if elicitation is None:
+        return False
+
+    # Per the MCP spec, an empty elicitation capability object implies form support.
+    return elicitation.form is not None or elicitation.url is None
+
+
+def _is_unsaved_changes_refusal(
+    result: SceneNewOutput | SceneOpenOutput,
+) -> bool:
+    """Return whether a scene tool result represents the standard unsaved-changes refusal."""
+    return (
+        result["success"] is False
+        and result["was_modified"] is True
+        and result["error"] == SCENE_UNSAVED_CHANGES_ERROR
+    )
+
+
+async def _confirm_discard_unsaved_changes(ctx: Context, operation: str) -> bool:
+    """Prompt the user to discard unsaved changes when the client supports elicitation."""
+    result = await ctx.session.elicit_form(
+        message=(
+            f"The current Maya scene has unsaved changes. "
+            f"Discard those changes and continue with {operation}?"
+        ),
+        requestedSchema={
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["discard", "cancel"],
+                    "title": "Action",
+                    "description": "Choose whether to discard unsaved changes and continue.",
+                }
+            },
+            "required": ["action"],
+            "additionalProperties": False,
+        },
+        related_request_id=ctx.request_id,
+    )
+    return (
+        result.action == "accept"
+        and result.content is not None
+        and result.content.get("action") == "discard"
+    )
+
+
 def tool_scene_info() -> SceneInfoOutput:
     """Get current scene information.
 
@@ -45,22 +104,31 @@ def tool_scene_info() -> SceneInfoOutput:
     return scene_info()
 
 
-def tool_scene_new(
+async def tool_scene_new(
     force: Annotated[
         bool,
         "If True, discard unsaved changes. If False (default), refuse when scene has unsaved changes.",
     ] = False,
+    ctx: Context | None = None,
 ) -> SceneNewOutput:
     """Create a new empty Maya scene.
 
     Args:
         force: If True, discard unsaved changes and create new scene.
             If False (default), refuse when scene has unsaved changes.
+        ctx: FastMCP request context, used for capability-gated elicitation.
 
     Returns:
         Dictionary with success, previous_file, was_modified, and error.
     """
-    return scene_new(force=force)
+    result = await asyncio.to_thread(scene_new, force=force)
+    if force or ctx is None or not _is_unsaved_changes_refusal(result):
+        return result
+    if not _supports_form_elicitation(ctx):
+        return result
+    if not await _confirm_discard_unsaved_changes(ctx, "creating a new scene"):
+        return result
+    return await asyncio.to_thread(scene_new, force=True)
 
 
 def tool_scene_save() -> SceneSaveOutput:
@@ -89,7 +157,7 @@ def tool_scene_save_as(
     return scene_save_as(file_path=file_path)
 
 
-def tool_scene_open(
+async def tool_scene_open(
     file_path: Annotated[
         str,
         "Path to the Maya scene file to open (.ma or .mb)",
@@ -98,6 +166,7 @@ def tool_scene_open(
         bool,
         "If True, discard unsaved changes. If False (default), refuse when scene has unsaved changes.",
     ] = False,
+    ctx: Context | None = None,
 ) -> SceneOpenOutput:
     """Open a Maya scene file.
 
@@ -105,11 +174,19 @@ def tool_scene_open(
         file_path: Path to the scene file (.ma or .mb).
         force: If True, discard unsaved changes and open the file.
             If False (default), refuse when scene has unsaved changes.
+        ctx: FastMCP request context, used for capability-gated elicitation.
 
     Returns:
         Dictionary with success, file_path, previous_file, was_modified, and error.
     """
-    return scene_open(file_path=file_path, force=force)
+    result = await asyncio.to_thread(scene_open, file_path=file_path, force=force)
+    if force or ctx is None or not _is_unsaved_changes_refusal(result):
+        return result
+    if not _supports_form_elicitation(ctx):
+        return result
+    if not await _confirm_discard_unsaved_changes(ctx, f"opening {file_path!r}"):
+        return result
+    return await asyncio.to_thread(scene_open, file_path=file_path, force=True)
 
 
 def tool_scene_undo() -> SceneUndoOutput:
@@ -221,7 +298,9 @@ def register_scene_tools(mcp: FastMCP) -> None:
         name="scene.new",
         description="Create a new empty Maya scene. "
         "Checks for unsaved changes first and refuses by default if the scene was modified. "
-        "Use force=True to discard unsaved changes.",
+        "Use force=True to discard unsaved changes. "
+        "When a client supports form elicitation, the server may ask for confirmation instead "
+        "of requiring an immediate retry.",
         annotations=ToolAnnotations(
             readOnlyHint=False,
             destructiveHint=False,
@@ -259,6 +338,8 @@ def register_scene_tools(mcp: FastMCP) -> None:
         description="Open a Maya scene file. "
         "Validates the file path and checks for unsaved changes before proceeding. "
         "Use force=True to discard unsaved changes. "
+        "When a client supports form elicitation, the server may ask for confirmation instead "
+        "of requiring an immediate retry. "
         "Supported formats: .ma (Maya ASCII), .mb (Maya Binary).",
         annotations=ToolAnnotations(
             readOnlyHint=False,

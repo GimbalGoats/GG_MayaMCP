@@ -1640,11 +1640,7 @@ Query vertex positions from a mesh with offset/limit pagination.
 
 ### `mesh.evaluate`
 
-<<<<<<< HEAD
 When the MCP client supplies a progress token, the server may emit progress notifications at the start of analysis and as each requested topology check completes. The JSON response shape does not change.
-=======
-When the MCP client supplies a progress token, the server may emit progress notifications as each requested topology check completes. The JSON response shape does not change.
->>>>>>> 1832c45 (docs(scene): document elicitation fallback for unsaved changes)
 
 Analyze mesh topology for issues: non-manifold edges, lamina faces, holes, and border edges.
 
@@ -2890,11 +2886,7 @@ List influences (joints) on a skin cluster with index mapping.
 
 Get per-vertex skin weights with offset/limit pagination.
 
-<<<<<<< HEAD
 When the MCP client supplies a progress token, the server may emit progress notifications at the start of the request and, for paginated requests, while traversing the requested vertex range. The JSON response shape does not change.
-=======
-When the MCP client supplies a progress token, the server may emit progress notifications while paginating through the requested vertex range. The JSON response shape does not change.
->>>>>>> 1832c45 (docs(scene): document elicitation fallback for unsaved changes)
 
 **Input**:
 
@@ -2957,11 +2949,7 @@ When the MCP client supplies a progress token, the server may emit progress noti
 
 Set per-vertex skin weights with optional normalization.
 
-<<<<<<< HEAD
 When the MCP client supplies a progress token, the server may emit progress notifications at the start of the request and while applying batches of weight edits. The JSON response shape does not change.
-=======
-When the MCP client supplies a progress token, the server may emit progress notifications while applying batches of weight edits. The JSON response shape does not change.
->>>>>>> 1832c45 (docs(scene): document elicitation fallback for unsaved changes)
 
 **Input**:
 
@@ -3512,6 +3500,8 @@ Import a file into the current Maya scene.
 ### `scene.export`
 
 Export scene content to a file.
+
+When the MCP client supplies a progress token, the server may emit coarse progress notifications for export preparation, execution, and completion. The JSON response shape does not change.
 
 **Input**:
 

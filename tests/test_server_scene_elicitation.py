@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, call, patch
 
 
 def _make_ctx(*, elicitation: object | None) -> SimpleNamespace:
@@ -22,7 +22,7 @@ def _make_ctx(*, elicitation: object | None) -> SimpleNamespace:
 
 def test_scene_new_keeps_refusal_for_old_clients() -> None:
     """scene.new returns the current refusal unchanged when elicitation is unavailable."""
-    from maya_mcp.server import tool_scene_new
+    from maya_mcp.registrars.scene import tool_scene_new
     from maya_mcp.tools.scene import SCENE_UNSAVED_CHANGES_ERROR
 
     ctx = _make_ctx(elicitation=None)
@@ -33,7 +33,7 @@ def test_scene_new_keeps_refusal_for_old_clients() -> None:
         "error": SCENE_UNSAVED_CHANGES_ERROR,
     }
 
-    with patch("maya_mcp.server.scene_new", return_value=refusal) as mock_scene_new:
+    with patch("maya_mcp.registrars.scene.scene_new", return_value=refusal) as mock_scene_new:
         result = asyncio.run(tool_scene_new(force=False, ctx=ctx))
 
     assert result == refusal
@@ -44,7 +44,7 @@ def test_scene_new_keeps_refusal_for_old_clients() -> None:
 
 def test_scene_new_retries_with_force_after_form_elicitation_accept() -> None:
     """scene.new retries with force=True after a supported client confirms discard."""
-    from maya_mcp.server import tool_scene_new
+    from maya_mcp.registrars.scene import tool_scene_new
     from maya_mcp.tools.scene import SCENE_UNSAVED_CHANGES_ERROR
 
     ctx = _make_ctx(elicitation=SimpleNamespace(form=object(), url=None))
@@ -65,7 +65,9 @@ def test_scene_new_retries_with_force_after_form_elicitation_accept() -> None:
         "error": None,
     }
 
-    with patch("maya_mcp.server.scene_new", side_effect=[refusal, success]) as mock_scene_new:
+    with patch(
+        "maya_mcp.registrars.scene.scene_new", side_effect=[refusal, success]
+    ) as mock_scene_new:
         result = asyncio.run(tool_scene_new(force=False, ctx=ctx))
 
     assert result == success
@@ -75,9 +77,44 @@ def test_scene_new_retries_with_force_after_form_elicitation_accept() -> None:
     ctx.session.elicit_form.assert_awaited_once()
 
 
+def test_scene_new_retries_with_force_via_worker_thread_after_elicitation_accept() -> None:
+    """scene.new offloads both sync Maya calls when retrying after elicitation."""
+    from maya_mcp.registrars import scene as scene_registrar
+    from maya_mcp.tools.scene import SCENE_UNSAVED_CHANGES_ERROR
+
+    ctx = _make_ctx(elicitation=SimpleNamespace(form=object(), url=None))
+    ctx.session.elicit_form.return_value = SimpleNamespace(
+        action="accept",
+        content={"action": "discard"},
+    )
+    refusal = {
+        "success": False,
+        "previous_file": "C:/projects/current.ma",
+        "was_modified": True,
+        "error": SCENE_UNSAVED_CHANGES_ERROR,
+    }
+    success = {
+        "success": True,
+        "previous_file": "C:/projects/current.ma",
+        "was_modified": True,
+        "error": None,
+    }
+    async_to_thread = AsyncMock(side_effect=[refusal, success])
+
+    with patch("maya_mcp.registrars.scene.asyncio.to_thread", async_to_thread):
+        result = asyncio.run(scene_registrar.tool_scene_new(force=False, ctx=ctx))
+
+    assert result == success
+    assert async_to_thread.await_args_list == [
+        call(scene_registrar.scene_new, force=False),
+        call(scene_registrar.scene_new, force=True),
+    ]
+    ctx.session.elicit_form.assert_awaited_once()
+
+
 def test_scene_new_empty_elicitation_capability_treated_as_form_support() -> None:
     """scene.new treats an empty elicitation capability object as form-capable."""
-    from maya_mcp.server import tool_scene_new
+    from maya_mcp.registrars.scene import tool_scene_new
     from maya_mcp.tools.scene import SCENE_UNSAVED_CHANGES_ERROR
 
     ctx = _make_ctx(elicitation=SimpleNamespace(form=None, url=None))
@@ -98,7 +135,9 @@ def test_scene_new_empty_elicitation_capability_treated_as_form_support() -> Non
         "error": None,
     }
 
-    with patch("maya_mcp.server.scene_new", side_effect=[refusal, success]) as mock_scene_new:
+    with patch(
+        "maya_mcp.registrars.scene.scene_new", side_effect=[refusal, success]
+    ) as mock_scene_new:
         result = asyncio.run(tool_scene_new(force=False, ctx=ctx))
 
     assert result == success
@@ -108,7 +147,7 @@ def test_scene_new_empty_elicitation_capability_treated_as_form_support() -> Non
 
 def test_scene_open_keeps_refusal_for_url_only_clients() -> None:
     """scene.open does not use elicitation when the client only supports URL mode."""
-    from maya_mcp.server import tool_scene_open
+    from maya_mcp.registrars.scene import tool_scene_open
     from maya_mcp.tools.scene import SCENE_UNSAVED_CHANGES_ERROR
 
     ctx = _make_ctx(elicitation=SimpleNamespace(form=None, url=object()))
@@ -120,7 +159,7 @@ def test_scene_open_keeps_refusal_for_url_only_clients() -> None:
         "error": SCENE_UNSAVED_CHANGES_ERROR,
     }
 
-    with patch("maya_mcp.server.scene_open", return_value=refusal) as mock_scene_open:
+    with patch("maya_mcp.registrars.scene.scene_open", return_value=refusal) as mock_scene_open:
         result = asyncio.run(tool_scene_open(file_path="C:/projects/next.ma", force=False, ctx=ctx))
 
     assert result == refusal
@@ -134,7 +173,7 @@ def test_scene_open_keeps_refusal_for_url_only_clients() -> None:
 
 def test_scene_open_retries_with_force_after_form_elicitation_accept() -> None:
     """scene.open retries with force=True after a supported client confirms discard."""
-    from maya_mcp.server import tool_scene_open
+    from maya_mcp.registrars.scene import tool_scene_open
     from maya_mcp.tools.scene import SCENE_UNSAVED_CHANGES_ERROR
 
     ctx = _make_ctx(elicitation=SimpleNamespace(form=object(), url=None))
@@ -157,7 +196,9 @@ def test_scene_open_retries_with_force_after_form_elicitation_accept() -> None:
         "error": None,
     }
 
-    with patch("maya_mcp.server.scene_open", side_effect=[refusal, success]) as mock_scene_open:
+    with patch(
+        "maya_mcp.registrars.scene.scene_open", side_effect=[refusal, success]
+    ) as mock_scene_open:
         result = asyncio.run(tool_scene_open(file_path="C:/projects/next.ma", force=False, ctx=ctx))
 
     assert result == success
@@ -170,6 +211,49 @@ def test_scene_open_retries_with_force_after_form_elicitation_accept() -> None:
         "file_path": "C:/projects/next.ma",
         "force": True,
     }
+    ctx.session.elicit_form.assert_awaited_once()
+
+
+def test_scene_open_retries_with_force_via_worker_thread_after_elicitation_accept() -> None:
+    """scene.open offloads both sync Maya calls when retrying after elicitation."""
+    from maya_mcp.registrars import scene as scene_registrar
+    from maya_mcp.tools.scene import SCENE_UNSAVED_CHANGES_ERROR
+
+    ctx = _make_ctx(elicitation=SimpleNamespace(form=object(), url=None))
+    ctx.session.elicit_form.return_value = SimpleNamespace(
+        action="accept",
+        content={"action": "discard"},
+    )
+    refusal = {
+        "success": False,
+        "file_path": None,
+        "previous_file": "C:/projects/current.ma",
+        "was_modified": True,
+        "error": SCENE_UNSAVED_CHANGES_ERROR,
+    }
+    success = {
+        "success": True,
+        "file_path": "C:/projects/next.ma",
+        "previous_file": "C:/projects/current.ma",
+        "was_modified": True,
+        "error": None,
+    }
+    async_to_thread = AsyncMock(side_effect=[refusal, success])
+
+    with patch("maya_mcp.registrars.scene.asyncio.to_thread", async_to_thread):
+        result = asyncio.run(
+            scene_registrar.tool_scene_open(
+                file_path="C:/projects/next.ma",
+                force=False,
+                ctx=ctx,
+            )
+        )
+
+    assert result == success
+    assert async_to_thread.await_args_list == [
+        call(scene_registrar.scene_open, file_path="C:/projects/next.ma", force=False),
+        call(scene_registrar.scene_open, file_path="C:/projects/next.ma", force=True),
+    ]
     ctx.session.elicit_form.assert_awaited_once()
 
 
