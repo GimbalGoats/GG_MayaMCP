@@ -84,15 +84,19 @@ class TestSceneInfo:
     def test_scene_info_ignores_prefixed_plugin_output(self, prefix_line: str) -> None:
         """Scene info tolerates extra output before the JSON payload."""
         mock_client = MagicMock()
-        mock_client.execute.return_value = prefix_line + "\n" + json.dumps(
-            {
-                "scene_name": None,
-                "modified": False,
-                "time_unit": "film",
-                "min_time": 1.0,
-                "max_time": 24.0,
-                "up_axis": "y",
-            }
+        mock_client.execute.return_value = (
+            prefix_line
+            + "\n"
+            + json.dumps(
+                {
+                    "scene_name": None,
+                    "modified": False,
+                    "time_unit": "film",
+                    "min_time": 1.0,
+                    "max_time": 24.0,
+                    "up_axis": "y",
+                }
+            )
         )
 
         with patch("maya_mcp.tools.scene.get_client", return_value=mock_client):

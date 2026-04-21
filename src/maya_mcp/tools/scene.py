@@ -6,7 +6,9 @@ This module provides tools for querying and manipulating Maya scenes.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Literal
+
+from typing_extensions import TypedDict
 
 from maya_mcp.errors import ValidationError
 from maya_mcp.transport import get_client
@@ -93,7 +95,17 @@ ALLOWED_EXPORT_EXTENSIONS: tuple[str, ...] = (
 FORBIDDEN_PATH_CHARACTERS: str = FORBIDDEN_PATH_CHARS
 
 
-def scene_info() -> dict[str, Any]:
+class SceneInfoOutput(TypedDict):
+    """Return payload for the scene.info tool."""
+
+    file_path: str | None
+    modified: bool
+    fps: float
+    frame_range: list[float]
+    up_axis: Literal["y", "z"]
+
+
+def scene_info() -> SceneInfoOutput:
     """Get information about the current Maya scene.
 
     Returns information about the currently open scene including

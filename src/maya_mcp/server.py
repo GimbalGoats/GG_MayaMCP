@@ -36,7 +36,12 @@ from maya_mcp.tools.animation import (
     animation_set_time_range,
 )
 from maya_mcp.tools.attributes import attributes_get, attributes_set
-from maya_mcp.tools.connection import maya_connect, maya_disconnect
+from maya_mcp.tools.connection import (
+    MayaConnectOutput,
+    MayaDisconnectOutput,
+    maya_connect,
+    maya_disconnect,
+)
 from maya_mcp.tools.connections import (
     connections_connect,
     connections_disconnect,
@@ -44,7 +49,7 @@ from maya_mcp.tools.connections import (
     connections_history,
     connections_list,
 )
-from maya_mcp.tools.health import health_check
+from maya_mcp.tools.health import HealthCheckOutput, health_check
 from maya_mcp.tools.mesh import mesh_evaluate, mesh_info, mesh_vertices
 from maya_mcp.tools.modeling import (
     modeling_bevel,
@@ -73,6 +78,7 @@ from maya_mcp.tools.nodes import (
     nodes_rename,
 )
 from maya_mcp.tools.scene import (
+    SceneInfoOutput,
     scene_export,
     scene_import,
     scene_info,
@@ -134,7 +140,7 @@ mcp = FastMCP(
         openWorldHint=False,
     ),
 )
-def tool_health_check() -> dict[str, Any]:
+def tool_health_check() -> HealthCheckOutput:
     """Check Maya connection health.
 
     Returns status (ok/offline/reconnecting), last error, last contact
@@ -161,7 +167,7 @@ def tool_maya_connect(
         Literal["python", "mel"],
         "Command interpreter type",
     ] = "python",
-) -> dict[str, Any]:
+) -> MayaConnectOutput:
     """Connect to Maya commandPort.
 
     Args:
@@ -185,7 +191,7 @@ def tool_maya_connect(
         openWorldHint=False,
     ),
 )
-def tool_maya_disconnect() -> dict[str, Any]:
+def tool_maya_disconnect() -> MayaDisconnectOutput:
     """Disconnect from Maya commandPort.
 
     Returns:
@@ -205,7 +211,7 @@ def tool_maya_disconnect() -> dict[str, Any]:
         openWorldHint=False,
     ),
 )
-def tool_scene_info() -> dict[str, Any]:
+def tool_scene_info() -> SceneInfoOutput:
     """Get current scene information.
 
     Returns file path, modification status, FPS, frame range, and up axis.
