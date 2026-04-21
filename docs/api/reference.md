@@ -9,6 +9,41 @@ read_when:
 
 This page documents the public Python surface and the tool modules that back the MCP server.
 
+## Typed Result Models
+
+Tool functions return plain dictionaries at runtime, but high-use tools expose
+`TypedDict` result models in their public Python annotations. These models
+describe the same keys documented in the tool contracts; they do not change
+MCP JSON response shapes or error conventions.
+
+### Nodes
+
+| Model | Backing tools |
+|-------|---------------|
+| `maya_mcp.tools.nodes.NodesListOutput` | `nodes.list` |
+| `maya_mcp.tools.nodes.NodesCreateOutput` | `nodes.create` |
+| `maya_mcp.tools.nodes.NodesInfoOutput` | `nodes.info` |
+| `maya_mcp.tools.nodes.NodesDeleteOutput` | `nodes.delete` |
+| `maya_mcp.tools.nodes.NodesRenameOutput` | `nodes.rename` |
+| `maya_mcp.tools.nodes.NodesParentOutput` | `nodes.parent` |
+| `maya_mcp.tools.nodes.NodesDuplicateOutput` | `nodes.duplicate` |
+
+### Attributes
+
+| Model | Backing tools |
+|-------|---------------|
+| `maya_mcp.tools.attributes.AttributesGetOutput` | `attributes.get` |
+| `maya_mcp.tools.attributes.AttributesSetOutput` | `attributes.set` |
+
+### Selection
+
+| Model | Backing tools |
+|-------|---------------|
+| `maya_mcp.tools.selection.SelectionOutput` | `selection.get`, `selection.set`, `selection.clear` |
+| `maya_mcp.tools.selection.SelectionWithErrorsOutput` | `selection.set_components` |
+| `maya_mcp.tools.selection.SelectionComponentsOutput` | `selection.get_components` |
+| `maya_mcp.tools.selection.SelectionConvertComponentsOutput` | `selection.convert_components` |
+
 ## Package
 
 ::: maya_mcp
