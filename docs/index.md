@@ -33,6 +33,8 @@ From source:
 pip install -e ".[dev]"
 ```
 
+The server targets the current FastMCP 3 line: `fastmcp>=3.2.4,<4`.
+
 ### Enable Maya `commandPort`
 
 Run this in Maya:
