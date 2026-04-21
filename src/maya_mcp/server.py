@@ -20,6 +20,17 @@ Example:
 
 from __future__ import annotations
 
+import os
+import sys
+
+if __name__ == "__main__" and (__package__ is None or __package__ == ""):
+    _package_dir = os.path.dirname(os.path.abspath(__file__))  # noqa: PTH100,PTH120
+    _src_dir = os.path.dirname(_package_dir)  # noqa: PTH120
+    if sys.path and os.path.abspath(sys.path[0]) == _package_dir:  # noqa: PTH100
+        sys.path.pop(0)
+    if _src_dir not in sys.path:
+        sys.path.insert(0, _src_dir)
+    __package__ = "maya_mcp"
 from typing import Annotated, Any, Literal
 
 from fastmcp import FastMCP
@@ -2507,6 +2518,8 @@ def main() -> None:
     This is the main entry point for the server. It starts the FastMCP
     server with stdio transport (the default for MCP).
     """
+    if os.environ.get("MAYA_MCP_SKIP_RUN") == "1":
+        return
     mcp.run()
 
 
