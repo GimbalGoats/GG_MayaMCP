@@ -93,6 +93,9 @@ ALLOWED_EXPORT_EXTENSIONS: tuple[str, ...] = (
     ".usdc",
 )
 FORBIDDEN_PATH_CHARACTERS: str = FORBIDDEN_PATH_CHARS
+SCENE_UNSAVED_CHANGES_ERROR = (
+    "Scene has unsaved changes. Use force=True to discard changes, or save first."
+)
 
 
 class SceneInfoOutput(TypedDict):
@@ -367,7 +370,7 @@ modified = cmds.file(query=True, modified=True)
 result["was_modified"] = modified
 
 if modified and not force:
-    result["error"] = "Scene has unsaved changes. Use force=True to discard changes, or save first."
+    result["error"] = {json.dumps(SCENE_UNSAVED_CHANGES_ERROR)}
 else:
     _ = cmds.file(new=True, force=True)
     result["success"] = True
@@ -463,7 +466,7 @@ result["was_modified"] = modified
 
 # Check unsaved changes
 if modified and not force:
-    result["error"] = "Scene has unsaved changes. Use force=True to discard changes, or save first."
+    result["error"] = {json.dumps(SCENE_UNSAVED_CHANGES_ERROR)}
 elif not os.path.isfile(file_path):
     result["error"] = "File not found: " + file_path
 else:
