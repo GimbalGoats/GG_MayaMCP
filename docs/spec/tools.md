@@ -3295,6 +3295,32 @@ All tools may return errors in a consistent format:
 
 All tools include MCP annotations to help AI clients understand their behavior and make safe decisions.
 
+## MCP `tools/list` Metadata Contract
+
+Maya MCP treats the serialized MCP `tools/list` response as part of its client-facing contract.
+
+For every advertised tool, clients should expect:
+
+- a stable MCP tool `name` matching the canonical names in this document
+- a non-empty `description`
+- an object-shaped `inputSchema`
+- an object-shaped `outputSchema`
+- populated MCP `annotations`
+
+This matters because many MCP clients reason from `tools/list` metadata before they ever call a tool. Changes to tool names, schema shape, or annotation hints are compatibility changes and should be reviewed the same way as changes to the tool behavior itself.
+
+Representative examples:
+
+- `health.check` advertises an empty object input schema because it takes no arguments
+- `nodes.list` advertises client-visible defaults such as `pattern: "*"` and `limit: 500`
+- `script.run` advertises a required `code` field and destructive annotations
+- `viewport.capture` advertises both enum-backed input options and structured output metadata
+
+Regression expectation:
+
+- server tests should inspect generated metadata from the serialized `tools/list` payload, not only direct Python function behavior
+- new tools or metadata changes should update those compatibility assertions alongside the implementation
+
 ### Annotation Types
 
 | Annotation | Description |
