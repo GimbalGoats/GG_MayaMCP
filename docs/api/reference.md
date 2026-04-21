@@ -52,6 +52,54 @@ MCP JSON response shapes or error conventions.
 | `maya_mcp.tools.mesh.MeshVerticesOutput` | `mesh.vertices` |
 | `maya_mcp.tools.mesh.MeshEvaluateOutput` | `mesh.evaluate` |
 
+### Connections
+
+| Model | Backing tools |
+|-------|---------------|
+| `maya_mcp.tools.connections.ConnectionEntry` | `connections.list` |
+| `maya_mcp.tools.connections.ConnectionsListOutput` | `connections.list` |
+| `maya_mcp.tools.connections.ConnectionAttributeInfo` | `connections.get` |
+| `maya_mcp.tools.connections.ConnectionsGetOutput` | `connections.get` |
+| `maya_mcp.tools.connections.ConnectionsConnectOutput` | `connections.connect` |
+| `maya_mcp.tools.connections.ConnectionPair` | `connections.disconnect` |
+| `maya_mcp.tools.connections.ConnectionsDisconnectOutput` | `connections.disconnect` |
+| `maya_mcp.tools.connections.ConnectionHistoryEntry` | `connections.history` |
+| `maya_mcp.tools.connections.ConnectionsHistoryOutput` | `connections.history` |
+
+### Viewport
+
+| Model | Backing tools |
+|-------|---------------|
+| `maya_mcp.tools.viewport.ViewportCaptureOutput` | `viewport.capture` |
+
+### Modeling
+
+| Model | Backing tools |
+|-------|---------------|
+| `maya_mcp.tools.modeling.ModelingCreatePolygonPrimitiveOutput` | `modeling.create_polygon_primitive` |
+| `maya_mcp.tools.modeling.ModelingExtrudeFacesOutput` | `modeling.extrude_faces` |
+| `maya_mcp.tools.modeling.ModelingBooleanOutput` | `modeling.boolean` |
+| `maya_mcp.tools.modeling.ModelingCombineOutput` | `modeling.combine` |
+| `maya_mcp.tools.modeling.ModelingSeparateOutput` | `modeling.separate` |
+| `maya_mcp.tools.modeling.ModelingMergeVerticesOutput` | `modeling.merge_vertices` |
+| `maya_mcp.tools.modeling.ModelingBevelOutput` | `modeling.bevel` |
+| `maya_mcp.tools.modeling.ModelingBridgeOutput` | `modeling.bridge` |
+| `maya_mcp.tools.modeling.ModelingInsertEdgeLoopOutput` | `modeling.insert_edge_loop` |
+| `maya_mcp.tools.modeling.ModelingDeleteFacesOutput` | `modeling.delete_faces` |
+| `maya_mcp.tools.modeling.ModelingMoveComponentsOutput` | `modeling.move_components` |
+| `maya_mcp.tools.modeling.ModelingFreezeTransformsOutput` | `modeling.freeze_transforms` |
+| `maya_mcp.tools.modeling.ModelingDeleteHistoryOutput` | `modeling.delete_history` |
+| `maya_mcp.tools.modeling.ModelingCenterPivotOutput` | `modeling.center_pivot` |
+| `maya_mcp.tools.modeling.ModelingSetPivotOutput` | `modeling.set_pivot` |
+
+### Shading
+
+| Model | Backing tools |
+|-------|---------------|
+| `maya_mcp.tools.shading.ShadingCreateMaterialOutput` | `shading.create_material` |
+| `maya_mcp.tools.shading.ShadingAssignMaterialOutput` | `shading.assign_material` |
+| `maya_mcp.tools.shading.ShadingSetMaterialColorOutput` | `shading.set_material_color` |
+
 ### Curves
 
 | Model | Backing tools |
@@ -71,6 +119,27 @@ MCP JSON response shapes or error conventions.
 | `maya_mcp.tools.skin.SkinWeightsGetOutput` | `skin.weights.get` |
 | `maya_mcp.tools.skin.SkinWeightsSetOutput` | `skin.weights.set` |
 | `maya_mcp.tools.skin.SkinCopyWeightsOutput` | `skin.copy_weights` |
+
+### Animation
+
+| Model | Backing tools |
+|-------|---------------|
+| `maya_mcp.tools.animation.AnimationSetTimeOutput` | `animation.set_time` |
+| `maya_mcp.tools.animation.AnimationGetTimeRangeOutput` | `animation.get_time_range` |
+| `maya_mcp.tools.animation.AnimationSetTimeRangeOutput` | `animation.set_time_range` |
+| `maya_mcp.tools.animation.AnimationSetKeyframeOutput` | `animation.set_keyframe` |
+| `maya_mcp.tools.animation.KeyframeEntry` | `animation.get_keyframes` |
+| `maya_mcp.tools.animation.AnimationGetKeyframesOutput` | `animation.get_keyframes` |
+| `maya_mcp.tools.animation.AnimationDeleteKeyframesOutput` | `animation.delete_keyframes` |
+
+### Scripts
+
+| Model | Backing tools |
+|-------|---------------|
+| `maya_mcp.tools.scripts.ScriptListEntry` | `script.list` |
+| `maya_mcp.tools.scripts.ScriptListOutput` | `script.list` |
+| `maya_mcp.tools.scripts.ScriptExecuteOutput` | `script.execute` |
+| `maya_mcp.tools.scripts.ScriptRunOutput` | `script.run` |
 
 ## Package
 

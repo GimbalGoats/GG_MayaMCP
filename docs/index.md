@@ -34,6 +34,9 @@ pip install -e ".[dev]"
 ```
 
 The server targets the current FastMCP 3 line: `fastmcp>=3.2.4,<4`.
+Use Python 3.10.1 or newer. Python 3.10.0 is excluded because its stdlib
+`dataclasses.make_dataclass()` implementation is not compatible with current
+FastMCP structured-output parsing.
 
 ### Enable Maya `commandPort`
 
@@ -64,6 +67,13 @@ Or:
 
 ```bash
 python -m maya_mcp.server
+```
+
+For local development from a source checkout, direct script launch is also
+supported:
+
+```bash
+python src/maya_mcp/server.py
 ```
 
 ### Configure a client

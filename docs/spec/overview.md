@@ -31,6 +31,8 @@ The communication path is:
 - Registers all 71 tools
 - Defines tool descriptions and annotations
 - Exposes the `main()` CLI entrypoint
+- Supports packaged CLI launch, module launch, and direct script launch for
+  local source checkouts
 
 ### Tool layer
 
