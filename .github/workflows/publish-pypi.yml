@@ -10,6 +10,7 @@ jobs:
     name: Build distributions
     runs-on: ubuntu-latest
     permissions:
+      actions: write
       contents: read
     steps:
       - uses: actions/checkout@v4
@@ -35,6 +36,8 @@ jobs:
       name: pypi
       url: https://pypi.org/p/maya-mcp
     permissions:
+      actions: read
+      contents: read
       id-token: write
     steps:
       - name: Download distributions
