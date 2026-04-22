@@ -279,6 +279,30 @@ python -m mkdocs build
 - Include examples in docstrings
 - Keep specs in sync with implementation
 
+## Publishing Releases
+
+PyPI publishing uses Trusted Publishing through GitHub Actions instead of a
+long-lived API token.
+
+Release workflow:
+
+1. Merge the release prep into `main`
+2. Create and push a version tag such as `v0.4.0`
+3. Publish a GitHub Release for that tag
+4. Ensure PyPI Trusted Publishing is configured for this repository
+
+The checked-in publish workflow is:
+
+- file: `.github/workflows/publish-pypi.yml`
+- GitHub environment: `pypi`
+
+For PyPI Trusted Publisher configuration on the `maya-mcp` project, use:
+
+- owner: `GimbalGoats`
+- repository: `GG_MayaMCP`
+- workflow filename: `publish-pypi.yml`
+- environment: `pypi`
+
 ## Questions?
 
 - Open an issue for bugs or feature requests
