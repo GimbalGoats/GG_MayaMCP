@@ -1,0 +1,37 @@
+name: Bug report
+description: Report a reproducible problem in Maya MCP.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the problem and the expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction
+      description: Provide exact steps, tool calls, and inputs.
+      placeholder: |
+        1. Start Maya with commandPort enabled
+        2. Run tool ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include OS, Python version, Maya version, and client.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error output
+      description: Paste the exact error or traceback if available.
+      render: shell

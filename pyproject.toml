@@ -53,7 +53,7 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/GimbalGoats/GG_MayaMCP"
-Documentation = "https://github.com/GimbalGoats/GG_MayaMCP/blob/main/README.md"
+Documentation = "https://gimbalgoats.github.io/GG_MayaMCP/"
 Repository = "https://github.com/GimbalGoats/GG_MayaMCP"
 Issues = "https://github.com/GimbalGoats/GG_MayaMCP/issues"
 

@@ -15,8 +15,15 @@ Thank you for your interest in contributing to Maya MCP! This document provides 
 1. **Fork and clone the repository:**
 
    ```bash
-   git clone https://github.com/YOUR_USERNAME/maya-mcp.git
-   cd maya-mcp
+   git clone https://github.com/YOUR_USERNAME/GG_MayaMCP.git
+   cd GG_MayaMCP
+   ```
+
+   Or clone the upstream repository directly if you are contributing without a fork:
+
+   ```bash
+   git clone https://github.com/GimbalGoats/GG_MayaMCP.git
+   cd GG_MayaMCP
    ```
 
 2. **Create a virtual environment:**
@@ -39,10 +46,12 @@ Thank you for your interest in contributing to Maya MCP! This document provides 
 
 4. **Verify your setup:**
 
+   The examples below use `python -m ...`; on Windows, `py -m ...` is equivalent.
+
    ```bash
-   ruff check .
-   mypy src/
-   pytest
+   python -m ruff check .
+   python -m mypy src/
+   python -m pytest
    ```
 
 ## Code Style
@@ -93,13 +102,13 @@ We use `ruff` for both linting and formatting:
 
 ```bash
 # Check for issues
-ruff check .
+python -m ruff check .
 
 # Auto-fix issues
-ruff check --fix .
+python -m ruff check --fix .
 
 # Format code
-ruff format .
+python -m ruff format .
 ```
 
 ## Testing
@@ -108,16 +117,16 @@ ruff format .
 
 ```bash
 # Run all tests
-pytest
+python -m pytest
 
 # Run with coverage
-pytest --cov=maya_mcp --cov-report=html
+python -m pytest --cov=maya_mcp --cov-report=html
 
 # Run specific test file
-pytest tests/test_transport_commandport.py
+python -m pytest tests/test_transport_commandport.py
 
 # Run tests matching a pattern
-pytest -k "test_health"
+python -m pytest -k "test_health"
 ```
 
 ### Writing Tests
@@ -160,11 +169,11 @@ def test_client_handles_connection_refused():
 3. **Verify your changes:**
 
    ```bash
-   ruff check .
-   ruff format --check .
-   mypy src/
-   pytest
-   mkdocs build
+   python -m ruff check .
+   python -m ruff format --check .
+   python -m mypy src/
+   python -m pytest
+   python -m mkdocs build
    ```
 
 4. **Commit with a clear message:**
@@ -257,10 +266,10 @@ def get_node(name: str) -> dict[str, Any]:
 
 ```bash
 # Serve locally with hot reload
-mkdocs serve
+python -m mkdocs serve
 
 # Build static site
-mkdocs build
+python -m mkdocs build
 ```
 
 ### Documentation Standards

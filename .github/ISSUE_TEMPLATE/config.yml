@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Support
+    url: https://github.com/GimbalGoats/GG_MayaMCP/blob/main/SUPPORT.md
+    about: Read the support guide before opening a general question.
+  - name: Security policy
+    url: https://github.com/GimbalGoats/GG_MayaMCP/blob/main/SECURITY.md
+    about: Follow the private reporting guidance for vulnerabilities.

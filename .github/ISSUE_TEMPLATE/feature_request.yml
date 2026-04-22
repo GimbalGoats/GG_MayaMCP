@@ -1,0 +1,25 @@
+name: Feature request
+description: Suggest a workflow, tool, or documentation improvement.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow or limitation are you trying to address?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the tool, behavior, or docs change you want.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Include examples, alternatives considered, or Maya-specific constraints.
