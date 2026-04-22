@@ -7,7 +7,9 @@ read_when:
 
 # API Reference
 
-This page documents the public Python surface and the tool modules that back the MCP server.
+This is the generated Python API reference for Maya MCP.
+
+Use it when you are working directly against the Python package. If you are integrating through MCP, start with [Getting Started](../usage/getting-started.md) and [Tool Guide](../spec/tools.md) first.
 
 ## Typed Result Models
 

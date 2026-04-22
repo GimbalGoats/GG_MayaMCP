@@ -1,109 +1,112 @@
 ---
-summary: "Security model for localhost-only Maya control, script execution trust levels, validation, and error sanitization."
+summary: "Security model for Maya MCP covering localhost-only transport, script execution trust levels, and error-sanitization rules."
 read_when:
-  - When changing security-sensitive behavior, validation, path handling, script execution, logging, or error payloads.
-  - When assessing whether a new tool or workflow preserves localhost-only and explicit-risk boundaries.
+  - When changing security-sensitive behavior, path validation, or script execution.
+  - When deciding whether a new tool keeps the same risk boundaries.
 ---
 
 # Security Specification
 
-This document defines the security model for Maya MCP.
+This is the implementation-facing security contract for Maya MCP.
+
+Use it when deciding whether a new tool, input, or workflow preserves the current trust boundaries.
+
+## Core Invariants
+
+These should remain true unless an ADR explicitly changes them:
+
+- transport is localhost-only
+- the server process does not gain direct Maya imports
+- arbitrary code execution stays opt-in, not default
+- free-form inputs are validated before they reach Maya
+- client-facing errors stay sanitized
 
 ## Security Posture
 
-Maya MCP is a local-development MCP server intended to communicate with a Maya instance on the same machine.
+Maya MCP is a local-development server, not a remote multi-tenant service.
 
-The main security assumptions are:
+Its security model is built around a simple idea: keep the server local, keep the tool surface explicit, and make higher-risk execution paths opt-in.
 
-- the MCP server runs locally
-- Maya runs locally
+## Main Assumptions
+
+- Maya runs on the same machine as the MCP server
 - communication stays on `localhost`
-- exposed tools are explicit and intentionally scoped
+- clients are trusted enough to use local tools, but not trusted enough for unrestricted execution by default
 
-This is not a remote multi-tenant service.
-
-## Assets to Protect
-
-| Asset | Goal |
-|-------|------|
-| Maya scene data | Prevent unintended reads or destructive writes |
-| Host system access | Prevent arbitrary code execution by default |
-| User credentials and secrets | Never expose them through logs or error messages |
-| Local filesystem | Avoid unintended file access and unsafe path handling |
-
-## Threat Model
-
-Relevant threats:
-
-- remote access if `commandPort` were exposed beyond localhost
-- malicious or careless MCP clients calling powerful tools
-- parameter injection through unsafe string inputs
-- information disclosure through raw errors, file paths, or tracebacks
-
-Out of scope:
-
-- compromise of Maya itself
-- compromise of the local operating system
-- security guarantees for user-authored scripts intentionally executed in Maya
-
-## Core Controls
+## Core Rules
 
 ### Localhost only
 
-The transport only supports `localhost` and `127.0.0.1`.
+Maya `commandPort` has no built-in authentication. Because of that, Maya MCP accepts only `localhost` and `127.0.0.1`.
 
-Why:
-
-- Maya `commandPort` does not provide authentication
-- remote exposure would turn local tooling into a network-exposed execution path
+Remote-host support is intentionally out of scope.
 
 ### No arbitrary code execution by default
 
-Most tools expose predefined workflows only.
+Most tools expose specific workflows.
 
-The one explicit raw-execution path is `script.run`, and it is disabled unless:
+The raw execution path, `script.run`, is disabled unless:
 
 ```text
 MAYA_MCP_ENABLE_RAW_EXECUTION=true
 ```
 
-`script.execute` is also constrained:
+### Validate before sending anything to Maya
 
-- file must be inside an allowlisted directory
-- file type must be valid
-- file size is capped
-- execution timeout is bounded
+Inputs should be checked before they become Maya commands.
 
-### Input validation
+Common validation areas:
 
-Tool inputs must be validated before they reach Maya.
-
-This includes:
-
-- node names
-- attribute names
+- node and attribute names
 - file paths
-- namespace values
-- script paths
-- raw code size limits
-- list and pagination limits
+- namespaces
+- list sizes and pagination values
+- raw code size
+- script path allowlists
 
-Validation should prefer allowlists and explicit bounds over permissive free-form input.
+Validation should happen as early as practical, but schema-visible tool semantics should remain easy to understand from the MCP layer.
 
-### Error sanitization
+### Sanitize errors
 
-Client-facing errors must not leak:
+Client-facing errors should be useful, but they should not leak:
 
 - secrets
 - raw stack traces
 - oversized command payloads
-- sensitive local paths when avoidable
+- avoidable local-path detail
 
-Typed errors should include structured context, but only the context needed to explain and recover from the failure.
+## Script Trust Model
 
-## Tool-Level Risk Model
+Script tooling is intentionally split into three levels:
 
-Maya MCP separates read and write behavior into different tools whenever practical.
+| Tier | Tool | Default state | Purpose |
+|---|---|---|---|
+| 1 | `script.list` | enabled | Discover approved scripts |
+| 2 | `script.execute` | enabled when directories are configured | Run `.py` files from allowlisted directories |
+| 3 | `script.run` | disabled | Run raw Python or MEL only after explicit opt-in |
+
+Relevant environment variables:
+
+| Variable | Meaning |
+|---|---|
+| `MAYA_MCP_SCRIPT_DIRS` | Semicolon-separated absolute allowlist for script discovery and execution |
+| `MAYA_MCP_ENABLE_RAW_EXECUTION` | Enables `script.run` when set to `true` or `1` |
+| `MAYA_MCP_SCRIPT_TIMEOUT` | Default timeout for script tools |
+
+Current implementation limits:
+
+- approved script file size cap: 1 MB
+- raw code size cap: 100 KB
+
+If these limits change, update both this page and `docs/spec/tools.md`.
+
+## Tool Risk Model
+
+The tool surface is organized so clients can make safer decisions:
+
+- read-only and write actions are separate where practical
+- mutating tools carry different MCP annotations than inspection tools
+- destructive or hard-to-recover operations are limited to a smaller set of tools
 
 Examples:
 
@@ -111,71 +114,53 @@ Examples:
 - `selection.get` vs `selection.set`
 - `skin.weights.get` vs `skin.weights.set`
 
-This supports clearer annotations and safer client behavior.
+This separation is part of the user and agent safety model, not only an API style choice.
 
-## Script Tool Trust Model
+## Human-In-The-Loop Expectation
 
-Script tooling uses a three-tier model:
+The MCP specification and current VS Code guidance both assume users should be able to review and deny non-read-only tool invocations.
 
-| Tier | Tool | Default State | Purpose |
-|------|------|---------------|---------|
-| 1 | `script.list` | enabled | Discover scripts from configured directories |
-| 2 | `script.execute` | enabled when directories are configured | Execute approved `.py` files from allowlisted directories |
-| 3 | `script.run` | disabled | Execute raw Python or MEL only after explicit opt-in |
+That matches Maya MCP's annotation strategy:
 
-Related configuration:
+- read-only tools are marked for easier low-risk use
+- mutating tools stay explicit
+- destructive actions are easy to identify
 
-| Variable | Meaning |
-|----------|---------|
-| `MAYA_MCP_SCRIPT_DIRS` | Semicolon-separated allowlist of absolute directories |
-| `MAYA_MCP_ENABLE_RAW_EXECUTION` | Enables `script.run` when set to `true` or `1` |
-| `MAYA_MCP_SCRIPT_TIMEOUT` | Timeout for script execution |
+Do not assume annotations alone are a sufficient security boundary. They are guidance metadata, not enforcement.
 
-## Maya `commandPort` Considerations
-
-`commandPort` itself has limited security features. Maya MCP relies primarily on locality and explicit tool design rather than on strong transport authentication.
-
-Recommended Maya-side setup during development:
-
-```python
-import maya.cmds as cmds
-
-cmds.commandPort(
-    name=":7001",
-    sourceType="python",
-    echoOutput=True,
-    securityWarning=True,
-)
-```
-
-`securityWarning=True` is useful for visibility during local development.
-
-## Alignment With MCP Security Guidance
-
-MCP guidance for remote servers often recommends OAuth and stronger session controls. Maya MCP does not implement those patterns because:
-
-- it is localhost-only
-- it does not operate as a remote shared service
-- it does not broker external credentials
-
-The main security boundary is the local machine, not an internet-facing deployment edge.
-
-## Developer Requirements
+## Developer Checklist
 
 When adding or changing tools:
 
-- do not add unrestricted execution paths casually
-- validate every free-form string input
-- keep read-only and mutating tools separate where possible
-- preserve localhost-only transport behavior
-- do not suppress type or validation failures in ways that hide unsafe states
+- keep localhost-only behavior intact
+- do not add unrestricted execution casually
+- validate all free-form strings
+- preserve read/write separation where practical
+- update docs when defaults, limits, or schemas change
+
+## When To Update This Doc
+
+Update this page when changing:
+
+- localhost-only enforcement
+- script execution trust levels
+- path validation or name validation rules
+- raw execution enablement behavior
+- error sanitization expectations
+- risk classification assumptions for tools
 
 ## Release Checklist
 
-Before shipping security-sensitive doc or tool changes, confirm:
+Before shipping security-sensitive changes, confirm:
 
-- localhost-only behavior is still enforced
-- `script.run` remains explicit opt-in
-- path validation still blocks traversal and unsafe inputs
-- errors do not leak secrets or tracebacks
-- tests cover malformed and adversarial inputs for the changed area
+- remote hosts are still rejected
+- `script.run` still requires explicit opt-in
+- path validation still blocks unsafe traversal
+- client-facing errors do not leak secrets or tracebacks
+- tests cover malformed or adversarial inputs in the changed area
+
+## Related Docs
+
+- [Tool Guide](tools.md)
+- [Transport Specification](transport.md)
+- [ADR-0001 CommandPort](../adr/0001-commandport.md)

@@ -1,48 +1,70 @@
 ---
-summary: "Documentation entrypoint with quick start, tool coverage, and links to canonical project docs."
+summary: "Friendly docs home for installing Maya MCP, connecting a client, and finding the right reference page."
 read_when:
-  - When first orienting to Maya MCP or deciding which project doc to read next.
-  - When updating quick-start setup, client configuration, or the high-level tool coverage table.
+  - When first orienting to Maya MCP.
+  - When you want the fastest path to install, connect, and use the server.
 ---
 
 # Maya MCP
 
-Maya MCP is an MCP server for controlling Autodesk Maya through `commandPort`.
+Maya MCP is a local MCP server for controlling Autodesk Maya through Maya's `commandPort`.
 
-This documentation set is the canonical reference for repository behavior, architecture, and tool contracts.
+It is designed for practical AI-assisted Maya work:
 
-## What Maya MCP Provides
+- run the MCP server outside Maya
+- keep Maya communication on `localhost`
+- expose typed tools instead of raw Maya APIs
+- keep read-only and mutating actions easy to reason about
+- support safer unsaved-scene confirmation flows when the client can elicit forms
 
-- Typed MCP tools for common Maya workflows
-- A transport layer isolated from Maya imports
-- Localhost-only communication with Maya
-- Capability-gated scene safety prompts for unsaved-change confirmations on
-  `scene.new` and `scene.open`
-- Recovery-oriented behavior for Maya restarts and failed operations
-- A dockable in-Maya control panel for managing `commandPort`
+## Start Here
 
-## Quick Start
+If you just want it working:
 
-### Install
+1. Read [Getting Started](usage/getting-started.md)
+2. Add it to your client with [Client Setup](usage/client-setup.md)
+3. Skim [Tool Guide](spec/tools.md) so you know what is available
+
+If you are changing the project:
+
+- [Architecture Overview](spec/overview.md)
+- [Transport Specification](spec/transport.md)
+- [Security Specification](spec/security.md)
+- [ADR-0001 CommandPort](adr/0001-commandport.md)
+
+## What You Get
+
+Maya MCP currently exposes 71 tools across these families:
+
+| Family | Count | Typical use |
+|---|---:|---|
+| `health` | 1 | Check whether Maya is reachable |
+| `maya` | 2 | Manually connect or disconnect the transport |
+| `scene` | 9 | Open, save, import, export, undo, redo |
+| `nodes` | 7 | List, create, rename, parent, duplicate, inspect |
+| `attributes` | 2 | Read and write attributes |
+| `selection` | 6 | Manage object and component selections |
+| `connections` | 5 | Inspect and edit DG connections |
+| `mesh` | 3 | Inspect topology and vertex data |
+| `viewport` | 1 | Capture screenshots from Maya |
+| `modeling` | 15 | Common polygon modeling actions |
+| `shading` | 3 | Create and assign materials |
+| `skin` | 6 | Bind, inspect, and edit skin weights |
+| `animation` | 6 | Timeline and keyframe workflows |
+| `curve` | 2 | Inspect NURBS curves |
+| `script` | 3 | Discover and run approved scripts, with opt-in raw execution |
+
+For scene replacement operations, `scene.new` and `scene.open` still refuse by default when the current scene has unsaved changes. Clients that advertise MCP form elicitation can receive an in-band discard-changes confirmation instead of having to retry explicitly with `force=true`.
+
+## Five-Minute Setup
+
+1. Install `maya-mcp`
 
 ```bash
 pip install maya-mcp
 ```
 
-From source:
-
-```bash
-pip install -e ".[dev]"
-```
-
-The server targets the current FastMCP 3 line: `fastmcp>=3.2.4,<4`.
-Use Python 3.10.1 or newer. Python 3.10.0 is excluded because its stdlib
-`dataclasses.make_dataclass()` implementation is not compatible with current
-FastMCP structured-output parsing.
-
-### Enable Maya `commandPort`
-
-Run this in Maya:
+2. Open Maya `commandPort`
 
 ```python
 import maya.cmds as cmds
@@ -56,74 +78,43 @@ cmds.commandPort(
     name=":7001",
     sourceType="python",
     echoOutput=True,
+    noreturn=False,
+    bufferSize=16384,
 )
 ```
 
-### Start the MCP server
+3. Start the server
 
 ```bash
 maya-mcp
 ```
 
-Or:
+4. Add it to your MCP client
 
-```bash
-python -m maya_mcp.server
-```
+Use the examples in [Client Setup](usage/client-setup.md).
 
-For local development from a source checkout, direct script launch is also
-supported:
+5. Call `health.check`
 
-```bash
-python src/maya_mcp/server.py
-```
+If that succeeds, try `scene.info` or `nodes.list`.
 
-### Configure a client
+## Guardrails
 
-```json
-{
-  "mcpServers": {
-    "maya": {
-      "command": "maya-mcp"
-    }
-  }
-}
-```
+These are the rules that shape the whole project:
 
-## Tool Coverage
+- The MCP server process does not import `maya.cmds`.
+- Maya communication stays on `localhost` only.
+- `script.run` is disabled unless `MAYA_MCP_ENABLE_RAW_EXECUTION=true`.
+- Large results use limits, truncation, or pagination where needed.
+- Exact tool schemas are exposed through MCP `tools/list` metadata.
 
-Maya MCP currently exposes 71 tools across these areas:
+## Documentation Map
 
-| Category | Tools |
-|----------|-------|
-| Health | `health.check` |
-| Connection | `maya.connect`, `maya.disconnect` |
-| Scene | `scene.info`, `scene.new`, `scene.open`, `scene.save`, `scene.save_as`, `scene.import`, `scene.export`, `scene.undo`, `scene.redo` |
-| Nodes | `nodes.list`, `nodes.create`, `nodes.delete`, `nodes.rename`, `nodes.parent`, `nodes.duplicate`, `nodes.info` |
-| Attributes | `attributes.get`, `attributes.set` |
-| Selection | `selection.get`, `selection.set`, `selection.clear`, `selection.set_components`, `selection.get_components`, `selection.convert_components` |
-| Connections | `connections.list`, `connections.get`, `connections.connect`, `connections.disconnect`, `connections.history` |
-| Mesh | `mesh.info`, `mesh.vertices`, `mesh.evaluate` |
-| Viewport | `viewport.capture` |
-| Modeling | `modeling.create_polygon_primitive`, `modeling.extrude_faces`, `modeling.boolean`, `modeling.combine`, `modeling.separate`, `modeling.merge_vertices`, `modeling.bevel`, `modeling.bridge`, `modeling.insert_edge_loop`, `modeling.delete_faces`, `modeling.move_components`, `modeling.freeze_transforms`, `modeling.delete_history`, `modeling.center_pivot`, `modeling.set_pivot` |
-| Shading | `shading.create_material`, `shading.assign_material`, `shading.set_material_color` |
-| Skinning | `skin.bind`, `skin.unbind`, `skin.influences`, `skin.weights.get`, `skin.weights.set`, `skin.copy_weights` |
-| Animation | `animation.set_time`, `animation.get_time_range`, `animation.set_time_range`, `animation.set_keyframe`, `animation.get_keyframes`, `animation.delete_keyframes` |
-| Curves | `curve.info`, `curve.cvs` |
-| Scripts | `script.list`, `script.execute`, `script.run` |
-
-For scene replacement operations, `scene.new` and `scene.open` still refuse by
-default when the current scene has unsaved changes. Clients that advertise MCP
-form elicitation can receive an in-band discard-changes confirmation instead of
-having to retry explicitly with `force=true`.
-
-## Read Next
-
-- [Architecture Overview](spec/overview.md)
-- [Transport Specification](spec/transport.md)
-- [Security Specification](spec/security.md)
-- [Tool Specification](spec/tools.md)
-- [API Reference](api/reference.md)
-- [Maya Control Panel](usage/maya-panel.md)
-- [ADR-0001 CommandPort](adr/0001-commandport.md)
-- [PRD](prd.md)
+- [Getting Started](usage/getting-started.md): install, run, verify
+- [Client Setup](usage/client-setup.md): VS Code and generic stdio examples
+- [Maya Control Panel](usage/maya-panel.md): optional in-Maya UI for managing `commandPort`
+- [Tool Guide](spec/tools.md): tool families, defaults, limits, risk model, and scene safety notes
+- [Architecture Overview](spec/overview.md): runtime shape and module layout
+- [Transport Specification](spec/transport.md): connection lifecycle, retries, errors
+- [Security Specification](spec/security.md): localhost-only and script-execution trust model
+- [API Reference](api/reference.md): generated Python API docs
+- [PRD](prd.md): scope and planned direction

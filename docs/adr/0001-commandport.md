@@ -91,6 +91,8 @@ cmds.commandPort(
     name=":7001",
     sourceType="python",
     echoOutput=True,
+    noreturn=False,
+    bufferSize=16384,
 )
 ```
 
