@@ -15,7 +15,7 @@ For exact argument and return shapes, the authoritative source is the MCP `tools
 
 These should remain true unless a reviewed compatibility change intentionally breaks them:
 
-- tool names stay stable and use `namespace.action`
+- tool names stay stable and use dotted segments such as `namespace.action` or `namespace.subnamespace.action`
 - every advertised tool has a description, `inputSchema`, `outputSchema`, and annotations
 - read-only and mutating actions remain separate where practical
 - defaults and limits are treated as part of the client-facing contract
@@ -23,7 +23,7 @@ These should remain true unless a reviewed compatibility change intentionally br
 
 ## Tool Naming
 
-Tool names follow `namespace.action`.
+Tool names follow dotted hierarchical segments such as `namespace.action` or `namespace.subnamespace.action`.
 
 Current namespaces:
 
