@@ -138,4 +138,4 @@ Likely next areas:
 - [Architecture Overview](spec/overview.md)
 - [Transport Specification](spec/transport.md)
 - [Security Specification](spec/security.md)
-- [Tool Specification](spec/tools.md)
+- [Tool Guide](spec/tools.md)

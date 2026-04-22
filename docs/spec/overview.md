@@ -1,223 +1,156 @@
 ---
-summary: "Architecture overview covering runtime flow, module responsibilities, constraints, and configuration surface."
+summary: "Short architecture guide covering runtime flow, module boundaries, configuration, and the main design constraints."
 read_when:
-  - When changing architecture, module boundaries, tool layering, shared utilities, or server registration.
-  - When orienting to how MCP clients, the server, transport, Maya, and the Maya panel interact.
+  - When changing module boundaries, server wiring, or tool layering.
+  - When you need the mental model for how Maya MCP talks to Maya.
 ---
 
 # Architecture Overview
 
-This document describes the runtime architecture of Maya MCP and the responsibilities of the main modules.
+This is the implementation-facing architecture summary for Maya MCP.
 
-## System Context
+Use it as the first source of truth when changing server wiring, module boundaries, or the separation between MCP wrappers, tool logic, and transport.
 
-Maya MCP runs as a separate Python process from Autodesk Maya.
+## Core Invariants
 
-The communication path is:
+These should remain true unless an ADR explicitly changes them:
 
-1. An MCP client talks to `maya_mcp.server` over MCP transport, usually stdio.
-2. The server dispatches a registered MCP wrapper from `src/maya_mcp/registrars/`.
-3. The wrapper delegates to the tool implementation in `src/maya_mcp/tools/`.
-4. The tool delegates to the transport layer in `src/maya_mcp/transport/commandport.py`.
-5. The transport layer sends Python or MEL commands to Maya over `localhost`.
-6. Maya executes the command inside its own process and returns the result.
+- the MCP server process is separate from the Maya process
+- the MCP server process does not import Maya modules
+- Maya communication happens only through the transport layer
+- transport remains localhost-only
+- tools stay workflow-first and relatively thin
 
-## Architectural Layers
+## Process Split
 
-### MCP server layer
+Maya MCP is intentionally split into two processes:
 
-`src/maya_mcp/server.py`
+- the MCP server process
+- the running Maya process
 
-- Creates the `FastMCP` server instance
-- Calls the central registrar entrypoint
-- Exposes the `main()` CLI entrypoint
-- Supports packaged CLI launch, module launch, and direct script launch for
-  local source checkouts
+They communicate only through Maya's `commandPort` over `localhost`.
 
-### Registration layer
+## Runtime Flow
 
-`src/maya_mcp/registrars/`
+The normal request path is:
 
-- Groups MCP wrapper functions by tool namespace
-- Defines tool descriptions, annotations, and schema-sensitive wrapper signatures
-- Registers wrappers onto the `FastMCP` server instance
-- Keeps `server.py` small so new tool families do not turn it into a merge hotspot
+1. An MCP client calls a tool on `maya_mcp.server`.
+2. The registered wrapper in `src/maya_mcp/registrars/` receives the call.
+3. The wrapper delegates to a function in `src/maya_mcp/tools/`.
+4. The tool uses `src/maya_mcp/transport/commandport.py`.
+5. The transport sends a Python or MEL payload to Maya.
+6. Maya executes it and returns the result.
 
-### Tool layer
+## Why This Split Exists
 
-`src/maya_mcp/tools/`
+The separation is deliberate:
 
-- Implements the underlying tool functions used by the MCP wrapper layer
-- Validates and shapes tool input and output
-- Keeps tool logic thin
-- Delegates transport work to shared lower layers
+- the server can run in a normal Python environment
+- tests can run without a live Maya session
+- Maya crashes or restarts do not take down the MCP process
+- the security boundary is easier to reason about
 
-Major tool namespaces:
+## Layer Responsibilities
 
-- `health.*`
-- `maya.*`
-- `scene.*`
-- `nodes.*`
-- `attributes.*`
-- `selection.*`
-- `connections.*`
-- `mesh.*`
-- `viewport.*`
-- `modeling.*`
-- `shading.*`
-- `skin.*`
-- `animation.*`
-- `curve.*`
-- `script.*`
+| Layer | Path | Responsibility |
+|---|---|---|
+| Server | `src/maya_mcp/server.py` | Creates the FastMCP server and registers tools |
+| Registrars | `src/maya_mcp/registrars/` | MCP-facing wrappers, descriptions, schemas, annotations |
+| Tools | `src/maya_mcp/tools/` | Thin workflow functions and result shaping |
+| Transport | `src/maya_mcp/transport/commandport.py` | Socket lifecycle, retries, timeouts, response parsing |
+| Shared types/errors | `src/maya_mcp/types.py`, `src/maya_mcp/errors.py` | Stable typed contracts |
+| Utilities | `src/maya_mcp/utils/` | Validation, coercion, script config, response guards |
+| Maya panel | `src/maya_mcp/maya_panel/` | Optional UI running inside Maya |
 
-### Shared types and errors
+## Change Boundaries
 
-`src/maya_mcp/types.py` and `src/maya_mcp/errors.py`
+Use these rules when deciding where a change belongs:
 
-- Shared enums and result types
-- Typed exception hierarchy
-- Stable error payloads for callers
+- change `server.py` when server metadata, startup wiring, or the top-level server factory changes
+- change `registrars/` when MCP-facing signatures, descriptions, annotations, progress wrappers, or schema-visible behavior changes
+- change `tools/` when workflow behavior, result shaping, or tool-level validation changes
+- change `transport/commandport.py` when socket lifecycle, retries, timeouts, response parsing, or host enforcement changes
+- change `utils/` when logic is shared below the tool layer and is not specific to a single MCP wrapper
 
-### Transport layer
+## Design Rules
 
-`src/maya_mcp/transport/commandport.py`
+### No Maya imports in the server
 
-- Owns socket lifecycle
-- Enforces localhost-only communication
-- Handles connect and command timeouts
-- Retries connection attempts with backoff
-- Translates socket and execution failures into typed errors
-
-### Utilities
-
-`src/maya_mcp/utils/`
-
-- Input validation helpers
-- Response parsing and coercion
-- Response size guards
-- Script-execution configuration and validation
-
-### Maya panel
-
-`src/maya_mcp/maya_panel/`
-
-- Runs inside Maya, not in the MCP server process
-- Provides a UI for opening and closing `commandPort`
-- Stores local panel preferences such as port and auto-start
-
-### Code Mode prototype
-
-`src/maya_mcp/code_mode.py`
-
-- Defines an experimental Code Mode gate for future server profiles
-- Enables only when `MAYA_MCP_CODE_MODE=1`
-- Keeps Code Mode factory selection separate from default server registration
-- Applies fixed prototype sandbox limits before any code execution path uses it
-- Does not change the default MCP server or make arbitrary code execution default
-
-## Key Design Constraints
-
-### Transport isolation
-
-The MCP server process must not import `maya.cmds` or other Maya modules.
-
-Why:
-
-- The server must be able to run in a standard Python environment
-- Maya crashes must not take down the server process
-- Tool tests must run without a live Maya session
-
-### Localhost-only communication
-
-Maya `commandPort` has no built-in authentication, so the transport is intentionally restricted to `localhost` and `127.0.0.1`.
+The server process must not import `maya.cmds` or other Maya modules.
 
 ### Thin tools
 
-Tool modules should stay close to MCP concerns:
+Tool modules should stay close to user-facing behavior and schemas. Socket policy, parsing, and lower-level validation belong below the tool layer.
 
-- parameter handling
-- result shaping
-- annotations
-- clear tool-level semantics
+### Localhost only
 
-Transport, parsing, and validation should live below the tool layer.
+`commandPort` has no authentication, so remote-host support is intentionally out of scope.
 
-### Recovery-oriented behavior
+### Workflow-first tool design
 
-Maya is an external process and may be unavailable, restarted, or mid-crash-recovery. The server is designed to detect this state, surface typed errors, and retry connection when appropriate.
+The tool surface is meant to support real workflows, not mirror every low-level Maya API call.
 
-## Module Responsibilities
+### Shared contract ownership
 
-| Module | Responsibility |
-|--------|----------------|
-| `maya_mcp.server` | FastMCP entrypoint and server factory |
-| `maya_mcp.registrars.*` | MCP wrapper registration and tool metadata |
-| `maya_mcp.transport.commandport` | Socket transport to Maya |
-| `maya_mcp.errors` | Typed error hierarchy |
-| `maya_mcp.types` | Shared types and connection-state models |
-| `maya_mcp.tools.*` | MCP tool implementations |
-| `maya_mcp.utils.*` | Validation, parsing, coercion, response guards |
-| `maya_mcp.maya_panel.*` | In-Maya UI for commandPort control |
+For implementation changes, the canonical companion docs are:
 
-## Request Flow
+- `docs/spec/tools.md` for tool defaults, limits, annotations, and read/write behavior
+- `docs/spec/transport.md` for connection behavior and typed transport failures
+- `docs/spec/security.md` for security boundaries and trust model
+- `docs/adr/0001-commandport.md` when reconsidering the transport choice itself
 
-Typical successful call:
+## Tool Families
 
-1. Client invokes a tool such as `scene.info`.
-2. `maya_mcp.server` routes the call to a registered wrapper from `maya_mcp.registrars.*`.
-3. The wrapper delegates to the corresponding function in `maya_mcp.tools.*`.
-4. The tool asks the transport client for execution.
-5. The transport connects to Maya if needed.
-6. Maya executes the request through `commandPort`.
-7. The transport parses the response and returns typed data.
-8. The wrapper returns the MCP result to the client.
+The server currently registers 71 tools across:
 
-Typical unavailable-Maya case:
+- health and connection
+- scene, nodes, attributes, selection
+- connections, mesh, viewport, curves
+- modeling, shading, skinning, animation
+- scripts
 
-1. A tool requests transport execution.
-2. The transport cannot connect to `localhost:7001`.
-3. Retry and backoff policy is applied.
-4. A `MayaUnavailableError` is raised with context.
-5. The next call can attempt reconnection again.
+See [Tool Guide](tools.md) for the practical overview.
 
 ## Configuration Surface
 
-Core transport settings are environment-driven:
+Core transport settings:
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `MAYA_MCP_HOST` | `localhost` | Maya host |
-| `MAYA_MCP_PORT` | `7001` | Maya commandPort port |
-| `MAYA_MCP_CONNECT_TIMEOUT` | `5.0` | Connect timeout in seconds |
-| `MAYA_MCP_COMMAND_TIMEOUT` | `30.0` | Command timeout in seconds |
-| `MAYA_MCP_MAX_RETRIES` | `3` | Max connection retries |
+| Variable | Default |
+|---|---:|
+| `MAYA_MCP_HOST` | `localhost` |
+| `MAYA_MCP_PORT` | `7001` |
+| `MAYA_MCP_CONNECT_TIMEOUT` | `5.0` |
+| `MAYA_MCP_COMMAND_TIMEOUT` | `30.0` |
+| `MAYA_MCP_MAX_RETRIES` | `3` |
 
-Script tools add:
+Script settings:
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `MAYA_MCP_SCRIPT_DIRS` | empty | Allowlisted script directories |
-| `MAYA_MCP_ENABLE_RAW_EXECUTION` | `false` | Enables `script.run` |
-| `MAYA_MCP_SCRIPT_TIMEOUT` | `60` | Script execution timeout |
+| Variable | Default |
+|---|---:|
+| `MAYA_MCP_SCRIPT_DIRS` | empty |
+| `MAYA_MCP_ENABLE_RAW_EXECUTION` | `false` |
+| `MAYA_MCP_SCRIPT_TIMEOUT` | `60` |
 
-Code Mode prototype adds:
+Experimental gate:
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `MAYA_MCP_CODE_MODE` | unset | Enables experimental Code Mode only when exactly `1` |
+| Variable | Default | Notes |
+|---|---:|---|
+| `MAYA_MCP_CODE_MODE` | unset | Enables the prototype Code Mode only when set to `1` |
 
-Current Code Mode sandbox limits are fixed in code:
+## Progress Support
 
-| Limit | Value |
-|-------|-------|
-| Language | Python only |
-| Code payload | 16 KB |
-| Execution timeout | 10 seconds |
-| Text output | 50 KB |
+Some longer-running tools can report progress when the client provides a progress token:
 
-## Related Documents
+- `scene.export`
+- `mesh.evaluate`
+- `skin.weights.get`
+- `skin.weights.set`
+
+Progress support is registrar-level behavior. Do not move client-visible progress semantics into low-level transport code.
+
+## Related Docs
 
 - [Transport Specification](transport.md)
 - [Security Specification](security.md)
-- [Tool Specification](tools.md)
+- [Tool Guide](tools.md)
 - [ADR-0001 CommandPort](../adr/0001-commandport.md)
