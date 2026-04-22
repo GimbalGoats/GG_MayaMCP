@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-22
+
 ### Added
 
 - `scene.new` tool - create new empty Maya scene with `force` parameter safety gate
@@ -164,7 +166,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - No arbitrary code execution - all operations are explicit tools
 - No raw Python/MEL string evaluation exposed to clients
 
-[Unreleased]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.3.0...main
+[Unreleased]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.4.0...main
+[0.4.0]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/GimbalGoats/GG_MayaMCP/releases/tag/v0.1.0
