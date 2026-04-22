@@ -16,6 +16,8 @@ This documentation set is the canonical reference for repository behavior, archi
 - Typed MCP tools for common Maya workflows
 - A transport layer isolated from Maya imports
 - Localhost-only communication with Maya
+- Capability-gated scene safety prompts for unsaved-change confirmations on
+  `scene.new` and `scene.open`
 - Recovery-oriented behavior for Maya restarts and failed operations
 - A dockable in-Maya control panel for managing `commandPort`
 
@@ -109,6 +111,11 @@ Maya MCP currently exposes 71 tools across these areas:
 | Animation | `animation.set_time`, `animation.get_time_range`, `animation.set_time_range`, `animation.set_keyframe`, `animation.get_keyframes`, `animation.delete_keyframes` |
 | Curves | `curve.info`, `curve.cvs` |
 | Scripts | `script.list`, `script.execute`, `script.run` |
+
+For scene replacement operations, `scene.new` and `scene.open` still refuse by
+default when the current scene has unsaved changes. Clients that advertise MCP
+form elicitation can receive an in-band discard-changes confirmation instead of
+having to retry explicitly with `force=true`.
 
 ## Read Next
 

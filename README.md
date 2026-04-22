@@ -15,6 +15,9 @@ Autodesk Maya is a trademark of Autodesk, Inc.
 - Transport isolation: the MCP server talks to Maya only over `commandPort`
 - Localhost-only design: no remote-host support
 - Typed tools: explicit schemas and predictable results
+- Client-aware scene safety: `scene.new` and `scene.open` can use MCP form
+  elicitation for unsaved-change confirmation when the client supports it,
+  while older clients keep the explicit `force=True` retry flow
 - Recovery-oriented workflow: health checks plus undo/redo support
 - Broad Maya coverage: 71 tools across scene, nodes, mesh, modeling, shading, skinning, animation, curves, scripts, and viewport capture
 
@@ -154,6 +157,11 @@ Maya MCP currently exposes 71 tools:
 | Scripts | `script.list`, `script.execute`, `script.run` |
 
 `script.run` is disabled by default and requires `MAYA_MCP_ENABLE_RAW_EXECUTION=true`.
+
+`scene.new` and `scene.open` still refuse by default when the current scene has
+unsaved changes. Clients that advertise MCP form elicitation can receive an
+in-band discard-changes confirmation instead of having to issue a second call
+with `force=True`.
 
 ## Architecture
 

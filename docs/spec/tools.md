@@ -186,6 +186,8 @@ Create a new, empty Maya scene.
 
 Checks whether the current scene has unsaved changes before proceeding. When `force` is `false` (default) and the scene has been modified, the operation is refused with an actionable error message. When `force` is `true`, unsaved changes are discarded.
 
+When the connected MCP client advertises form elicitation capability, the server may ask the user to confirm discarding unsaved changes and then internally retry with `force=true`. Clients without elicitation capability keep the current refusal behavior and must retry explicitly with `force=true`.
+
 **Important:** This tool never triggers Maya's interactive "Save changes?" dialog, which would block the commandPort indefinitely.
 
 **Input**:
@@ -321,6 +323,8 @@ Redo the last undone operation in Maya.
 Open a Maya scene file.
 
 Checks whether the current scene has unsaved changes before proceeding. When `force` is `false` (default) and the scene has been modified, the operation is refused with an actionable error message. When `force` is `true`, unsaved changes are discarded.
+
+When the connected MCP client advertises form elicitation capability, the server may ask the user to confirm discarding unsaved changes and then internally retry with `force=true`. Clients without elicitation capability keep the current refusal behavior and must retry explicitly with `force=true`.
 
 **Important:** This tool never triggers Maya's interactive "Save changes?" dialog, which would block the commandPort indefinitely.
 
