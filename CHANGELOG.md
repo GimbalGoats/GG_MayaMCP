@@ -66,6 +66,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `scene.new` and `scene.open` now support MCP form elicitation as a
+  compatibility-preserving fallback for unsaved changes
+  - Clients that advertise form elicitation can confirm discarding changes
+    in-band and the server retries internally with `force=True`
+  - Clients without elicitation support keep the existing `force=False`
+    refusal behavior and must retry explicitly with `force=True`
 - FastMCP integration updated to v3-compatible wiring
 - Supported Python runtime is now effectively 3.10.1+; Python 3.10.0 is
   excluded because its stdlib `dataclasses.make_dataclass()` implementation

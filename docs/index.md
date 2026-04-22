@@ -15,6 +15,7 @@ It is designed for practical AI-assisted Maya work:
 - keep Maya communication on `localhost`
 - expose typed tools instead of raw Maya APIs
 - keep read-only and mutating actions easy to reason about
+- support safer unsaved-scene confirmation flows when the client can elicit forms
 
 ## Start Here
 
@@ -52,6 +53,8 @@ Maya MCP currently exposes 71 tools across these families:
 | `animation` | 6 | Timeline and keyframe workflows |
 | `curve` | 2 | Inspect NURBS curves |
 | `script` | 3 | Discover and run approved scripts, with opt-in raw execution |
+
+For scene replacement operations, `scene.new` and `scene.open` still refuse by default when the current scene has unsaved changes. Clients that advertise MCP form elicitation can receive an in-band discard-changes confirmation instead of having to retry explicitly with `force=true`.
 
 ## Five-Minute Setup
 
@@ -109,7 +112,7 @@ These are the rules that shape the whole project:
 - [Getting Started](usage/getting-started.md): install, run, verify
 - [Client Setup](usage/client-setup.md): VS Code and generic stdio examples
 - [Maya Control Panel](usage/maya-panel.md): optional in-Maya UI for managing `commandPort`
-- [Tool Guide](spec/tools.md): tool families, defaults, limits, and risk model
+- [Tool Guide](spec/tools.md): tool families, defaults, limits, risk model, and scene safety notes
 - [Architecture Overview](spec/overview.md): runtime shape and module layout
 - [Transport Specification](spec/transport.md): connection lifecycle, retries, errors
 - [Security Specification](spec/security.md): localhost-only and script-execution trust model

@@ -14,7 +14,7 @@ This project is unofficial and is not affiliated with or endorsed by Autodesk. A
 - runs outside Maya, so the server stays isolated from Maya imports
 - talks to Maya over `localhost` only
 - exposes 71 typed tools instead of raw API calls
-- keeps read and write operations easy to understand
+- supports safer scene replacement flows for unsaved changes
 - leaves raw code execution disabled unless you opt in
 
 ## Quick Start
@@ -120,6 +120,8 @@ Call these tools in order:
 | `script` | 3 |
 
 `script.run` is disabled by default and requires `MAYA_MCP_ENABLE_RAW_EXECUTION=true`.
+
+`scene.new` and `scene.open` still refuse by default when the current scene has unsaved changes. Clients that advertise MCP form elicitation can receive an in-band discard-changes confirmation instead of having to retry with `force=True`.
 
 ## Main Docs
 

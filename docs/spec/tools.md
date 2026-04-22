@@ -1,8 +1,8 @@
 ---
 summary: "Practical tool guide covering Maya MCP tool families, stable naming, defaults, limits, annotations, and error behavior."
 read_when:
-  - When adding, changing, or removing MCP tools, defaults, limits, or risk annotations.
-  - When you want a compact overview of what the tool surface does without reading every schema by hand.
+  - When adding, changing, or removing MCP tools, tool schemas, defaults, limits, risk annotations, or read/write behavior.
+  - When validating tool output shapes, error responses, pagination, token-budget behavior, or scene safety prompts.
 ---
 
 # Tool Guide
@@ -50,7 +50,7 @@ There are currently 71 tools.
 Use these sources in this order:
 
 1. live MCP `tools/list` metadata for exact schemas and annotations
-2. this page for stable defaults, limits, and risk model
+2. this page for stable defaults, limits, risk model, and scene-safety behavior
 3. implementation code in `src/maya_mcp/registrars/` and `src/maya_mcp/tools/`
 
 ## Tool Families
@@ -189,6 +189,19 @@ Some modeling responses also pass through shared response guards so large Maya o
 
 If any default, limit, truncation flag, or paging behavior changes, update this page in the same change.
 
+## Scene Safety Behavior
+
+`scene.new` and `scene.open` still refuse by default when the current scene has unsaved changes.
+
+Current contract:
+
+- `force=false` keeps the safe default and does not discard changes silently
+- `force=true` allows discard-and-proceed behavior
+- clients that advertise MCP form elicitation can receive an in-band discard-changes confirmation
+- clients without elicitation support keep the refusal flow and must retry explicitly
+
+This behavior is client-visible and should be treated as part of the tool contract.
+
 ## Safe Usage Patterns
 
 ### Best first calls
@@ -269,12 +282,14 @@ Representative error types:
 Update this page when any of these change:
 
 - tool names
+- tool schemas
 - defaults
 - limits
 - annotations
 - read/write separation
 - trust model for script or execution tools
 - progress support
+- scene safety prompting behavior
 - truncation or pagination behavior
 
 If exact schemas change, also treat the serialized MCP `tools/list` metadata as part of the public contract.
