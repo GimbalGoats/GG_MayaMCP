@@ -7,6 +7,9 @@ Maya MCP is a Model Context Protocol (MCP) server for controlling Autodesk Maya 
 
 It gives MCP-compatible clients a typed tool surface for scene inspection, editing, modeling, animation, shading, skinning, scripting, and viewport capture without importing Maya modules in the server process.
 
+This project is unofficial and is not affiliated with or endorsed by Autodesk.
+Autodesk Maya is a trademark of Autodesk, Inc.
+
 ## Highlights
 
 - Transport isolation: the MCP server talks to Maya only over `commandPort`
@@ -165,6 +168,7 @@ The server process never imports `maya.cmds`.
 
 ## Documentation
 
+- Published docs: <https://gimbalgoats.github.io/GG_MayaMCP/>
 - [Docs Home](docs/index.md)
 - [Architecture Overview](docs/spec/overview.md)
 - [Transport Specification](docs/spec/transport.md)
@@ -175,20 +179,27 @@ The server process never imports `maya.cmds`.
 
 ## Development
 
-Repository commands on this machine use `py`:
+Use whichever Python launcher matches your environment. The examples below use
+`python -m ...`; on Windows, `py -m ...` is equivalent.
 
 ```bash
-py -m ruff check .
-py -m ruff format .
-py -m mypy src/
-py -m pytest
+python -m ruff check .
+python -m ruff format .
+python -m mypy src/
+python -m pytest
 ```
 
 If tests resolve `maya_mcp` from `site-packages` instead of this repo:
 
+```bash
+PYTHONPATH=src python -m pytest
+```
+
+PowerShell equivalent:
+
 ```powershell
 $env:PYTHONPATH='src'
-py -m pytest
+python -m pytest
 ```
 
 ## Security Notes
