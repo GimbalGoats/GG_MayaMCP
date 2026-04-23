@@ -27,6 +27,12 @@ From PyPI:
 pip install maya-mcp
 ```
 
+On Windows:
+
+```powershell
+py -m pip install maya-mcp
+```
+
 From a source checkout:
 
 ```bash
@@ -78,6 +84,12 @@ Module entrypoint:
 python -m maya_mcp.server
 ```
 
+On Windows:
+
+```powershell
+py -m maya_mcp.server
+```
+
 Direct script launch from a source checkout:
 
 ```bash
@@ -96,13 +108,13 @@ That follows current FastMCP guidance for portable project configuration.
 
 Use [Client Setup](client-setup.md).
 
-If your client supports plain stdio server definitions, the minimum working command is:
+Most users should pick the client-specific examples there:
 
-```json
-{
-  "command": "maya-mcp"
-}
-```
+- Codex CLI / IDE extension: `~/.codex/config.toml`
+- Claude Code: `.mcp.json`
+- VS Code: `.vscode/mcp.json`
+
+For Codex CLI and Claude Code on Windows, `py -m maya_mcp.server` is usually more reliable than depending on the `maya-mcp` console script being on `PATH`.
 
 ## 5. Verify It Works
 

@@ -27,6 +27,12 @@ This project is unofficial and is not affiliated with or endorsed by Autodesk. A
 pip install maya-mcp
 ```
 
+On Windows:
+
+```powershell
+py -m pip install maya-mcp
+```
+
 From source:
 
 ```bash
@@ -72,15 +78,68 @@ fastmcp run
 
 ### 4. Add it to your client
 
-Minimal generic config:
+#### Codex CLI / IDE extension
+
+Codex uses `~/.codex/config.toml` for MCP servers. The CLI and IDE extension share that config.
+
+Installed package:
+
+```toml
+[mcp_servers.maya]
+command = "maya-mcp"
+```
+
+Source checkout or Windows-friendly setup:
+
+```toml
+[mcp_servers.maya]
+command = "py"
+args = ["-m", "maya_mcp.server"]
+env = { PYTHONPATH = "src" }
+```
+
+Use the `PYTHONPATH` line only when running from a source checkout.
+Use `python` instead of `py` on platforms that do not provide the Windows launcher.
+
+#### Claude Code
+
+Claude Code project-scoped MCP servers live in `.mcp.json`.
+The server key is user-defined; these examples use `maya` consistently.
+
+Installed package:
 
 ```json
 {
-  "command": "maya-mcp"
+  "mcpServers": {
+    "maya": {
+      "command": "maya-mcp",
+      "args": []
+    }
+  }
 }
 ```
 
-VS Code workspace example in `.vscode/mcp.json`:
+Source checkout or Windows-friendly setup:
+
+```json
+{
+  "mcpServers": {
+    "maya": {
+      "command": "py",
+      "args": ["-m", "maya_mcp.server"],
+      "env": {
+        "PYTHONPATH": "src"
+      }
+    }
+  }
+}
+```
+
+For Codex CLI and Claude Code on Windows, `py -m maya_mcp.server` is usually more reliable than relying on the `maya-mcp` console script being on the correct `PATH`.
+
+#### VS Code
+
+VS Code uses `.vscode/mcp.json` with a `servers` object.
 
 ```json
 {
@@ -88,6 +147,21 @@ VS Code workspace example in `.vscode/mcp.json`:
     "maya": {
       "type": "stdio",
       "command": "maya-mcp"
+    }
+  }
+}
+```
+
+#### Other MCP clients
+
+Some clients use a generic `mcpServers` object:
+
+```json
+{
+  "mcpServers": {
+    "maya": {
+      "command": "maya-mcp",
+      "args": []
     }
   }
 }

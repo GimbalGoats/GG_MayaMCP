@@ -1,21 +1,70 @@
 ---
-summary: "Client configuration guide for Maya MCP with VS Code examples, generic stdio configs, and environment variable overrides."
+summary: "Client configuration guide for Maya MCP with Codex, Claude Code, VS Code, and generic stdio examples."
 read_when:
   - When wiring Maya MCP into an MCP client.
-  - When you need a minimal working stdio configuration or want to pass environment overrides.
+  - When you need a client-specific MCP config example or want to pass environment overrides.
 ---
 
 # Client Setup
 
-Maya MCP is a local `stdio` server. In practice, most clients only need a command and optional environment variables.
+Maya MCP is a local `stdio` server, but the config file shape depends on the client.
 
-## Minimal Setup
+For Codex CLI and Claude Code on Windows, `py -m maya_mcp.server` is usually more reliable than depending on the `maya-mcp` console script being on the active `PATH`.
+The server key or name is user-defined; these examples use `maya` consistently.
 
-If your client accepts a plain command-based MCP server definition, this is the smallest useful config:
+## Codex CLI / IDE Extension
+
+Codex reads MCP server config from `~/.codex/config.toml`. The CLI and IDE extension share that config.
+
+Installed package:
+
+```toml
+[mcp_servers.maya]
+command = "maya-mcp"
+```
+
+Source checkout or Windows-friendly setup:
+
+```toml
+[mcp_servers.maya]
+command = "py"
+args = ["-m", "maya_mcp.server"]
+env = { PYTHONPATH = "src" }
+```
+
+Use the `PYTHONPATH` line only when running from a source checkout.
+Use `python` instead of `py` on platforms that do not provide the Windows launcher.
+
+## Claude Code
+
+Claude Code project-scoped MCP servers live in `.mcp.json`.
+
+Installed package:
 
 ```json
 {
-  "command": "maya-mcp"
+  "mcpServers": {
+    "maya": {
+      "command": "maya-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+Source checkout or Windows-friendly setup:
+
+```json
+{
+  "mcpServers": {
+    "maya": {
+      "command": "py",
+      "args": ["-m", "maya_mcp.server"],
+      "env": {
+        "PYTHONPATH": "src"
+      }
+    }
+  }
 }
 ```
 
@@ -58,9 +107,9 @@ Use this when:
 - Maya is listening on a non-default port
 - you want to enable script discovery from approved folders
 
-## Generic `mcpServers` Example
+## Other MCP Clients
 
-Some clients use an `mcpServers` object instead of VS Code's `servers` object. For those clients, the equivalent configuration usually looks like this:
+Some clients use a generic `mcpServers` object instead of VS Code's `servers` object. For those clients, the equivalent configuration usually looks like this:
 
 ```json
 {
@@ -74,27 +123,6 @@ Some clients use an `mcpServers` object instead of VS Code's `servers` object. F
 ```
 
 If your client has its own config file shape, keep the launch command the same and adapt only the surrounding JSON.
-
-## Source Checkout Workflow
-
-If you are developing from this repo and do not want to rely on the installed CLI entrypoint, you can point the client at Python directly:
-
-```json
-{
-  "servers": {
-    "maya": {
-      "type": "stdio",
-      "command": "py",
-      "args": ["-m", "maya_mcp.server"],
-      "env": {
-        "PYTHONPATH": "src"
-      }
-    }
-  }
-}
-```
-
-Use `python` instead of `py` on platforms that do not provide the Windows launcher.
 
 ## FastMCP Project Config
 
