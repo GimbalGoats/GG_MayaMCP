@@ -284,6 +284,13 @@ python -m mkdocs build
 PyPI publishing uses Trusted Publishing through GitHub Actions instead of a
 long-lived API token.
 
+Not every merge needs a new package release.
+In general, cut a new PyPI version only when shipped package behavior,
+dependencies, entrypoints, or package metadata need to change for installers.
+Docs-only, README-only, CI-only, and contributor-workflow changes usually do
+not require a new package version unless you intentionally want to refresh the
+PyPI project page content.
+
 Release workflow:
 
 1. Merge the release prep into `main`
