@@ -84,6 +84,12 @@ Module entrypoint:
 python -m maya_mcp.server
 ```
 
+On Windows:
+
+```powershell
+py -m maya_mcp.server
+```
+
 Direct script launch from a source checkout:
 
 ```bash

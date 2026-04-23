@@ -104,13 +104,14 @@ Use `python` instead of `py` on platforms that do not provide the Windows launch
 #### Claude Code
 
 Claude Code project-scoped MCP servers live in `.mcp.json`.
+The server key is user-defined; these examples use `maya` consistently.
 
 Installed package:
 
 ```json
 {
   "mcpServers": {
-    "maya-mcp": {
+    "maya": {
       "command": "maya-mcp",
       "args": []
     }
@@ -123,7 +124,7 @@ Source checkout or Windows-friendly setup:
 ```json
 {
   "mcpServers": {
-    "maya-mcp": {
+    "maya": {
       "command": "py",
       "args": ["-m", "maya_mcp.server"],
       "env": {
@@ -134,7 +135,7 @@ Source checkout or Windows-friendly setup:
 }
 ```
 
-For Codex CLI and Claude Code on Windows, `py -m maya_mcp.server` is usually more reliable than relying on the `maya-mcp` console script being on the right PATH.
+For Codex CLI and Claude Code on Windows, `py -m maya_mcp.server` is usually more reliable than relying on the `maya-mcp` console script being on the correct `PATH`.
 
 #### VS Code
 

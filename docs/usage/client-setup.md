@@ -1,8 +1,8 @@
 ---
-summary: "Client configuration guide for Maya MCP with VS Code examples, generic stdio configs, and environment variable overrides."
+summary: "Client configuration guide for Maya MCP with Codex, Claude Code, VS Code, and generic stdio examples."
 read_when:
   - When wiring Maya MCP into an MCP client.
-  - When you need a minimal working stdio configuration or want to pass environment overrides.
+  - When you need a client-specific MCP config example or want to pass environment overrides.
 ---
 
 # Client Setup
@@ -10,6 +10,7 @@ read_when:
 Maya MCP is a local `stdio` server, but the config file shape depends on the client.
 
 For Codex CLI and Claude Code on Windows, `py -m maya_mcp.server` is usually more reliable than depending on the `maya-mcp` console script being on the active `PATH`.
+The server key or name is user-defined; these examples use `maya` consistently.
 
 ## Codex CLI / IDE Extension
 
@@ -43,7 +44,7 @@ Installed package:
 ```json
 {
   "mcpServers": {
-    "maya-mcp": {
+    "maya": {
       "command": "maya-mcp",
       "args": []
     }
@@ -56,7 +57,7 @@ Source checkout or Windows-friendly setup:
 ```json
 {
   "mcpServers": {
-    "maya-mcp": {
+    "maya": {
       "command": "py",
       "args": ["-m", "maya_mcp.server"],
       "env": {
