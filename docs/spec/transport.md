@@ -102,9 +102,11 @@ Maya `commandPort` can echo output, include null bytes, or return duplicate JSON
 The transport normalizes that noise before tool code sees the result:
 
 - strips empty and `None` fragments
+- drops known Maya startup/plugin warning lines that can arrive on the commandPort stream before command output
 - prefers JSON-like payloads when present
 - deduplicates repeated JSON echoes
 - returns the last unique JSON block when Maya printed more than one
+- preserves useful non-JSON output lines after cleanup when a command does not return JSON
 
 That keeps parsing logic centralized instead of spreading it across tool modules.
 
@@ -156,7 +158,9 @@ cmds.commandPort(
 
 ## Operational Notes
 
-- The transport assumes request-at-a-time usage; it is not a general concurrent Maya client.
+- The transport serializes commandPort access per client. Concurrent server handlers can call the same client, but socket send/receive work still runs one request at a time.
+- `connect`, `disconnect`, and `reconfigure` share the same per-client serialization, so lifecycle changes cannot mutate socket state during an active command.
+- The per-client lock does not coordinate separate `CommandPortClient` instances. Live tests and MCP server flows should route tool calls through the shared transport client instead of keeping multiple commandPort sockets open to the same Maya session.
 - Restart the MCP server after local code changes when validating against a live Maya session.
 - Restart Maya if `commandPort` state becomes confused or stale.
 

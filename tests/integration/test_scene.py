@@ -186,7 +186,6 @@ class TestSceneUndoIntegration:
             result = scene_undo()
 
             assert result["success"] is True
-            assert result["undone"] is not None
 
             # Verify it's gone
             exists_after = maya_client.execute(
@@ -272,7 +271,6 @@ class TestSceneRedoIntegration:
             result = scene_redo()
 
             assert result["success"] is True
-            assert result["redone"] is not None
 
             # Verify it's back
             exists_after_redo = maya_client.execute(

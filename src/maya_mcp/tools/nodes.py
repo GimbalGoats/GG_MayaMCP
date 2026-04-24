@@ -265,7 +265,8 @@ def nodes_create(
     type_escaped = json.dumps(node_type)
     name_escaped = json.dumps(name) if name else "None"
     parent_escaped = json.dumps(parent) if parent else "None"
-    attrs_escaped = json.dumps(attributes) if attributes else "{}"
+    attrs_json = json.dumps(attributes or {})
+    attrs_escaped = json.dumps(attrs_json)
 
     command = f"""
 import maya.cmds as cmds
@@ -274,7 +275,7 @@ import json
 node_type = {type_escaped}
 desired_name = {name_escaped}
 parent_node = {parent_escaped}
-attrs = {attrs_escaped}
+attrs = json.loads({attrs_escaped})
 
 result = {{"node": None, "node_type": node_type, "parent": None, "attributes_set": [], "attribute_errors": {{}}}}
 

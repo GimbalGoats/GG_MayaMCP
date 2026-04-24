@@ -75,14 +75,15 @@ def attributes_get(
 
     # Build the Maya command - get each attribute and collect results
     node_escaped = json.dumps(node)
-    attrs_escaped = json.dumps(attributes)
+    attrs_json = json.dumps(attributes)
+    attrs_escaped = json.dumps(attrs_json)
 
     command = f"""
 import maya.cmds as cmds
 import json
 
 node = {node_escaped}
-attrs = {attrs_escaped}
+attrs = json.loads({attrs_escaped})
 
 result = {{"values": {{}}, "errors": {{}}}}
 
@@ -170,14 +171,15 @@ def attributes_set(
 
     # Build the Maya command - set each attribute and collect results
     node_escaped = json.dumps(node)
-    attrs_escaped = json.dumps(attributes)
+    attrs_json = json.dumps(attributes)
+    attrs_escaped = json.dumps(attrs_json)
 
     command = f"""
 import maya.cmds as cmds
 import json
 
 node = {node_escaped}
-attrs = {attrs_escaped}
+attrs = json.loads({attrs_escaped})
 
 result = {{"set": [], "errors": {{}}}}
 
