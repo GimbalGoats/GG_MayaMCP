@@ -52,6 +52,7 @@ BUFFER_SIZE = 65536
 
 # Module-level client instance for singleton pattern
 _client: CommandPortClient | None = None
+_client_lock = threading.Lock()
 
 _MAYA_COMMANDPORT_NOISE_LINES = {
     "Arnold renderer not loaded.",
@@ -155,9 +156,10 @@ def get_client() -> CommandPortClient:
         >>> client.execute("cmds.ls()")
     """
     global _client
-    if _client is None:
-        _client = CommandPortClient()
-    return _client
+    with _client_lock:
+        if _client is None:
+            _client = CommandPortClient()
+        return _client
 
 
 class CommandPortClient:

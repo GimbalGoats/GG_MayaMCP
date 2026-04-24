@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import maya_mcp.transport.commandport as transport_module
 from maya_mcp.errors import MayaTimeoutError, MayaUnavailableError
 from maya_mcp.transport.commandport import CommandPortClient, _parse_maya_response
 from maya_mcp.types import ConnectionConfig, ConnectionStatus
@@ -95,6 +96,57 @@ class TestParseMayaResponse:
         raw_response = "None\n\x00first\n\x00second\n\x00first\n\x00"
 
         assert _parse_maya_response(raw_response) == "first\nsecond"
+
+
+class TestGlobalClient:
+    """Tests for module-level client singleton behavior."""
+
+    def test_get_client_initializes_singleton_once_across_threads(self) -> None:
+        """Concurrent first access creates only one shared client instance."""
+        original_client = transport_module._client
+        original_client_class = transport_module.CommandPortClient
+        transport_module._client = None
+        instances: list[object] = []
+        constructor_entered = threading.Event()
+        release_constructor = threading.Event()
+
+        class SlowClient:
+            def __init__(self) -> None:
+                instances.append(self)
+                constructor_entered.set()
+                assert release_constructor.wait(timeout=2.0)
+
+        try:
+            transport_module.CommandPortClient = SlowClient  # type: ignore[assignment]
+            results: list[object] = []
+            errors: list[BaseException] = []
+
+            def get_shared_client() -> None:
+                try:
+                    results.append(transport_module.get_client())
+                except BaseException as exc:  # pragma: no cover - asserted below
+                    errors.append(exc)
+
+            first_thread = threading.Thread(target=get_shared_client)
+            second_thread = threading.Thread(target=get_shared_client)
+
+            first_thread.start()
+            assert constructor_entered.wait(timeout=1.0)
+            second_thread.start()
+            release_constructor.set()
+
+            first_thread.join(timeout=1.0)
+            second_thread.join(timeout=1.0)
+
+            assert not first_thread.is_alive()
+            assert not second_thread.is_alive()
+            assert errors == []
+            assert len(instances) == 1
+            assert results == [instances[0], instances[0]]
+        finally:
+            release_constructor.set()
+            transport_module.CommandPortClient = original_client_class
+            transport_module._client = original_client
 
 
 class TestCommandPortClientInit:

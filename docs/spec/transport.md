@@ -159,6 +159,7 @@ cmds.commandPort(
 ## Operational Notes
 
 - The transport serializes commandPort access per client. Concurrent server handlers can call the same client, but socket send/receive work still runs one request at a time.
+- The module-level shared transport client is initialized under a singleton lock so concurrent first access still creates only one process-wide default client.
 - `connect`, `disconnect`, and `reconfigure` share the same per-client serialization, so lifecycle changes cannot mutate socket state during an active command.
 - The per-client lock does not coordinate separate `CommandPortClient` instances. Live tests and MCP server flows should route tool calls through the shared transport client instead of keeping multiple commandPort sockets open to the same Maya session.
 - Restart the MCP server after local code changes when validating against a live Maya session.
