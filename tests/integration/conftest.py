@@ -71,13 +71,17 @@ def maya_client() -> Generator[CommandPortClient, None, None]:
     """Provide a connected CommandPortClient for testing.
 
     This fixture creates a fresh client for each test and ensures
-    cleanup after the test completes.
+    cleanup after the test completes. It also installs the client as the
+    transport singleton so tool calls and fixture setup share one commandPort
+    socket.
 
     Yields:
         A connected CommandPortClient instance.
     """
+    import maya_mcp.transport.commandport as transport_module
     from maya_mcp.transport.commandport import CommandPortClient
 
+    original_client = transport_module._client
     client = CommandPortClient(
         host="localhost",
         port=7001,
@@ -86,10 +90,13 @@ def maya_client() -> Generator[CommandPortClient, None, None]:
         max_retries=1,  # Don't retry too much in tests
     )
     client.connect()
+    transport_module._client = client
 
-    yield client
-
-    client.disconnect()
+    try:
+        yield client
+    finally:
+        transport_module._client = original_client
+        client.disconnect()
 
 
 @pytest.fixture(scope="function")
@@ -107,6 +114,9 @@ def clean_scene(maya_client: CommandPortClient) -> Generator[None, None, None]:
     """
     # Create new empty scene
     maya_client.execute("import maya.cmds as cmds; cmds.file(new=True, force=True)")
+    # Flush after the new-scene command completes so Maya startup/plugin callbacks
+    # do not become the first undo item in live tests.
+    maya_client.execute("import maya.cmds as cmds; cmds.flushUndo()")
 
     yield
 

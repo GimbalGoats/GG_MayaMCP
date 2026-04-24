@@ -10,13 +10,143 @@ These tests verify the CommandPortClient's behavior including:
 
 from __future__ import annotations
 
+import threading
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+import maya_mcp.transport.commandport as transport_module
 from maya_mcp.errors import MayaTimeoutError, MayaUnavailableError
-from maya_mcp.transport.commandport import CommandPortClient
+from maya_mcp.transport.commandport import CommandPortClient, _parse_maya_response
 from maya_mcp.types import ConnectionConfig, ConnectionStatus
+
+
+class BlockingCommandSocket:
+    """Socket fake that can pause the first command while tests race callers."""
+
+    def __init__(self) -> None:
+        self.first_recv_started = threading.Event()
+        self.release_first_recv = threading.Event()
+        self.second_send_started = threading.Event()
+        self.close_started = threading.Event()
+        self.send_order: list[str] = []
+        self._lock = threading.Lock()
+        self._active_command = ""
+        self._recv_counts: dict[str, int] = {}
+
+    def setsockopt(self, *_args: object) -> None:
+        """Accept socket keepalive options."""
+
+    def settimeout(self, _timeout: float) -> None:
+        """Accept timeout changes."""
+
+    def connect(self, _address: tuple[str, int]) -> None:
+        """Pretend to connect successfully."""
+
+    def sendall(self, data: bytes) -> None:
+        """Record which command was sent."""
+        command = data.decode("utf-8")
+        command_name = "second" if "second" in command else "first"
+        with self._lock:
+            self._active_command = command_name
+            self.send_order.append(command_name)
+        if command_name == "second":
+            self.second_send_started.set()
+
+    def recv(self, _buffer_size: int) -> bytes:
+        """Return one response chunk per command, then simulate read completion."""
+        with self._lock:
+            command_name = self._active_command
+            count = self._recv_counts.get(command_name, 0)
+            self._recv_counts[command_name] = count + 1
+
+        if count > 0:
+            raise TimeoutError()
+
+        if command_name == "first":
+            self.first_recv_started.set()
+            if not self.release_first_recv.wait(timeout=2.0):
+                raise TimeoutError()
+
+        return command_name.encode("utf-8")
+
+    def close(self) -> None:
+        """Record close attempts."""
+        self.close_started.set()
+
+
+class TestParseMayaResponse:
+    """Tests for commandPort response cleanup."""
+
+    def test_ignores_known_maya_noise_before_plain_output(self) -> None:
+        """Known Maya startup/plugin warning lines do not replace command output."""
+        raw_response = (
+            "Arnold renderer not loaded.\n"
+            "The MtoA plug-in needed for this scene is not loaded.\n"
+            "Make sure Autoload is on in the Plug-in Manager.\n"
+            "See this article for more detail.\n"
+            "https://www.autodesk.com/maya-arnold-not-available-error\n"
+            "\x00False\n\x00False\n\x00"
+        )
+
+        assert _parse_maya_response(raw_response) == "False"
+
+    def test_preserves_multiple_non_json_output_lines(self) -> None:
+        """Non-JSON multi-line command output is preserved after cleanup."""
+        raw_response = "None\n\x00first\n\x00second\n\x00first\n\x00"
+
+        assert _parse_maya_response(raw_response) == "first\nsecond"
+
+
+class TestGlobalClient:
+    """Tests for module-level client singleton behavior."""
+
+    def test_get_client_initializes_singleton_once_across_threads(self) -> None:
+        """Concurrent first access creates only one shared client instance."""
+        original_client = transport_module._client
+        original_client_class = transport_module.CommandPortClient
+        transport_module._client = None
+        instances: list[object] = []
+        constructor_entered = threading.Event()
+        release_constructor = threading.Event()
+
+        class SlowClient:
+            def __init__(self) -> None:
+                instances.append(self)
+                constructor_entered.set()
+                assert release_constructor.wait(timeout=2.0)
+
+        try:
+            transport_module.CommandPortClient = SlowClient  # type: ignore[assignment]
+            results: list[object] = []
+            errors: list[BaseException] = []
+
+            def get_shared_client() -> None:
+                try:
+                    results.append(transport_module.get_client())
+                except BaseException as exc:  # pragma: no cover - asserted below
+                    errors.append(exc)
+
+            first_thread = threading.Thread(target=get_shared_client)
+            second_thread = threading.Thread(target=get_shared_client)
+
+            first_thread.start()
+            assert constructor_entered.wait(timeout=1.0)
+            second_thread.start()
+            release_constructor.set()
+
+            first_thread.join(timeout=1.0)
+            second_thread.join(timeout=1.0)
+
+            assert not first_thread.is_alive()
+            assert not second_thread.is_alive()
+            assert errors == []
+            assert len(instances) == 1
+            assert results == [instances[0], instances[0]]
+        finally:
+            release_constructor.set()
+            transport_module.CommandPortClient = original_client_class
+            transport_module._client = original_client
 
 
 class TestCommandPortClientInit:
@@ -312,6 +442,96 @@ class TestCommandPortClientExecute:
                 client.execute("cmds.ls()")
 
             assert "during send" in exc_info.value.message
+
+    def test_concurrent_execute_serializes_send_recv(self) -> None:
+        """Concurrent execute calls do not interleave socket send/recv."""
+        client = CommandPortClient(command_timeout=1.0)
+        fake_socket = BlockingCommandSocket()
+        results: dict[str, str] = {}
+        errors: list[BaseException] = []
+
+        def execute(name: str) -> None:
+            try:
+                results[name] = client.execute(f"print('{name}')")
+            except BaseException as exc:  # pragma: no cover - asserted below
+                errors.append(exc)
+
+        with patch("socket.socket", return_value=fake_socket):
+            client.connect()
+
+            first_thread = threading.Thread(target=execute, args=("first",))
+            second_thread = threading.Thread(target=execute, args=("second",))
+
+            first_thread.start()
+            assert fake_socket.first_recv_started.wait(timeout=1.0)
+
+            second_thread.start()
+            assert not fake_socket.second_send_started.wait(timeout=0.1)
+
+            fake_socket.release_first_recv.set()
+            first_thread.join(timeout=1.0)
+            second_thread.join(timeout=1.0)
+
+        assert not first_thread.is_alive()
+        assert not second_thread.is_alive()
+        assert errors == []
+        assert results == {"first": "first", "second": "second"}
+        assert fake_socket.send_order == ["first", "second"]
+
+    @pytest.mark.parametrize("operation", ["disconnect", "reconfigure"])
+    def test_lifecycle_mutation_waits_for_execute(self, operation: str) -> None:
+        """Disconnect and reconfigure cannot mutate socket state mid-execute."""
+        client = CommandPortClient(command_timeout=1.0)
+        fake_socket = BlockingCommandSocket()
+        results: dict[str, str | bool | None] = {}
+        errors: list[BaseException] = []
+        mutation_started = threading.Event()
+
+        def execute() -> None:
+            try:
+                results["execute"] = client.execute("print('first')")
+            except BaseException as exc:  # pragma: no cover - asserted below
+                errors.append(exc)
+
+        def mutate_lifecycle() -> None:
+            mutation_started.set()
+            try:
+                if operation == "disconnect":
+                    results["mutation"] = client.disconnect()
+                else:
+                    client.reconfigure(port=7002)
+                    results["mutation"] = None
+            except BaseException as exc:  # pragma: no cover - asserted below
+                errors.append(exc)
+
+        with patch("socket.socket", return_value=fake_socket):
+            client.connect()
+
+            execute_thread = threading.Thread(target=execute)
+            mutation_thread = threading.Thread(target=mutate_lifecycle)
+
+            execute_thread.start()
+            assert fake_socket.first_recv_started.wait(timeout=1.0)
+
+            mutation_thread.start()
+            assert mutation_started.wait(timeout=1.0)
+            assert not fake_socket.close_started.wait(timeout=0.1)
+            assert client.config.port == 7001
+
+            fake_socket.release_first_recv.set()
+            execute_thread.join(timeout=1.0)
+            mutation_thread.join(timeout=1.0)
+
+        assert not execute_thread.is_alive()
+        assert not mutation_thread.is_alive()
+        assert errors == []
+        assert results["execute"] == "first"
+        assert fake_socket.close_started.is_set()
+        if operation == "disconnect":
+            assert results["mutation"] is True
+        else:
+            assert results["mutation"] is None
+            assert client.config.port == 7002
 
 
 class TestCommandPortClientHealth:

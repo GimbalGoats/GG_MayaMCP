@@ -31,6 +31,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import socket
+import threading
 import time
 
 from maya_mcp.errors import (
@@ -51,6 +52,20 @@ BUFFER_SIZE = 65536
 
 # Module-level client instance for singleton pattern
 _client: CommandPortClient | None = None
+_client_lock = threading.Lock()
+
+_MAYA_COMMANDPORT_NOISE_LINES = {
+    "Arnold renderer not loaded.",
+    "The MtoA plug-in needed for this scene is not loaded.",
+    "Make sure Autoload is on in the Plug-in Manager.",
+    "See this article for more detail.",
+    "https://www.autodesk.com/maya-arnold-not-available-error",
+}
+
+
+def _is_noise_line(part: str) -> bool:
+    """Return True for known Maya commandPort noise lines."""
+    return part in _MAYA_COMMANDPORT_NOISE_LINES
 
 
 def _parse_maya_response(raw_response: str) -> str:
@@ -73,9 +88,11 @@ def _parse_maya_response(raw_response: str) -> str:
         1. Split by null bytes / newlines, strip whitespace, drop empty / "None".
         2. Find all JSON-like parts (start with ``{`` or ``[``).
         3. If multiple identical JSON parts exist (echoOutput duplication), return one.
-        4. Prefer the **last** unique JSON part, because our ``print(json.dumps(...))``
+        4. Drop known Maya startup/plugin warning lines that can arrive on the
+           commandPort stream before command output.
+        5. Prefer the **last** unique JSON part, because our ``print(json.dumps(...))``
            is always the final statement.
-        5. Fall back to the first non-empty part for non-JSON responses.
+        6. Fall back to the unique non-empty non-JSON parts joined by newline.
 
     Args:
         raw_response: Raw response string from Maya commandPort.
@@ -98,7 +115,11 @@ def _parse_maya_response(raw_response: str) -> str:
     parts = raw_response.replace("\x00", "\n").split("\n")
 
     # Filter out empty strings and 'None' (from print() return)
-    filtered = [p.strip() for p in parts if p.strip() and p.strip() != "None"]
+    filtered = [
+        p.strip()
+        for p in parts
+        if p.strip() and p.strip() != "None" and not _is_noise_line(p.strip())
+    ]
 
     if not filtered:
         return ""
@@ -115,8 +136,10 @@ def _parse_maya_response(raw_response: str) -> str:
         # If different, return the last one (our print is always last)
         return unique_json[-1]
 
-    # Fall back to the first non-empty part for non-JSON responses
-    return filtered[0]
+    # Fall back to unique non-empty parts for non-JSON responses. Returning all
+    # useful lines preserves command output when Maya logs unrelated text on the
+    # same commandPort stream.
+    return "\n".join(dict.fromkeys(filtered))
 
 
 def get_client() -> CommandPortClient:
@@ -133,9 +156,10 @@ def get_client() -> CommandPortClient:
         >>> client.execute("cmds.ls()")
     """
     global _client
-    if _client is None:
-        _client = CommandPortClient()
-    return _client
+    with _client_lock:
+        if _client is None:
+            _client = CommandPortClient()
+        return _client
 
 
 class CommandPortClient:
@@ -206,6 +230,7 @@ class CommandPortClient:
         )
         self.state = ClientState(config=self.config)
         self._socket: socket.socket | None = None
+        self._lock = threading.RLock()
 
     def connect(self) -> bool:
         """Establish connection to Maya commandPort.
@@ -224,66 +249,67 @@ class CommandPortClient:
             >>> if client.connect():
             ...     print("Connected to Maya")
         """
-        if self._socket is not None:
-            # Already connected
-            return True
-
-        self.state.status = ConnectionStatus.RECONNECTING
-        last_error: str | None = None
-        logger.info("Connecting to Maya at %s:%d", self.config.host, self.config.port)
-
-        for attempt in range(self.config.max_retries):
-            try:
-                self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-                self._socket.settimeout(self.config.connect_timeout)
-                self._socket.connect((self.config.host, self.config.port))
-
-                # Connection successful
-                self.state.status = ConnectionStatus.OK
-                self.state.last_error = None
-                self.state.update_contact()
-                logger.info("Connected to Maya at %s:%d", self.config.host, self.config.port)
+        with self._lock:
+            if self._socket is not None:
+                # Already connected
                 return True
 
-            except TimeoutError:
-                last_error = f"Connection timed out after {self.config.connect_timeout}s"
-                self._cleanup_socket()
-            except ConnectionRefusedError:
-                last_error = "Connection refused - is Maya running with commandPort open?"
-                self._cleanup_socket()
-            except OSError as e:
-                last_error = f"Socket error: {e}"
-                self._cleanup_socket()
+            self.state.status = ConnectionStatus.RECONNECTING
+            last_error: str | None = None
+            logger.info("Connecting to Maya at %s:%d", self.config.host, self.config.port)
 
-            # Exponential backoff before retry
-            if attempt < self.config.max_retries - 1:
-                delay = self.config.retry_base_delay * (2**attempt)
-                logger.debug(
-                    "Connection attempt %d/%d failed: %s. Retrying in %.1fs",
-                    attempt + 1,
-                    self.config.max_retries,
-                    last_error,
-                    delay,
-                )
-                time.sleep(delay)
+            for attempt in range(self.config.max_retries):
+                try:
+                    self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+                    self._socket.settimeout(self.config.connect_timeout)
+                    self._socket.connect((self.config.host, self.config.port))
 
-        # All retries exhausted
-        self.state.status = ConnectionStatus.OFFLINE
-        self.state.last_error = last_error
-        logger.warning(
-            "Failed to connect to Maya after %d attempts: %s",
-            self.config.max_retries,
-            last_error,
-        )
+                    # Connection successful
+                    self.state.status = ConnectionStatus.OK
+                    self.state.last_error = None
+                    self.state.update_contact()
+                    logger.info("Connected to Maya at %s:%d", self.config.host, self.config.port)
+                    return True
 
-        raise MayaUnavailableError(
-            message=f"Cannot connect to Maya commandPort at {self.config.host}:{self.config.port}",
-            host=self.config.host,
-            port=self.config.port,
-            attempts=self.config.max_retries,
-            last_error=last_error,
-        )
+                except TimeoutError:
+                    last_error = f"Connection timed out after {self.config.connect_timeout}s"
+                    self._cleanup_socket()
+                except ConnectionRefusedError:
+                    last_error = "Connection refused - is Maya running with commandPort open?"
+                    self._cleanup_socket()
+                except OSError as e:
+                    last_error = f"Socket error: {e}"
+                    self._cleanup_socket()
+
+                # Exponential backoff before retry
+                if attempt < self.config.max_retries - 1:
+                    delay = self.config.retry_base_delay * (2**attempt)
+                    logger.debug(
+                        "Connection attempt %d/%d failed: %s. Retrying in %.1fs",
+                        attempt + 1,
+                        self.config.max_retries,
+                        last_error,
+                        delay,
+                    )
+                    time.sleep(delay)
+
+            # All retries exhausted
+            self.state.status = ConnectionStatus.OFFLINE
+            self.state.last_error = last_error
+            logger.warning(
+                "Failed to connect to Maya after %d attempts: %s",
+                self.config.max_retries,
+                last_error,
+            )
+
+            raise MayaUnavailableError(
+                message=f"Cannot connect to Maya commandPort at {self.config.host}:{self.config.port}",
+                host=self.config.host,
+                port=self.config.port,
+                attempts=self.config.max_retries,
+                last_error=last_error,
+            )
 
     def disconnect(self) -> bool:
         """Close the connection to Maya.
@@ -295,12 +321,13 @@ class CommandPortClient:
             >>> client.disconnect()
             True
         """
-        was_connected = self._socket is not None
-        self._cleanup_socket()
-        self.state.status = ConnectionStatus.OFFLINE
-        if was_connected:
-            logger.info("Disconnected from Maya")
-        return was_connected
+        with self._lock:
+            was_connected = self._socket is not None
+            self._cleanup_socket()
+            self.state.status = ConnectionStatus.OFFLINE
+            if was_connected:
+                logger.info("Disconnected from Maya")
+            return was_connected
 
     def execute(self, command: str) -> str:
         """Execute a Python command in Maya and return the result.
@@ -325,7 +352,8 @@ class CommandPortClient:
             >>> print(result)
             ['pCube1', 'pSphere1']
         """
-        return self._execute_with_retry(command, allow_retry=True)
+        with self._lock:
+            return self._execute_with_retry(command, allow_retry=True)
 
     def _execute_with_retry(self, command: str, *, allow_retry: bool) -> str:
         """Execute a command with optional reconnect-and-retry on send failure.
@@ -446,7 +474,8 @@ class CommandPortClient:
             >>> if client.is_connected():
             ...     print("Connected")
         """
-        return self._socket is not None and self.state.status == ConnectionStatus.OK
+        with self._lock:
+            return self._socket is not None and self.state.status == ConnectionStatus.OK
 
     def get_status(self) -> ConnectionStatus:
         """Get the current connection status.
@@ -459,7 +488,8 @@ class CommandPortClient:
             >>> if status == ConnectionStatus.OK:
             ...     print("Connected and healthy")
         """
-        return self.state.status
+        with self._lock:
+            return self.state.status
 
     def get_health(self) -> HealthCheckResult:
         """Get detailed health information.
@@ -471,13 +501,14 @@ class CommandPortClient:
             >>> health = client.get_health()
             >>> print(f"Status: {health.status}")
         """
-        return HealthCheckResult(
-            status=self.state.status.value,
-            last_error=self.state.last_error,
-            last_contact=self.state.get_last_contact_iso(),
-            host=self.config.host,
-            port=self.config.port,
-        )
+        with self._lock:
+            return HealthCheckResult(
+                status=self.state.status.value,
+                last_error=self.state.last_error,
+                last_contact=self.state.get_last_contact_iso(),
+                host=self.config.host,
+                port=self.config.port,
+            )
 
     def reconfigure(
         self,
@@ -498,22 +529,23 @@ class CommandPortClient:
         Example:
             >>> client.reconfigure(port=7002)
         """
-        # Disconnect first
-        self.disconnect()
+        with self._lock:
+            # Disconnect first
+            self.disconnect()
 
-        # Update config
-        new_host = host if host is not None else self.config.host
-        new_port = port if port is not None else self.config.port
+            # Update config
+            new_host = host if host is not None else self.config.host
+            new_port = port if port is not None else self.config.port
 
-        self.config = ConnectionConfig(
-            host=new_host,
-            port=new_port,
-            connect_timeout=self.config.connect_timeout,
-            command_timeout=self.config.command_timeout,
-            max_retries=self.config.max_retries,
-            retry_base_delay=self.config.retry_base_delay,
-        )
-        self.state.config = self.config
+            self.config = ConnectionConfig(
+                host=new_host,
+                port=new_port,
+                connect_timeout=self.config.connect_timeout,
+                command_timeout=self.config.command_timeout,
+                max_retries=self.config.max_retries,
+                retry_base_delay=self.config.retry_base_delay,
+            )
+            self.state.config = self.config
 
     def _cleanup_socket(self) -> None:
         """Clean up the socket connection."""
