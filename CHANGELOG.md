@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Serialized `CommandPortClient` access so concurrent MCP handlers cannot
+  interleave Maya commandPort socket send/receive operations.
+- Synchronized shared transport client initialization to prevent concurrent
+  first access from opening multiple commandPort sockets.
+- Filtered known Maya/Arnold commandPort startup noise before response parsing.
+- Safely embedded JSON values in `attributes` and `nodes.create` Maya-side
+  commands, including booleans and null-like values.
+
 ## [0.4.0] - 2026-04-22
 
 ### Added
