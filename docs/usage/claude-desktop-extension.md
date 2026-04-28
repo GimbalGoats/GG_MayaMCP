@@ -119,11 +119,29 @@ polygon cube with `modeling_create_polygon_primitive`.
 
 If Claude Desktop still shows the server as failed after reinstalling a rebuilt
 `.mcpb`, fully quit and reopen Claude Desktop, then toggle Maya MCP off and on
-under Settings -> Developer -> Local MCP servers. On the Windows Store build,
-the useful server log is usually:
+under Settings -> Developer -> Local MCP servers.
+
+To find the local MCP server log on Windows, check both the regular Claude
+Desktop profile and the Microsoft Store package profile:
+
+```powershell
+$logName = "mcp-server-Maya MCP.log"
+$regularLog = Join-Path $env:APPDATA "Claude\logs\$logName"
+
+if (Test-Path $regularLog) {
+    $regularLog
+}
+
+Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA "Packages") -Directory -Filter "Claude_*" |
+    ForEach-Object { Join-Path $_.FullName "LocalCache\Roaming\Claude\logs\$logName" } |
+    Where-Object { Test-Path $_ }
+```
+
+Common path patterns are:
 
 ```text
-C:\Users\<you>\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\logs\mcp-server-Maya MCP.log
+%APPDATA%\Claude\logs\mcp-server-Maya MCP.log
+%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude\logs\mcp-server-Maya MCP.log
 ```
 
 ## Submission Notes
