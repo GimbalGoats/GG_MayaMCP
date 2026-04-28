@@ -137,6 +137,22 @@ Source checkout or Windows-friendly setup:
 
 For Codex CLI and Claude Code on Windows, `py -m maya_mcp.server` is usually more reliable than relying on the `maya-mcp` console script being on the correct `PATH`.
 
+#### Claude Desktop Extension
+
+Maya MCP can also be packaged as a Claude Desktop MCPB extension. The extension
+still runs the same local stdio server and keeps Maya communication on
+`localhost`.
+
+Build and installation notes live in
+[Claude Desktop Extension](docs/usage/claude-desktop-extension.md).
+
+The packaging script supports a user-local MCPB CLI install:
+
+```powershell
+npm install --prefix "$env:USERPROFILE\.tools\mcpb" @anthropic-ai/mcpb
+.\packaging\claude-mcpb\build.ps1
+```
+
 #### VS Code
 
 VS Code uses `.vscode/mcp.json` with a `servers` object.
@@ -204,10 +220,12 @@ Call these tools in order:
 - [Docs Home](docs/index.md)
 - [Getting Started](docs/usage/getting-started.md)
 - [Client Setup](docs/usage/client-setup.md)
+- [Claude Desktop Extension](docs/usage/claude-desktop-extension.md)
 - [Tool Guide](docs/spec/tools.md)
 - [Architecture Overview](docs/spec/overview.md)
 - [Transport Specification](docs/spec/transport.md)
 - [Security Specification](docs/spec/security.md)
+- [Privacy Policy](docs/privacy.md)
 - [API Reference](docs/api/reference.md)
 
 Published docs: <https://gimbalgoats.github.io/GG_MayaMCP/>
@@ -237,6 +255,12 @@ py -m pytest
 - no Maya imports in the MCP server process
 - no arbitrary code execution by default
 - no secrets or raw tracebacks in client-facing errors
+
+## Privacy
+
+Maya MCP runs locally. The project does not operate a hosted service, collect
+telemetry, or receive Maya scene data from local use. See
+[Privacy Policy](docs/privacy.md).
 
 ## License
 

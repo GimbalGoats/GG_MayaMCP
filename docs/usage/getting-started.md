@@ -112,6 +112,7 @@ Most users should pick the client-specific examples there:
 
 - Codex CLI / IDE extension: `~/.codex/config.toml`
 - Claude Code: `.mcp.json`
+- Claude Desktop extension: packaged MCPB, see [Claude Desktop Extension](claude-desktop-extension.md)
 - VS Code: `.vscode/mcp.json`
 
 For Codex CLI and Claude Code on Windows, `py -m maya_mcp.server` is usually more reliable than depending on the `maya-mcp` console script being on `PATH`.

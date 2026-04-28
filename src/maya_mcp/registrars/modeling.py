@@ -507,7 +507,7 @@ def register_modeling_tools(mcp: FastMCP) -> None:
         description="Delete polygon faces from a mesh.",
         annotations=ToolAnnotations(
             readOnlyHint=False,
-            destructiveHint=False,
+            destructiveHint=True,
             idempotentHint=False,
             openWorldHint=False,
         ),
@@ -529,7 +529,7 @@ def register_modeling_tools(mcp: FastMCP) -> None:
         description="Freeze (reset) transforms on nodes, applying current values as identity.",
         annotations=ToolAnnotations(
             readOnlyHint=False,
-            destructiveHint=False,
+            destructiveHint=True,
             idempotentHint=True,
             openWorldHint=False,
         ),
@@ -540,7 +540,7 @@ def register_modeling_tools(mcp: FastMCP) -> None:
         description="Delete construction history from nodes or the entire scene.",
         annotations=ToolAnnotations(
             readOnlyHint=False,
-            destructiveHint=False,
+            destructiveHint=True,
             idempotentHint=True,
             openWorldHint=False,
         ),

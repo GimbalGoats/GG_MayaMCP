@@ -25,6 +25,12 @@ def _build_expected_tool_annotations() -> dict[str, AnnotationExpectation]:
         True,
         False,
     )
+    destructive_idempotent = (
+        False,
+        True,
+        True,
+        False,
+    )
     write_non_idempotent = (
         False,
         False,
@@ -66,20 +72,13 @@ def _build_expected_tool_annotations() -> dict[str, AnnotationExpectation]:
     for name in (
         "maya.connect",
         "maya.disconnect",
-        "scene.new",
-        "scene.open",
-        "scene.save",
-        "scene.save_as",
         "scene.export",
-        "nodes.delete",
         "nodes.rename",
         "nodes.parent",
         "attributes.set",
         "connections.connect",
         "connections.disconnect",
         "selection.clear",
-        "modeling.freeze_transforms",
-        "modeling.delete_history",
         "modeling.center_pivot",
         "modeling.set_pivot",
         "shading.set_material_color",
@@ -87,6 +86,17 @@ def _build_expected_tool_annotations() -> dict[str, AnnotationExpectation]:
         "animation.set_time_range",
     ):
         expectations[name] = write_idempotent
+
+    for name in (
+        "scene.new",
+        "scene.open",
+        "scene.save",
+        "scene.save_as",
+        "nodes.delete",
+        "modeling.freeze_transforms",
+        "modeling.delete_history",
+    ):
+        expectations[name] = destructive_idempotent
 
     for name in (
         "scene.undo",
@@ -106,19 +116,23 @@ def _build_expected_tool_annotations() -> dict[str, AnnotationExpectation]:
         "modeling.bevel",
         "modeling.bridge",
         "modeling.insert_edge_loop",
-        "modeling.delete_faces",
         "modeling.move_components",
         "shading.create_material",
         "shading.assign_material",
-        "skin.bind",
-        "skin.unbind",
         "skin.weights.set",
         "skin.copy_weights",
         "animation.set_keyframe",
     ):
         expectations[name] = write_non_idempotent
 
-    for name in ("script.execute", "script.run", "animation.delete_keyframes"):
+    for name in (
+        "modeling.delete_faces",
+        "skin.bind",
+        "skin.unbind",
+        "script.execute",
+        "script.run",
+        "animation.delete_keyframes",
+    ):
         expectations[name] = destructive_non_idempotent
 
     return expectations
@@ -157,11 +171,16 @@ def test_tools_list_returns_expected_names() -> None:
 
 def test_tools_list_exposes_schemas_and_annotations_for_every_tool() -> None:
     """Every advertised tool should include client-usable schema metadata."""
+    from maya_mcp.tool_metadata import TOOL_TITLES
+
     tool_map = _tool_map()
+
+    assert set(TOOL_TITLES) == set(tool_map)
 
     for tool_name, expected_annotations in EXPECTED_TOOL_ANNOTATIONS.items():
         tool = tool_map[tool_name]
 
+        assert tool.title == TOOL_TITLES[tool_name], tool_name
         assert tool.description, tool_name
 
         input_schema = tool.inputSchema
@@ -191,6 +210,7 @@ def test_tools_list_serializes_expected_metadata_for_representative_tools() -> N
     assert health_check.inputSchema == {
         "additionalProperties": False,
         "properties": {},
+        "required": [],
         "type": "object",
     }
 

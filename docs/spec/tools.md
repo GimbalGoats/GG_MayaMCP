@@ -16,7 +16,7 @@ For exact argument and return shapes, the authoritative source is the MCP `tools
 These should remain true unless a reviewed compatibility change intentionally breaks them:
 
 - tool names stay stable and use dotted segments such as `namespace.action` or `namespace.subnamespace.action`
-- every advertised tool has a description, `inputSchema`, `outputSchema`, and annotations
+- every advertised tool has a title, description, `inputSchema`, `outputSchema`, and annotations
 - read-only and mutating actions remain separate where practical
 - defaults and limits are treated as part of the client-facing contract
 - tool-visible behavior belongs in docs when it changes
@@ -248,11 +248,12 @@ Risk classes in practice:
 | read-only | safe inspection; no Maya state changes | `health.check`, `scene.info`, `nodes.list`, `mesh.info` |
 | write but idempotent | changes Maya state, but repeating the same call should settle to the same result | `maya.connect`, `attributes.set`, `selection.clear`, `scene.save` |
 | write and non-idempotent | changes Maya state and repeating it may stack or diverge | `nodes.create`, `scene.import`, `modeling.extrude_faces`, `animation.set_keyframe` |
-| destructive or high-risk | harder to recover from or intentionally powerful | `script.execute`, `script.run`, `animation.delete_keyframes` |
+| destructive or high-risk | removes data, replaces scene state, changes harder-to-recover state, or is intentionally powerful | `scene.new`, `scene.open`, `nodes.delete`, `modeling.delete_history`, `script.run` |
 
 All advertised tools include:
 
 - a stable tool `name`
+- a human-readable `title`
 - a non-empty `description`
 - an object `inputSchema`
 - an object `outputSchema`

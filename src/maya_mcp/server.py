@@ -36,6 +36,7 @@ from fastmcp import FastMCP
 
 from maya_mcp import __version__
 from maya_mcp.registrars import register_all_tools
+from maya_mcp.tool_metadata import build_tool_title_transform
 
 SERVER_VERSION = __version__
 SERVER_WEBSITE_URL = "https://github.com/GimbalGoats/GG_MayaMCP"
@@ -54,6 +55,7 @@ def create_server() -> FastMCP:
         website_url=SERVER_WEBSITE_URL,
     )
     register_all_tools(mcp)
+    mcp.add_transform(build_tool_title_transform())
     return mcp
 
 

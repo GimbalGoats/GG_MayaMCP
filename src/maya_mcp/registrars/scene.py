@@ -303,7 +303,7 @@ def register_scene_tools(mcp: FastMCP) -> None:
         "of requiring an immediate retry.",
         annotations=ToolAnnotations(
             readOnlyHint=False,
-            destructiveHint=False,
+            destructiveHint=True,
             idempotentHint=True,
             openWorldHint=False,
         ),
@@ -315,7 +315,7 @@ def register_scene_tools(mcp: FastMCP) -> None:
         "Saves to the current file path. Fails if the scene is untitled.",
         annotations=ToolAnnotations(
             readOnlyHint=False,
-            destructiveHint=False,
+            destructiveHint=True,
             idempotentHint=True,
             openWorldHint=False,
         ),
@@ -327,7 +327,7 @@ def register_scene_tools(mcp: FastMCP) -> None:
         "Validates the path and saves as Maya ASCII or Binary based on extension.",
         annotations=ToolAnnotations(
             readOnlyHint=False,
-            destructiveHint=False,
+            destructiveHint=True,
             idempotentHint=True,
             openWorldHint=False,
         ),
@@ -343,7 +343,7 @@ def register_scene_tools(mcp: FastMCP) -> None:
         "Supported formats: .ma (Maya ASCII), .mb (Maya Binary).",
         annotations=ToolAnnotations(
             readOnlyHint=False,
-            destructiveHint=False,
+            destructiveHint=True,
             idempotentHint=True,
             openWorldHint=False,
         ),

@@ -336,7 +336,7 @@ def register_skin_tools(mcp: FastMCP) -> None:
         "Creates a skinCluster with configurable bind method and max influences.",
         annotations=ToolAnnotations(
             readOnlyHint=False,
-            destructiveHint=False,
+            destructiveHint=True,
             idempotentHint=False,
             openWorldHint=False,
         ),
@@ -347,7 +347,7 @@ def register_skin_tools(mcp: FastMCP) -> None:
         description="Detach a skin cluster from a mesh, removing skin deformation.",
         annotations=ToolAnnotations(
             readOnlyHint=False,
-            destructiveHint=False,
+            destructiveHint=True,
             idempotentHint=False,
             openWorldHint=False,
         ),

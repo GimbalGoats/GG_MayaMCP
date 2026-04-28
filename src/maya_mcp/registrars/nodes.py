@@ -214,7 +214,7 @@ def register_node_tools(mcp: FastMCP) -> None:
         description="Delete one or more nodes from the Maya scene.",
         annotations=ToolAnnotations(
             readOnlyHint=False,
-            destructiveHint=False,
+            destructiveHint=True,
             idempotentHint=True,
             openWorldHint=False,
         ),
