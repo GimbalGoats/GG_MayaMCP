@@ -15,7 +15,10 @@ jobs:
     name: Build Claude Desktop MCPB
     runs-on: windows-latest
     permissions:
-      contents: write
+      contents: read
+    outputs:
+      package_version: ${{ steps.versions.outputs.package_version }}
+      asset_name: ${{ steps.versions.outputs.asset_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -70,11 +73,23 @@ jobs:
         with:
           name: claude-desktop-mcpb-${{ steps.versions.outputs.package_version }}
           path: dist/release/${{ steps.versions.outputs.asset_name }}
+  attach-mcpb-release:
+    name: Attach MCPB to GitHub Release
+    needs: build-mcpb
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download MCPB artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: claude-desktop-mcpb-${{ needs.build-mcpb.outputs.package_version }}
+          path: dist/release
       - name: Attach MCPB to GitHub Release
-        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/release/${{ steps.versions.outputs.asset_name }}
+          files: dist/release/${{ needs.build-mcpb.outputs.asset_name }}
 
   build:
     name: Build distributions

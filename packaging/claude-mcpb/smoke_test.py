@@ -7,6 +7,7 @@ import asyncio
 import os
 import struct
 import sys
+import tempfile
 from pathlib import Path
 
 from mcp import ClientSession, StdioServerParameters
@@ -74,11 +75,29 @@ async def smoke_test(bundle_dir: Path, expected_tools: int | None) -> None:
         env=env,
     )
 
-    with Path(os.devnull).open("w", encoding="utf-8") as errlog:
-        async with stdio_client(params, errlog=errlog) as (read, write):
-            async with ClientSession(read, write) as session:
-                init = await session.initialize()
-                tools_result = await session.list_tools()
+    errlog_handle, errlog_name = tempfile.mkstemp(text=True)
+    os.close(errlog_handle)
+    errlog_path = Path(errlog_name)
+    try:
+        with errlog_path.open("w+", encoding="utf-8") as errlog:
+            try:
+                async with (
+                    stdio_client(params, errlog=errlog) as (read, write),
+                    ClientSession(read, write) as session,
+                ):
+                    init = await session.initialize()
+                    tools_result = await session.list_tools()
+            except Exception as exc:
+                errlog.flush()
+                errlog.seek(0)
+                server_stderr = errlog.read().strip()
+                if not server_stderr:
+                    server_stderr = "<empty>"
+                raise RuntimeError(
+                    f"MCPB smoke test failed. Server stderr:\n{server_stderr}"
+                ) from exc
+    finally:
+        errlog_path.unlink(missing_ok=True)
 
     tool_names = {tool.name for tool in tools_result.tools}
     missing_tools = sorted(set(REQUIRED_TOOLS) - tool_names)

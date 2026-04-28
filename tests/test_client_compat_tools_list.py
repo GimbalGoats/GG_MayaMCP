@@ -147,7 +147,10 @@ EXPECTED_TOOL_NAMES = frozenset(EXPECTED_TOOL_ANNOTATIONS)
 
 def _list_tools() -> ListToolsResult:
     """Return the serialized MCP ``tools/list`` response."""
-    from maya_mcp.server import mcp
+    with patch.dict("os.environ", {"MAYA_MCP_CLAUDE_DESKTOP_COMPAT": "false"}):
+        from maya_mcp.server import create_server
+
+        mcp = create_server()
 
     tools = [tool.to_mcp_tool() for tool in asyncio.run(mcp.list_tools())]
     return ListToolsResult(nextCursor=None, tools=tools)
