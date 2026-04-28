@@ -15,6 +15,13 @@
   "homepage": "https://github.com/GimbalGoats/GG_MayaMCP",
   "documentation": "https://gimbalgoats.github.io/GG_MayaMCP/",
   "support": "https://github.com/GimbalGoats/GG_MayaMCP/issues",
+  "icon": "icon.png",
+  "icons": [
+    {
+      "src": "icon.png",
+      "size": "512x512"
+    }
+  ],
   "privacy_policies": [
     "https://gimbalgoats.github.io/GG_MayaMCP/privacy/"
   ],

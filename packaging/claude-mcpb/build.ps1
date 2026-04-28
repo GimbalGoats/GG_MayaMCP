@@ -39,6 +39,7 @@ if (Test-Path $stageDir) {
 New-Item -ItemType Directory -Path $stageDir | Out-Null
 
 Copy-Item -LiteralPath (Join-Path $packageDir "manifest.json") -Destination $stageDir
+Copy-Item -LiteralPath (Join-Path $packageDir "icon.png") -Destination $stageDir
 Copy-Item -LiteralPath (Join-Path $packageDir ".mcpbignore") -Destination $stageDir
 Copy-Item -LiteralPath (Join-Path $packageDir "README.md") -Destination (Join-Path $stageDir "README.md")
 Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSE") -Destination $stageDir

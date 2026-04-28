@@ -54,7 +54,8 @@ From the repository root on Windows:
 
 The script stages a clean extension tree under `dist/mcpb/maya-mcp` and runs
 `mcpb pack` there. It first looks for `mcpb` on `PATH`, then falls back to the
-user-local install at `$env:USERPROFILE\.tools\mcpb`.
+user-local install at `$env:USERPROFILE\.tools\mcpb`. The staged extension
+includes the connector logo from `packaging/claude-mcpb/icon.png`.
 
 The generated package path is:
 
@@ -152,7 +153,7 @@ For Anthropic review, prepare:
 - public setup docs
 - a public privacy policy
 - a support URL
-- a 512x512 PNG logo
+- the bundled 512x512 PNG logo at `packaging/claude-mcpb/icon.png`
 - three or more documented examples that exercise real tools
 - a test Maya scene or clear reviewer setup steps
 
