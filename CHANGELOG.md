@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Claude Desktop Extension packaging for Maya MCP, including MCPB manifest,
+  icon, bundle README, local build script, and smoke-test coverage for the
+  packaged server.
+- GitHub release workflow support for building, validating, smoke-testing, and
+  attaching `maya-mcp-<version>.mcpb` release artifacts.
+- Claude Desktop compatibility mode metadata and safe tool-name aliases for
+  clients that require underscore-only tool names.
+- Privacy policy and Claude Desktop Extension usage documentation.
+
 ## [0.4.1] - 2026-04-24
 
 ### Fixed
