@@ -21,6 +21,8 @@ The MCPB package:
 - runs the existing `maya-mcp` stdio server
 - keeps Maya communication on `localhost`
 - exposes the same MCP tools as normal `maya-mcp`
+- advertises Claude Desktop-safe tool names with underscores, such as
+  `health_check`, because Claude Desktop rejects dots in connector tool names
 - lets Claude Desktop collect local settings such as the Maya commandPort
 - keeps `script.run` disabled unless the user explicitly enables it
 
@@ -66,6 +68,18 @@ To inspect the package:
 & "$env:USERPROFILE\.tools\mcpb\node_modules\.bin\mcpb.cmd" info dist\mcpb\maya-mcp\maya-mcp.mcpb
 ```
 
+## Release Automation
+
+The `Publish` GitHub Actions workflow builds the MCPB package on
+`windows-latest` for every published GitHub Release and manual dispatch. The
+workflow installs `@anthropic-ai/mcpb`, runs the same
+`packaging/claude-mcpb/build.ps1` script, validates the manifest, inspects the
+bundle, unpacks the generated archive for a stdio server smoke test, and uploads
+a `maya-mcp-<version>.mcpb` artifact.
+
+For release events, the workflow also attaches that `.mcpb` file to the GitHub
+Release alongside the PyPI publishing path.
+
 ## Install In Claude Desktop
 
 Install the generated `.mcpb` file by using one of Claude Desktop's extension
@@ -85,16 +99,29 @@ During installation, configure:
 | Approved script directories | empty | Optional semicolon-separated absolute paths |
 | Enable raw `script.run` | disabled | Leave disabled unless raw execution is required |
 
+Claude Desktop installs the extension before it enables the MCP server. If the
+required settings above are not saved, Developer settings may show Maya MCP as
+installed but failed or disabled.
+
 ## Verify
 
 Open Maya, enable `commandPort`, then ask Claude Desktop to call:
 
-1. `health.check`
-2. `scene.info`
-3. `nodes.list`
+1. `health_check`
+2. `scene_info`
+3. `nodes_list`
 
 For a write-path smoke test, use a disposable scene and ask Claude to create a
-polygon cube with `modeling.create_polygon_primitive`.
+polygon cube with `modeling_create_polygon_primitive`.
+
+If Claude Desktop still shows the server as failed after reinstalling a rebuilt
+`.mcpb`, fully quit and reopen Claude Desktop, then toggle Maya MCP off and on
+under Settings -> Developer -> Local MCP servers. On the Windows Store build,
+the useful server log is usually:
+
+```text
+C:\Users\<you>\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\logs\mcp-server-Maya MCP.log
+```
 
 ## Submission Notes
 

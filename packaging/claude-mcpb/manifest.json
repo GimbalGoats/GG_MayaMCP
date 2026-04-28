@@ -30,7 +30,8 @@
         "MAYA_MCP_CONNECT_TIMEOUT": "${user_config.connect_timeout}",
         "MAYA_MCP_COMMAND_TIMEOUT": "${user_config.command_timeout}",
         "MAYA_MCP_SCRIPT_DIRS": "${user_config.script_dirs}",
-        "MAYA_MCP_ENABLE_RAW_EXECUTION": "${user_config.enable_raw_execution}"
+        "MAYA_MCP_ENABLE_RAW_EXECUTION": "${user_config.enable_raw_execution}",
+        "MAYA_MCP_CLAUDE_DESKTOP_COMPAT": "true"
       }
     }
   },

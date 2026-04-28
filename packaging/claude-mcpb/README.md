@@ -59,9 +59,13 @@ cmds.commandPort(
 
 After installing the extension, verify the connection with:
 
-1. `health.check`
-2. `scene.info`
-3. `nodes.list`
+1. `health_check`
+2. `scene_info`
+3. `nodes_list`
+
+The Claude Desktop bundle uses underscore tool names because Claude Desktop
+rejects dots in connector tool names. The normal `maya-mcp` server still uses
+dotted names.
 
 ## Examples
 
@@ -70,20 +74,22 @@ After installing the extension, verify the connection with:
 Ask Claude to check whether Maya is reachable, summarize the current scene, and
 list the first nodes in the scene.
 
-Expected tools: `health.check`, `scene.info`, `nodes.list`.
+Expected Claude Desktop bundle tools: `health_check`, `scene_info`,
+`nodes_list`.
 
 ### Create simple geometry
 
 Ask Claude to create a polygon cube, name it, and report its transform and shape
 information.
 
-Expected tools: `modeling.create_polygon_primitive`, `nodes.info`.
+Expected Claude Desktop bundle tools: `modeling_create_polygon_primitive`,
+`nodes_info`.
 
 ### Capture the viewport
 
 Ask Claude to capture the active Maya viewport as an image.
 
-Expected tool: `viewport.capture`.
+Expected Claude Desktop bundle tool: `viewport_capture`.
 
 ## Security Notes
 

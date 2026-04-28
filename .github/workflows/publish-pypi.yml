@@ -1,4 +1,4 @@
-name: Publish to PyPI
+name: Publish
 
 on:
   release:
@@ -6,6 +6,53 @@ on:
   workflow_dispatch:
 
 jobs:
+  build-mcpb:
+    name: Build Claude Desktop MCPB
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install MCPB CLI
+        run: npm install -g @anthropic-ai/mcpb
+      - name: Install smoke-test dependencies
+        run: python -m pip install -e .
+      - name: Build MCPB package
+        shell: pwsh
+        run: .\packaging\claude-mcpb\build.ps1
+      - name: Inspect MCPB package
+        shell: pwsh
+        run: |
+          mcpb validate packaging\claude-mcpb\manifest.json
+          mcpb info dist\mcpb\maya-mcp\maya-mcp.mcpb
+      - name: Smoke test MCPB package
+        shell: pwsh
+        run: |
+          mcpb unpack dist\mcpb\maya-mcp\maya-mcp.mcpb dist\mcpb-smoke
+          python packaging\claude-mcpb\smoke_test.py dist\mcpb-smoke --expected-tools 71
+      - name: Prepare release asset
+        shell: pwsh
+        run: |
+          $manifest = Get-Content packaging\claude-mcpb\manifest.json -Raw | ConvertFrom-Json
+          New-Item -ItemType Directory -Path dist\release | Out-Null
+          Copy-Item dist\mcpb\maya-mcp\maya-mcp.mcpb "dist\release\maya-mcp-$($manifest.version).mcpb"
+      - name: Upload MCPB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-desktop-mcpb
+          path: dist/release/*.mcpb
+      - name: Attach MCPB to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/release/*.mcpb
+
   build:
     name: Build distributions
     runs-on: ubuntu-latest
@@ -30,7 +77,7 @@ jobs:
 
   publish:
     name: Publish to PyPI
-    needs: build
+    needs: [build, build-mcpb]
     runs-on: ubuntu-latest
     environment:
       name: pypi

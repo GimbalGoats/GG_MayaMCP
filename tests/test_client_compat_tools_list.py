@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import patch
 
 from mcp.types import ListToolsResult, Tool
+
+from maya_mcp.tool_metadata import to_claude_desktop_tool_name
 
 AnnotationExpectation = tuple[bool, bool, bool, bool]
 
@@ -167,6 +170,22 @@ def test_tools_list_returns_expected_names() -> None:
     assert result.nextCursor is None
     assert len(result.tools) == len(names) == len(EXPECTED_TOOL_NAMES)
     assert names == EXPECTED_TOOL_NAMES
+
+
+def test_claude_desktop_compat_exposes_safe_tool_aliases() -> None:
+    """Claude Desktop MCPB mode should avoid dots in advertised tool names."""
+    with patch.dict("os.environ", {"MAYA_MCP_CLAUDE_DESKTOP_COMPAT": "true"}):
+        from maya_mcp.server import create_server
+
+        mcp = create_server()
+
+    tools = [tool.to_mcp_tool() for tool in asyncio.run(mcp.list_tools())]
+    names = {tool.name for tool in tools}
+
+    assert len(tools) == len(names) == len(EXPECTED_TOOL_NAMES)
+    assert names == {to_claude_desktop_tool_name(name) for name in EXPECTED_TOOL_NAMES}
+    assert all("." not in name for name in names)
+    assert {"health_check", "scene_info", "nodes_list"}.issubset(names)
 
 
 def test_tools_list_exposes_schemas_and_annotations_for_every_tool() -> None:

@@ -9,6 +9,8 @@ from __future__ import annotations
 from fastmcp.server.transforms import ToolTransform
 from fastmcp.tools.tool_transform import ToolTransformConfig
 
+CLAUDE_DESKTOP_COMPAT_ENV_VAR = "MAYA_MCP_CLAUDE_DESKTOP_COMPAT"
+
 TOOL_TITLES: dict[str, str] = {
     "health.check": "Check Maya Connection Health",
     "maya.connect": "Connect To Maya",
@@ -84,8 +86,19 @@ TOOL_TITLES: dict[str, str] = {
 }
 
 
-def build_tool_title_transform() -> ToolTransform:
+def to_claude_desktop_tool_name(tool_name: str) -> str:
+    """Return a Claude Desktop-compatible alias for a Maya MCP tool name."""
+    return tool_name.replace(".", "_")
+
+
+def build_tool_title_transform(*, claude_desktop_compat: bool = False) -> ToolTransform:
     """Return a FastMCP transform that adds display titles to all tools."""
     return ToolTransform(
-        {name: ToolTransformConfig(title=title) for name, title in TOOL_TITLES.items()}
+        {
+            name: ToolTransformConfig(
+                name=to_claude_desktop_tool_name(name) if claude_desktop_compat else None,
+                title=title,
+            )
+            for name, title in TOOL_TITLES.items()
+        }
     )

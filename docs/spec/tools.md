@@ -25,6 +25,12 @@ These should remain true unless a reviewed compatibility change intentionally br
 
 Tool names follow dotted hierarchical segments such as `namespace.action` or `namespace.subnamespace.action`.
 
+The Claude Desktop MCPB package is the compatibility exception. Claude Desktop
+rejects dots in connector tool names, so that bundle advertises underscore
+aliases such as `health_check`, `scene_info`, and
+`modeling_create_polygon_primitive`. The underlying tool behavior and schemas
+are otherwise the same as the standard dotted-name server.
+
 Current namespaces:
 
 - `health`
