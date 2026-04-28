@@ -5,6 +5,8 @@
 [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://gimbalgoats.github.io/GG_MayaMCP/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+![Maya MCP banner](docs/assets/maya-mcp-banner.png)
+
 Maya MCP is a local Model Context Protocol server for controlling Autodesk Maya through Maya's `commandPort`.
 
 It gives MCP clients a typed tool surface for scene work, nodes, selection, modeling, shading, skinning, animation, curves, scripts, and viewport capture without importing Maya modules in the server process.
@@ -145,6 +147,10 @@ still runs the same local stdio server and keeps Maya communication on
 
 Build and installation notes live in
 [Claude Desktop Extension](docs/usage/claude-desktop-extension.md).
+
+Published GitHub Releases attach the built `.mcpb` package as
+`maya-mcp-<version>.mcpb` after the release workflow validates and smoke-tests
+the bundle.
 
 The packaging script supports a user-local MCPB CLI install:
 

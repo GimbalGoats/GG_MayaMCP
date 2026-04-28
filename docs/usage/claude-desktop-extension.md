@@ -72,13 +72,16 @@ To inspect the package:
 
 The `Publish` GitHub Actions workflow builds the MCPB package on
 `windows-latest` for every published GitHub Release and manual dispatch. The
-workflow installs `@anthropic-ai/mcpb`, runs the same
-`packaging/claude-mcpb/build.ps1` script, validates the manifest, inspects the
-bundle, unpacks the generated archive for a stdio server smoke test, and uploads
-a `maya-mcp-<version>.mcpb` artifact.
+workflow installs `@anthropic-ai/mcpb`, verifies that `pyproject.toml`, the MCPB
+manifest, and the release tag version agree, runs the same
+`packaging/claude-mcpb/build.ps1` script, validates the staged manifest,
+inspects the bundle, unpacks the generated archive for a stdio server smoke
+test, and uploads a `maya-mcp-<version>.mcpb` artifact.
 
 For release events, the workflow also attaches that `.mcpb` file to the GitHub
-Release alongside the PyPI publishing path.
+Release alongside the PyPI publishing path. Manual dispatch builds and uploads
+the MCPB artifact without publishing to PyPI unless the `publish_pypi` input is
+explicitly enabled.
 
 ## Install In Claude Desktop
 

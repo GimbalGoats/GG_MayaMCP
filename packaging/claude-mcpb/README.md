@@ -34,6 +34,18 @@ dist/mcpb/maya-mcp/maya-mcp.mcpb
 The script finds `mcpb` on `PATH` first, then falls back to the user-local
 install at `%USERPROFILE%\.tools\mcpb`.
 
+## Release Automation
+
+The repository `Publish` workflow builds this package on `windows-latest` for
+published GitHub Releases and manual dispatches. It verifies that the MCPB
+manifest version matches `pyproject.toml` and the release tag, validates the
+staged manifest, inspects the bundle, unpacks it for a stdio smoke test, and
+uploads `maya-mcp-<version>.mcpb`.
+
+On published GitHub Releases, that `.mcpb` file is attached to the release.
+Manual dispatches build and upload the artifact without publishing to PyPI
+unless `publish_pypi` is enabled.
+
 ## Maya Setup
 
 Run this in Maya's Script Editor on the Python tab:
