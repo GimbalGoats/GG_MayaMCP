@@ -9,6 +9,10 @@ from __future__ import annotations
 # Characters forbidden in node names (shell metacharacters + control chars)
 FORBIDDEN_NODE_CHARS = frozenset([";", "|", "&", "$", "`", "\n", "\r"])
 
+# Characters forbidden in existing-node references. Maya DAG paths use "|"
+# as a hierarchy separator, so references validate that syntax separately.
+FORBIDDEN_NODE_REFERENCE_CHARS = frozenset([";", "&", "$", "`", "\n", "\r"])
+
 # Characters forbidden in patterns (superset of node chars + quotes)
 FORBIDDEN_PATTERN_CHARS = frozenset([";", "|", "&", "$", "`", "\n", "\r", '"', "'"])
 
@@ -29,6 +33,32 @@ def validate_node_name(node: str) -> None:
         raise ValueError(f"Invalid node name: {node}")
     if any(c in node for c in FORBIDDEN_NODE_CHARS):
         raise ValueError(f"Invalid characters in node name: {node}")
+
+
+def validate_node_reference(node: str) -> None:
+    """Validate an existing node reference for security.
+
+    Existing Maya nodes may be addressed by short name or by DAG path, such
+    as ``|group1|mesh1``. The pipe character is allowed only as a path
+    separator with non-empty path segments.
+
+    Args:
+        node: The node reference to validate.
+
+    Raises:
+        ValueError: If the node reference is invalid or contains forbidden
+            characters.
+    """
+    if not node or not isinstance(node, str):
+        raise ValueError(f"Invalid node name: {node}")
+    if any(c in node for c in FORBIDDEN_NODE_REFERENCE_CHARS):
+        raise ValueError(f"Invalid characters in node name: {node}")
+    if "|" in node:
+        path_segments = node.split("|")
+        if path_segments[0] == "":
+            path_segments = path_segments[1:]
+        if not path_segments or any(segment == "" for segment in path_segments):
+            raise ValueError(f"Invalid DAG path in node name: {node}")
 
 
 def validate_attribute_name(attr: str) -> None:

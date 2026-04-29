@@ -134,6 +134,11 @@ Use these sources in this order:
 - `curve.info`
 - `curve.cvs`
 
+Mesh node inputs accept either short node names or Maya DAG paths such as
+`|group1|mesh1`. The `|` character is accepted only as a hierarchy separator;
+malformed paths and shell/control characters are rejected before commands are
+sent to Maya.
+
 ### Modeling
 
 - `modeling.create_polygon_primitive`
