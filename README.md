@@ -21,6 +21,23 @@ This project is unofficial and is not affiliated with or endorsed by Autodesk. A
 - supports safer scene replacement flows for unsaved changes
 - leaves raw code execution disabled unless you opt in
 
+## Claude Desktop Quick Start
+
+For Claude Desktop, use the packaged MCPB extension from GitHub Releases.
+
+1. Download `maya-mcp-<version>.mcpb` from the latest
+   [GitHub Release](https://github.com/GimbalGoats/GG_MayaMCP/releases).
+2. Install it in Claude Desktop by double-clicking the `.mcpb` file, dragging
+   it into Claude Desktop, or using Settings -> Extensions -> Advanced settings
+   -> Install Extension.
+3. Keep the Maya commandPort setting at `7001` unless you use a different port.
+4. Open Maya and run the commandPort setup from the next section.
+5. In Claude Desktop, verify with `health_check`, `scene_info`, and
+   `nodes_list`.
+
+Claude Desktop uses underscore tool names such as `scene_info`. Other MCP
+clients use dotted names such as `scene.info`.
+
 ## Quick Start
 
 ### 1. Install
@@ -141,11 +158,10 @@ For Codex CLI and Claude Code on Windows, `py -m maya_mcp.server` is usually mor
 
 #### Claude Desktop Extension
 
-Maya MCP can also be packaged as a Claude Desktop MCPB extension. The extension
-still runs the same local stdio server and keeps Maya communication on
-`localhost`.
+Maya MCP ships as a Claude Desktop MCPB extension. The extension still runs the
+same local stdio server and keeps Maya communication on `localhost`.
 
-Build and installation notes live in
+User installation, build, verification, and troubleshooting notes live in
 [Claude Desktop Extension](docs/usage/claude-desktop-extension.md).
 
 Published GitHub Releases attach the built `.mcpb` package as

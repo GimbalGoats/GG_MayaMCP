@@ -14,6 +14,18 @@ This is the recommended Claude distribution path for Maya MCP because Maya runs
 on the user's workstation and the server communicates only with Maya's local
 `commandPort`.
 
+## Quick Start
+
+1. Download `maya-mcp-<version>.mcpb` from the latest GitHub Release.
+2. Install it in Claude Desktop by double-clicking the `.mcpb` file, dragging
+   it into Claude Desktop, or using Settings -> Extensions -> Advanced settings
+   -> Install Extension.
+3. Leave the Maya commandPort setting at `7001` unless your Maya setup uses a
+   different port.
+4. Open Maya and enable `commandPort`.
+5. Ask Claude Desktop to call `health_check`, then `scene_info`, then
+   `nodes_list`.
+
 ## What This Package Does
 
 The MCPB package:
@@ -29,7 +41,125 @@ The MCPB package:
 The normal MCP server behavior does not change. Existing clients can still run
 `maya-mcp`, `py -m maya_mcp.server`, or `fastmcp run`.
 
-## Build The Package
+## Requirements
+
+You need:
+
+- Claude Desktop with local extensions enabled
+- Autodesk Maya running on the same machine
+- Maya `commandPort` open on the configured local port, usually `7001`
+- the `.mcpb` package from a GitHub Release, or Node/npm and the MCPB CLI when
+  building from source
+
+## Install From A Release
+
+Published GitHub Releases attach the package as:
+
+```text
+maya-mcp-<version>.mcpb
+```
+
+Install it with any Claude Desktop extension flow:
+
+- double-click the `.mcpb` file
+- drag the `.mcpb` file into Claude Desktop
+- use Settings -> Extensions -> Advanced settings -> Install Extension
+
+During installation, configure:
+
+| Setting | Default | Notes |
+|---|---:|---|
+| Maya commandPort | `7001` | Must match the open Maya commandPort |
+| Connect timeout | `5` | Seconds to wait while connecting |
+| Command timeout | `30` | Seconds to wait for Maya command responses |
+| Approved script directories | empty | Optional semicolon-separated absolute paths |
+| Enable raw `script.run` | disabled | Leave disabled unless raw execution is required |
+
+Claude Desktop installs the extension before it enables the MCP server. If the
+required settings above are not saved, Developer settings may show Maya MCP as
+installed but failed or disabled.
+
+## Enable Maya CommandPort
+
+Run this in Maya's Script Editor on the Python tab:
+
+```python
+import maya.cmds as cmds
+
+try:
+    cmds.commandPort(name=":7001", close=True)
+except RuntimeError:
+    pass
+
+cmds.commandPort(
+    name=":7001",
+    sourceType="python",
+    echoOutput=True,
+    noreturn=False,
+    bufferSize=16384,
+)
+```
+
+The port number must match the Claude Desktop extension setting.
+
+## Verify In Claude Desktop
+
+After Maya is running and `commandPort` is open, ask Claude Desktop to call:
+
+1. `health_check`
+2. `scene_info`
+3. `nodes_list`
+
+For a write-path smoke test, use a disposable scene and ask Claude to create a
+polygon cube with `modeling_create_polygon_primitive`.
+
+## Example Prompts
+
+Inspect the open scene:
+
+```text
+Check whether Maya is reachable, summarize the current scene, and list the first
+20 nodes.
+```
+
+Create simple geometry:
+
+```text
+Create a polygon cube, name it mcp_test_cube, assign a simple material, and
+report its transform and shape information.
+```
+
+Capture the viewport:
+
+```text
+Capture the active Maya viewport and tell me where the image was written.
+```
+
+## FAQ
+
+### Does this work in Claude web?
+
+No. Maya MCP needs Claude Desktop because the MCP server and Maya both run on
+your local workstation.
+
+### Does Claude edit my Maya files directly?
+
+Claude works through the open Maya session. Changes affect the current scene and
+are written to disk only when a save/export tool is used or when you save in
+Maya.
+
+### Do I need to enable raw script execution?
+
+No. Leave raw `script.run` disabled unless you explicitly need arbitrary Python
+or MEL execution. Most workflows use the typed Maya MCP tools.
+
+### Why are Claude Desktop tool names different?
+
+Claude Desktop rejects dots in connector tool names, so the MCPB package
+advertises underscore names such as `scene_info`. Other MCP clients can use the
+normal dotted names such as `scene.info`.
+
+## Build From Source
 
 Install the MCPB CLI.
 
@@ -69,6 +199,13 @@ To inspect the package:
 & "$env:USERPROFILE\.tools\mcpb\node_modules\.bin\mcpb.cmd" info dist\mcpb\maya-mcp\maya-mcp.mcpb
 ```
 
+To smoke-test the unpacked package:
+
+```powershell
+& "$env:USERPROFILE\.tools\mcpb\node_modules\.bin\mcpb.cmd" unpack dist\mcpb\maya-mcp\maya-mcp.mcpb dist\mcpb-smoke
+py packaging\claude-mcpb\smoke_test.py dist\mcpb-smoke --expected-tools 71
+```
+
 ## Release Automation
 
 The `Publish` GitHub Actions workflow builds the MCPB package on
@@ -84,43 +221,19 @@ Release alongside the PyPI publishing path. Manual dispatch builds and uploads
 the MCPB artifact without publishing to PyPI unless the `publish_pypi` input is
 explicitly enabled.
 
-## Install In Claude Desktop
-
-Install the generated `.mcpb` file by using one of Claude Desktop's extension
-flows:
-
-- double-click the `.mcpb` file
-- drag the `.mcpb` file into Claude Desktop
-- use Settings -> Extensions -> Advanced settings -> Install Extension
-
-During installation, configure:
-
-| Setting | Default | Notes |
-|---|---:|---|
-| Maya commandPort | `7001` | Must match the open Maya commandPort |
-| Connect timeout | `5` | Seconds to wait while connecting |
-| Command timeout | `30` | Seconds to wait for Maya command responses |
-| Approved script directories | empty | Optional semicolon-separated absolute paths |
-| Enable raw `script.run` | disabled | Leave disabled unless raw execution is required |
-
-Claude Desktop installs the extension before it enables the MCP server. If the
-required settings above are not saved, Developer settings may show Maya MCP as
-installed but failed or disabled.
-
-## Verify
-
-Open Maya, enable `commandPort`, then ask Claude Desktop to call:
-
-1. `health_check`
-2. `scene_info`
-3. `nodes_list`
-
-For a write-path smoke test, use a disposable scene and ask Claude to create a
-polygon cube with `modeling_create_polygon_primitive`.
+## Troubleshooting
 
 If Claude Desktop still shows the server as failed after reinstalling a rebuilt
 `.mcpb`, fully quit and reopen Claude Desktop, then toggle Maya MCP off and on
 under Settings -> Developer -> Local MCP servers.
+
+If `health_check` fails:
+
+- confirm Maya is running on the same machine
+- confirm Maya `commandPort` is open on the configured port
+- confirm the extension setting uses the same port
+- restart Claude Desktop after reinstalling or changing extension settings
+- restart Maya if the commandPort state becomes stale
 
 To find the local MCP server log on Windows, check both the regular Claude
 Desktop profile and the Microsoft Store package profile:

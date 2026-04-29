@@ -4,6 +4,17 @@ Maya MCP is a local MCP server for controlling Autodesk Maya through Maya's
 `commandPort`. This bundle runs on the user's workstation, communicates over
 stdio with Claude Desktop, and connects only to Maya on `localhost`.
 
+## Quick Start
+
+1. Install `maya-mcp-<version>.mcpb` in Claude Desktop by double-clicking it,
+   dragging it into Claude Desktop, or using Settings -> Extensions -> Advanced
+   settings -> Install Extension.
+2. Keep the Maya commandPort setting at `7001` unless your Maya setup uses a
+   different port.
+3. Open Maya and enable `commandPort`.
+4. In Claude Desktop, verify with `health_check`, `scene_info`, and
+   `nodes_list`.
+
 ## Requirements
 
 - Claude Desktop with desktop extensions enabled.
@@ -78,6 +89,24 @@ After installing the extension, verify the connection with:
 The Claude Desktop bundle uses underscore tool names because Claude Desktop
 rejects dots in connector tool names. The normal `maya-mcp` server still uses
 dotted names.
+
+## FAQ
+
+### Does this work in Claude web?
+
+No. This extension needs Claude Desktop because Maya MCP and Maya both run on
+your local workstation.
+
+### Does Claude edit my Maya files directly?
+
+Claude works through the open Maya session. Changes affect the current scene and
+are written to disk only when a save/export tool is used or when you save in
+Maya.
+
+### Should I enable raw script.run?
+
+Leave raw `script.run` disabled unless you explicitly need arbitrary Python or
+MEL execution. Most workflows use typed Maya MCP tools.
 
 ## Examples
 
