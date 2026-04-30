@@ -5,6 +5,8 @@
 [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://gimbalgoats.github.io/GG_MayaMCP/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+[Download Claude Desktop extension (.mcpb)](https://github.com/GimbalGoats/GG_MayaMCP/releases/latest)
+
 ![Maya MCP banner](docs/assets/maya-mcp-banner.png)
 
 Maya MCP is a local Model Context Protocol server for controlling Autodesk Maya through Maya's `commandPort`.
@@ -23,10 +25,10 @@ This project is unofficial and is not affiliated with or endorsed by Autodesk. A
 
 ## Claude Desktop Quick Start
 
-For Claude Desktop, use the packaged MCPB extension from GitHub Releases.
+For Claude Desktop, use the packaged MCPB extension from
+[the latest GitHub Release](https://github.com/GimbalGoats/GG_MayaMCP/releases/latest).
 
-1. Download `maya-mcp-<version>.mcpb` from the latest
-   [GitHub Release](https://github.com/GimbalGoats/GG_MayaMCP/releases).
+1. Download `maya-mcp-<version>.mcpb` from the release **Assets** section.
 2. Install it in Claude Desktop by double-clicking the `.mcpb` file, dragging
    it into Claude Desktop, or using Settings -> Extensions -> Advanced settings
    -> Install Extension.
