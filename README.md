@@ -2,8 +2,14 @@
 
 [![Python 3.10.1+](https://img.shields.io/badge/python-3.10.1%2B-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://img.shields.io/pypi/v/maya-mcp.svg)](https://pypi.org/project/maya-mcp/)
+[![GitHub release](https://img.shields.io/github/v/release/GimbalGoats/GG_MayaMCP?label=release)](https://github.com/GimbalGoats/GG_MayaMCP/releases/latest)
+[![CI](https://github.com/GimbalGoats/GG_MayaMCP/actions/workflows/ci.yml/badge.svg)](https://github.com/GimbalGoats/GG_MayaMCP/actions/workflows/ci.yml)
+[![Publish](https://github.com/GimbalGoats/GG_MayaMCP/actions/workflows/publish-pypi.yml/badge.svg)](https://github.com/GimbalGoats/GG_MayaMCP/actions/workflows/publish-pypi.yml)
 [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://gimbalgoats.github.io/GG_MayaMCP/)
+[![Claude Desktop](https://img.shields.io/badge/Claude%20Desktop-.mcpb-6f42c1)](https://github.com/GimbalGoats/GG_MayaMCP/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+[Download Claude Desktop extension (.mcpb)](https://github.com/GimbalGoats/GG_MayaMCP/releases/latest)
 
 ![Maya MCP banner](docs/assets/maya-mcp-banner.png)
 
@@ -23,10 +29,10 @@ This project is unofficial and is not affiliated with or endorsed by Autodesk. A
 
 ## Claude Desktop Quick Start
 
-For Claude Desktop, use the packaged MCPB extension from GitHub Releases.
+For Claude Desktop, use the packaged MCPB extension from
+[the latest GitHub Release](https://github.com/GimbalGoats/GG_MayaMCP/releases/latest).
 
-1. Download `maya-mcp-<version>.mcpb` from the latest
-   [GitHub Release](https://github.com/GimbalGoats/GG_MayaMCP/releases).
+1. Download `maya-mcp-<version>.mcpb` from the release **Assets** section.
 2. Install it in Claude Desktop by double-clicking the `.mcpb` file, dragging
    it into Claude Desktop, or using Settings -> Extensions -> Advanced settings
    -> Install Extension.
