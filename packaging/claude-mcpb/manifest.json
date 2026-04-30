@@ -2,7 +2,7 @@
   "manifest_version": "0.4",
   "name": "maya-mcp",
   "display_name": "Maya MCP",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Control a local Autodesk Maya session through a typed MCP tool surface.",
   "long_description": "Maya MCP runs locally on the user's workstation and talks to Autodesk Maya through Maya's localhost commandPort. It exposes typed tools for scene inspection, nodes, selection, mesh data, modeling, shading, skinning, animation, curves, viewport capture, and approved script workflows. Raw code execution is disabled by default and must be explicitly enabled.",
   "author": {

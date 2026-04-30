@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-04-30
+
 ### Added
 
 - Claude Desktop Extension packaging for Maya MCP, including MCPB manifest,
@@ -17,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Claude Desktop compatibility mode metadata and safe tool-name aliases for
   clients that require underscore-only tool names.
 - Privacy policy and Claude Desktop Extension usage documentation.
+
+### Fixed
+
+- Accepted Maya DAG paths for mesh tool node inputs.
 
 ## [0.4.1] - 2026-04-24
 
@@ -189,7 +195,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - No arbitrary code execution - all operations are explicit tools
 - No raw Python/MEL string evaluation exposed to clients
 
-[Unreleased]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.4.1...main
+[Unreleased]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.5.0...main
+[0.5.0]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.2.0...v0.3.0

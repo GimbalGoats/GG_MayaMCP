@@ -7,10 +7,10 @@ read_when:
 
 # Product Requirements Document
 
-**Product**: Maya MCP  
-**Version**: 0.4.1  
-**Status**: Active development  
-**Last Updated**: 2026-04-22
+**Product**: Maya MCP
+**Version**: 0.5.0
+**Status**: Active development
+**Last Updated**: 2026-04-30
 
 ## Overview
 
