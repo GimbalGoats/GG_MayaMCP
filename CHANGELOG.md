@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- Added README badges and clearer release-asset guidance for finding the
+  Claude Desktop MCPB package.
+
 ## [0.5.0] - 2026-04-30
 
 ### Added

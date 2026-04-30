@@ -9,8 +9,6 @@
 [![Claude Desktop](https://img.shields.io/badge/Claude%20Desktop-.mcpb-6f42c1)](https://github.com/GimbalGoats/GG_MayaMCP/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[Download Claude Desktop extension (.mcpb)](https://github.com/GimbalGoats/GG_MayaMCP/releases/latest)
-
 ![Maya MCP banner](docs/assets/maya-mcp-banner.png)
 
 Maya MCP is a local Model Context Protocol server for controlling Autodesk Maya through Maya's `commandPort`.
