@@ -1,0 +1,96 @@
+{
+  "manifest_version": "0.4",
+  "name": "maya-mcp",
+  "display_name": "Maya MCP",
+  "version": "0.4.1",
+  "description": "Control a local Autodesk Maya session through a typed MCP tool surface.",
+  "long_description": "Maya MCP runs locally on the user's workstation and talks to Autodesk Maya through Maya's localhost commandPort. It exposes typed tools for scene inspection, nodes, selection, mesh data, modeling, shading, skinning, animation, curves, viewport capture, and approved script workflows. Raw code execution is disabled by default and must be explicitly enabled.",
+  "author": {
+    "name": "Maya MCP Contributors"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GimbalGoats/GG_MayaMCP"
+  },
+  "homepage": "https://github.com/GimbalGoats/GG_MayaMCP",
+  "documentation": "https://gimbalgoats.github.io/GG_MayaMCP/",
+  "support": "https://github.com/GimbalGoats/GG_MayaMCP/issues",
+  "icon": "icon.png",
+  "icons": [
+    {
+      "src": "icon.png",
+      "size": "512x512"
+    }
+  ],
+  "privacy_policies": [
+    "https://gimbalgoats.github.io/GG_MayaMCP/privacy/"
+  ],
+  "server": {
+    "type": "uv",
+    "entry_point": "src/maya_mcp/server.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": ["run", "--directory", "${__dirname}", "maya-mcp"],
+      "env": {
+        "MAYA_MCP_HOST": "localhost",
+        "MAYA_MCP_PORT": "${user_config.maya_port}",
+        "MAYA_MCP_CONNECT_TIMEOUT": "${user_config.connect_timeout}",
+        "MAYA_MCP_COMMAND_TIMEOUT": "${user_config.command_timeout}",
+        "MAYA_MCP_SCRIPT_DIRS": "${user_config.script_dirs}",
+        "MAYA_MCP_ENABLE_RAW_EXECUTION": "${user_config.enable_raw_execution}",
+        "MAYA_MCP_CLAUDE_DESKTOP_COMPAT": "true"
+      }
+    }
+  },
+  "user_config": {
+    "maya_port": {
+      "type": "number",
+      "title": "Maya commandPort",
+      "description": "Local Maya commandPort number. The default Maya MCP setup uses 7001.",
+      "default": 7001,
+      "min": 1,
+      "max": 65535,
+      "required": true
+    },
+    "connect_timeout": {
+      "type": "number",
+      "title": "Connect timeout",
+      "description": "Seconds to wait while connecting to Maya.",
+      "default": 5,
+      "min": 1,
+      "max": 60,
+      "required": true
+    },
+    "command_timeout": {
+      "type": "number",
+      "title": "Command timeout",
+      "description": "Seconds to wait for Maya to respond to a command.",
+      "default": 30,
+      "min": 1,
+      "max": 300,
+      "required": true
+    },
+    "script_dirs": {
+      "type": "string",
+      "title": "Approved script directories",
+      "description": "Optional semicolon-separated absolute directories for script.list and script.execute.",
+      "default": "",
+      "required": false
+    },
+    "enable_raw_execution": {
+      "type": "boolean",
+      "title": "Enable raw script.run",
+      "description": "Allow raw Python or MEL execution in Maya. Leave disabled unless you understand the risk.",
+      "default": false,
+      "required": false
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "win32"],
+    "runtimes": {
+      "python": ">=3.10.1"
+    }
+  },
+  "keywords": ["maya", "autodesk", "mcp", "3d", "animation", "modeling"],
+  "license": "MIT"
+}

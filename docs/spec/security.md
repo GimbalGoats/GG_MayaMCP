@@ -64,6 +64,10 @@ Common validation areas:
 - raw code size
 - script path allowlists
 
+Existing-node references may use Maya DAG path separators such as
+`|group1|mesh1`. Those separators are validated as path structure; malformed
+paths and shell/control characters remain blocked.
+
 Validation should happen as early as practical, but schema-visible tool semantics should remain easy to understand from the MCP layer.
 
 ### Sanitize errors

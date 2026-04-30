@@ -25,6 +25,11 @@ If you just want it working:
 2. Add it to your client with [Client Setup](usage/client-setup.md)
 3. Skim [Tool Guide](spec/tools.md) so you know what is available
 
+If you want to install or submit Maya MCP as a Claude Desktop extension:
+
+- [Claude Desktop Extension](usage/claude-desktop-extension.md)
+- [Privacy Policy](privacy.md)
+
 If you are changing the project:
 
 - [Architecture Overview](spec/overview.md)
@@ -111,10 +116,12 @@ These are the rules that shape the whole project:
 
 - [Getting Started](usage/getting-started.md): install, run, verify
 - [Client Setup](usage/client-setup.md): VS Code and generic stdio examples
+- [Claude Desktop Extension](usage/claude-desktop-extension.md): MCPB build, install, and submission notes
 - [Maya Control Panel](usage/maya-panel.md): optional in-Maya UI for managing `commandPort`
 - [Tool Guide](spec/tools.md): tool families, defaults, limits, risk model, and scene safety notes
 - [Architecture Overview](spec/overview.md): runtime shape and module layout
 - [Transport Specification](spec/transport.md): connection lifecycle, retries, errors
 - [Security Specification](spec/security.md): localhost-only and script-execution trust model
+- [Privacy Policy](privacy.md): data handling for local server and Claude Desktop extension use
 - [API Reference](api/reference.md): generated Python API docs
 - [PRD](prd.md): scope and planned direction

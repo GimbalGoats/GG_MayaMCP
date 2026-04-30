@@ -123,6 +123,35 @@ class TestMeshInfo:
         assert result["is_mesh"] is False
         assert "not a mesh" in result["errors"]["_mesh"]
 
+    def test_mesh_info_accepts_full_dag_path(self) -> None:
+        """Mesh info accepts Maya full DAG paths."""
+        mock_client = MagicMock()
+        node = "|master|model|Lion|LionVar1"
+        mock_response = json.dumps(
+            {
+                "node": node,
+                "exists": True,
+                "is_mesh": True,
+                "shape": "LionVarShape1",
+                "vertex_count": 8,
+                "face_count": 6,
+                "edge_count": 12,
+                "uv_count": 8,
+                "uv_sets": ["map1"],
+                "has_uvs": True,
+                "bounding_box": [-0.5, -0.5, -0.5, 0.5, 0.5, 0.5],
+                "errors": None,
+            }
+        )
+        mock_client.execute.return_value = mock_response
+
+        with patch("maya_mcp.tools.mesh.get_client", return_value=mock_client):
+            result = mesh_info(node)
+
+        assert result["node"] == node
+        call_arg = mock_client.execute.call_args[0][0]
+        assert f"node = {json.dumps(node)}" in call_arg
+
     def test_mesh_info_invalid_node_name(self) -> None:
         """Mesh info raises ValueError for invalid node name."""
         with pytest.raises(ValueError, match="Invalid characters"):
@@ -199,8 +228,8 @@ class TestMeshVertices:
 
     def test_mesh_vertices_invalid_node_name(self) -> None:
         """Mesh vertices raises ValueError for invalid node name."""
-        with pytest.raises(ValueError, match="Invalid characters"):
-            mesh_vertices("pCube1|bad", offset=0)
+        with pytest.raises(ValueError, match="Invalid DAG path"):
+            mesh_vertices("pCube1||bad", offset=0)
 
 
 class TestMeshEvaluate:

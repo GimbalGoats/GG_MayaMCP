@@ -1,5 +1,5 @@
 ---
-summary: "Client configuration guide for Maya MCP with Codex, Claude Code, VS Code, and generic stdio examples."
+summary: "Client configuration guide for Maya MCP with Codex, Claude Code, Claude Desktop MCPB, VS Code, and generic stdio examples."
 read_when:
   - When wiring Maya MCP into an MCP client.
   - When you need a client-specific MCP config example or want to pass environment overrides.
@@ -67,6 +67,15 @@ Source checkout or Windows-friendly setup:
   }
 }
 ```
+
+## Claude Desktop Extension
+
+For Claude Desktop users who want a one-click local extension, build the MCPB
+package described in [Claude Desktop Extension](claude-desktop-extension.md).
+
+The MCPB package still runs the same local stdio server. It adds Claude Desktop
+installation metadata and a settings UI for the Maya commandPort and related
+environment variables.
 
 ## VS Code
 

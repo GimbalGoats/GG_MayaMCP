@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import patch
 
 from mcp.types import ListToolsResult, Tool
+
+from maya_mcp.tool_metadata import to_claude_desktop_tool_name
 
 AnnotationExpectation = tuple[bool, bool, bool, bool]
 
@@ -22,6 +25,12 @@ def _build_expected_tool_annotations() -> dict[str, AnnotationExpectation]:
     write_idempotent = (
         False,
         False,
+        True,
+        False,
+    )
+    destructive_idempotent = (
+        False,
+        True,
         True,
         False,
     )
@@ -66,20 +75,13 @@ def _build_expected_tool_annotations() -> dict[str, AnnotationExpectation]:
     for name in (
         "maya.connect",
         "maya.disconnect",
-        "scene.new",
-        "scene.open",
-        "scene.save",
-        "scene.save_as",
         "scene.export",
-        "nodes.delete",
         "nodes.rename",
         "nodes.parent",
         "attributes.set",
         "connections.connect",
         "connections.disconnect",
         "selection.clear",
-        "modeling.freeze_transforms",
-        "modeling.delete_history",
         "modeling.center_pivot",
         "modeling.set_pivot",
         "shading.set_material_color",
@@ -87,6 +89,17 @@ def _build_expected_tool_annotations() -> dict[str, AnnotationExpectation]:
         "animation.set_time_range",
     ):
         expectations[name] = write_idempotent
+
+    for name in (
+        "scene.new",
+        "scene.open",
+        "scene.save",
+        "scene.save_as",
+        "nodes.delete",
+        "modeling.freeze_transforms",
+        "modeling.delete_history",
+    ):
+        expectations[name] = destructive_idempotent
 
     for name in (
         "scene.undo",
@@ -106,19 +119,23 @@ def _build_expected_tool_annotations() -> dict[str, AnnotationExpectation]:
         "modeling.bevel",
         "modeling.bridge",
         "modeling.insert_edge_loop",
-        "modeling.delete_faces",
         "modeling.move_components",
         "shading.create_material",
         "shading.assign_material",
-        "skin.bind",
-        "skin.unbind",
         "skin.weights.set",
         "skin.copy_weights",
         "animation.set_keyframe",
     ):
         expectations[name] = write_non_idempotent
 
-    for name in ("script.execute", "script.run", "animation.delete_keyframes"):
+    for name in (
+        "modeling.delete_faces",
+        "skin.bind",
+        "skin.unbind",
+        "script.execute",
+        "script.run",
+        "animation.delete_keyframes",
+    ):
         expectations[name] = destructive_non_idempotent
 
     return expectations
@@ -130,7 +147,10 @@ EXPECTED_TOOL_NAMES = frozenset(EXPECTED_TOOL_ANNOTATIONS)
 
 def _list_tools() -> ListToolsResult:
     """Return the serialized MCP ``tools/list`` response."""
-    from maya_mcp.server import mcp
+    with patch.dict("os.environ", {"MAYA_MCP_CLAUDE_DESKTOP_COMPAT": "false"}):
+        from maya_mcp.server import create_server
+
+        mcp = create_server()
 
     tools = [tool.to_mcp_tool() for tool in asyncio.run(mcp.list_tools())]
     return ListToolsResult(nextCursor=None, tools=tools)
@@ -155,13 +175,34 @@ def test_tools_list_returns_expected_names() -> None:
     assert names == EXPECTED_TOOL_NAMES
 
 
+def test_claude_desktop_compat_exposes_safe_tool_aliases() -> None:
+    """Claude Desktop MCPB mode should avoid dots in advertised tool names."""
+    with patch.dict("os.environ", {"MAYA_MCP_CLAUDE_DESKTOP_COMPAT": "true"}):
+        from maya_mcp.server import create_server
+
+        mcp = create_server()
+
+    tools = [tool.to_mcp_tool() for tool in asyncio.run(mcp.list_tools())]
+    names = {tool.name for tool in tools}
+
+    assert len(tools) == len(names) == len(EXPECTED_TOOL_NAMES)
+    assert names == {to_claude_desktop_tool_name(name) for name in EXPECTED_TOOL_NAMES}
+    assert all("." not in name for name in names)
+    assert {"health_check", "scene_info", "nodes_list"}.issubset(names)
+
+
 def test_tools_list_exposes_schemas_and_annotations_for_every_tool() -> None:
     """Every advertised tool should include client-usable schema metadata."""
+    from maya_mcp.tool_metadata import TOOL_TITLES
+
     tool_map = _tool_map()
+
+    assert set(TOOL_TITLES) == set(tool_map)
 
     for tool_name, expected_annotations in EXPECTED_TOOL_ANNOTATIONS.items():
         tool = tool_map[tool_name]
 
+        assert tool.title == TOOL_TITLES[tool_name], tool_name
         assert tool.description, tool_name
 
         input_schema = tool.inputSchema
@@ -191,6 +232,7 @@ def test_tools_list_serializes_expected_metadata_for_representative_tools() -> N
     assert health_check.inputSchema == {
         "additionalProperties": False,
         "properties": {},
+        "required": [],
         "type": "object",
     }
 

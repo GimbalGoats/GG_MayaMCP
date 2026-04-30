@@ -13,7 +13,7 @@ from typing_extensions import NotRequired, TypedDict
 from maya_mcp.transport import get_client
 from maya_mcp.utils.parsing import parse_json_response
 from maya_mcp.utils.response_guard import guard_response_size
-from maya_mcp.utils.validation import validate_node_name as _validate_node_name
+from maya_mcp.utils.validation import validate_node_reference as _validate_node_reference
 
 DEFAULT_VERTEX_LIMIT = 1000
 
@@ -90,7 +90,7 @@ def mesh_info(node: str) -> MeshInfoOutput:
     and UV set information.
 
     Args:
-        node: Name of the mesh node (transform or shape).
+        node: Name or DAG path of the mesh node (transform or shape).
 
     Returns:
         Dictionary with mesh statistics:
@@ -115,7 +115,7 @@ def mesh_info(node: str) -> MeshInfoOutput:
         >>> result = mesh_info("pCube1")
         >>> print(f"Vertices: {result['vertex_count']}, Faces: {result['face_count']}")
     """
-    _validate_node_name(node)
+    _validate_node_reference(node)
 
     client = get_client()
     node_escaped = json.dumps(node)
@@ -188,7 +188,7 @@ def mesh_vertices(
     pagination for large meshes to avoid token budget issues.
 
     Args:
-        node: Name of the mesh node (transform or shape).
+        node: Name or DAG path of the mesh node (transform or shape).
         offset: Starting vertex index (0-based).
         limit: Maximum number of vertices to return. Default 1000.
             Use 0 for unlimited (use with caution).
@@ -215,7 +215,7 @@ def mesh_vertices(
         >>> for i, v in enumerate(result['vertices']):
         ...     print(f"v{result['offset'] + i}: {v}")
     """
-    _validate_node_name(node)
+    _validate_node_reference(node)
     if offset < 0:
         raise ValueError(f"offset must be non-negative, got {offset}")
 
@@ -307,7 +307,7 @@ def mesh_evaluate(
     holes, and border edges. Returns lists of problematic components.
 
     Args:
-        node: Name of the mesh node (transform or shape).
+        node: Name or DAG path of the mesh node (transform or shape).
         checks: List of checks to perform. Options:
             - "non_manifold": Find non-manifold edges
             - "lamina": Find lamina faces (faces sharing all edges)
@@ -343,7 +343,7 @@ def mesh_evaluate(
         >>> if not result['is_clean']:
         ...     print(f"Found {result['non_manifold_count']} non-manifold edges")
     """
-    _validate_node_name(node)
+    _validate_node_reference(node)
 
     if checks is None:
         checks = ["non_manifold", "lamina", "holes", "border"]

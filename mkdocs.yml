@@ -89,6 +89,7 @@ nav:
   - Getting Started:
       - Install and Run: usage/getting-started.md
       - Client Setup: usage/client-setup.md
+      - Claude Desktop Extension: usage/claude-desktop-extension.md
   - Usage:
       - Maya Control Panel: usage/maya-panel.md
   - Reference:
@@ -99,6 +100,7 @@ nav:
       - Python API: api/reference.md
   - Project:
       - Docs Home: index.md
+      - Privacy Policy: privacy.md
       - PRD: prd.md
   - Decisions:
       - ADR-0001 CommandPort: adr/0001-commandport.md
