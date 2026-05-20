@@ -26,6 +26,14 @@ The transport layer is the only part of Maya MCP that talks to Maya directly.
 
 Its implementation lives in `src/maya_mcp/transport/commandport.py`.
 
+Maya MCP normally talks to Maya's built-in `commandPort`. For Maya versions
+where Autodesk's Python 3 `CommandPort.py` response writer is broken, the
+project also ships a Maya-side compatibility server helper at
+`scripts/enable_compat_server.py`. That helper runs inside Maya, binds only to
+`127.0.0.1`, executes received Python commands on Maya's main thread, and
+returns captured stdout/stderr over TCP using the same port expected by the MCP
+transport.
+
 ## Purpose
 
 The transport is responsible for:
@@ -155,6 +163,27 @@ cmds.commandPort(
     bufferSize=16384,
 )
 ```
+
+## Maya 2022/2024 Compatibility Server
+
+Use `scripts/enable_compat_server.py` instead of the built-in `commandPort` when
+Maya logs this Autodesk-side response error:
+
+```text
+TypeError: a bytes-like object is required, not 'str'
+```
+
+The compatibility helper:
+
+- closes the built-in `commandPort` on the chosen port if it is open
+- binds to `127.0.0.1` only
+- keeps the MCP server process outside Maya
+- executes commands on Maya's main thread through `maya.utils`
+- returns captured output as UTF-8 bytes
+
+The MCP server still uses `CommandPortClient` and the same `MAYA_MCP_HOST` /
+`MAYA_MCP_PORT` configuration. The workaround changes only the Maya-side socket
+listener, not the MCP-facing tool surface.
 
 ## Operational Notes
 

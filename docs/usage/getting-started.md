@@ -70,6 +70,35 @@ This opens the default port that Maya MCP expects: `localhost:7001`.
 
 If you prefer using the helper script from this repo, use `scripts/enable_commandport.py`.
 
+### Maya 2022/2024 compatibility workaround
+
+Some Maya 2022 and Maya 2024 installs have a Python 3 bug in Autodesk's
+`CommandPort.py` response writer. The usual symptom is that `maya.connect`
+succeeds, but tools such as `scene.info`, `nodes.list`, or `selection.get`
+return empty responses while Maya's Script Editor logs:
+
+```text
+TypeError: a bytes-like object is required, not 'str'
+```
+
+For those versions, use the compatibility server instead of Maya's built-in
+`commandPort`. In Maya's Script Editor, run `scripts/enable_compat_server.py`
+from this repo. It closes the built-in `commandPort` on `:7001` if needed and
+starts a localhost-only Python TCP server on the same port.
+
+If the test machine does not have a source checkout, run this in Maya's Python
+tab using the branch or tag you installed:
+
+```python
+import urllib.request
+
+url = "https://raw.githubusercontent.com/GimbalGoats/GG_MayaMCP/fix/maya-2024-commandport-compat/scripts/enable_compat_server.py"
+exec(urllib.request.urlopen(url).read().decode("utf-8"))
+```
+
+After that, start the MCP server normally. The client still connects to
+`localhost:7001`.
+
 ## 3. Start the MCP Server
 
 Installed package:
@@ -160,6 +189,8 @@ If the server starts but tools cannot connect:
 - call `maya.connect` explicitly once
 - restart Maya after changing `commandPort` setup
 - restart the MCP server after changing local code in a source checkout
+- on Maya 2022/2024, use the compatibility server above if Maya logs the
+  `bytes-like object` `CommandPort.py` error
 
 ## Where To Go Next
 

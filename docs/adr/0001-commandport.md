@@ -26,6 +26,12 @@ The chosen mechanism must:
 
 Maya MCP uses Maya's built-in `commandPort` with an INET TCP socket.
 
+For Maya versions where Autodesk's built-in `CommandPort.py` response writer is
+broken under Python 3, Maya MCP may use the project-provided Maya-side
+compatibility server as a temporary commandPort-compatible listener. This keeps
+the same localhost-only TCP boundary and keeps the MCP server outside Maya, but
+replaces Autodesk's faulty response writer on the Maya side.
+
 ## Why This Option Won
 
 - built into Maya, so there is no plugin deployment requirement
@@ -66,6 +72,8 @@ Rejected because it is significantly more complex than the command/response patt
 - users must open `commandPort` in Maya
 - transport must remain localhost-only because `commandPort` has no authentication
 - large responses require careful buffering and response-guard behavior
+- affected Maya 2022/2024 installs may need the compatibility server instead of
+  the built-in `commandPort`
 
 ## Security Implications
 
