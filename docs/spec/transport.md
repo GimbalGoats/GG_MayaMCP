@@ -185,6 +185,12 @@ The MCP server still uses `CommandPortClient` and the same `MAYA_MCP_HOST` /
 `MAYA_MCP_PORT` configuration. The workaround changes only the Maya-side socket
 listener, not the MCP-facing tool surface.
 
+Compatibility server requests use the same persistent socket shape as
+`CommandPortClient`: send a UTF-8 command and leave the socket open while
+waiting for the response. The helper treats a short idle period as the end of a
+command, so probe clients should not call `shutdown(SHUT_WR)` after sending a
+command.
+
 ## Operational Notes
 
 - The transport serializes commandPort access per client. Concurrent server handlers can call the same client, but socket send/receive work still runs one request at a time.
