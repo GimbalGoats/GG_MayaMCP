@@ -20,6 +20,26 @@ def _load_compat_server_script() -> Any:
     return module
 
 
+def _read_compat_response(client: socket.socket) -> str:
+    """Read one compatibility server response from a persistent socket."""
+    chunks = [client.recv(1024)]
+
+    client.settimeout(0.05)
+    try:
+        while True:
+            try:
+                chunk = client.recv(1024)
+            except TimeoutError:
+                break
+            if not chunk:
+                break
+            chunks.append(chunk)
+    finally:
+        client.settimeout(2.0)
+
+    return b"".join(chunks).decode("utf-8").strip()
+
+
 def test_compat_server_executes_multiline_commands_on_persistent_socket() -> None:
     """Compatibility server accepts multiline commands and keeps the socket open."""
     module = _load_compat_server_script()
@@ -33,10 +53,10 @@ def test_compat_server_executes_multiline_commands_on_persistent_socket() -> Non
             client.settimeout(2.0)
 
             client.sendall(b"value = 40 + 2\nprint(value)\n")
-            assert client.recv(1024).decode("utf-8").strip() == "42"
+            assert _read_compat_response(client) == "42"
 
             client.sendall(b"print(value)\n")
-            assert client.recv(1024).decode("utf-8").strip() == "42"
+            assert _read_compat_response(client) == "42"
     finally:
         server.shutdown()
         server.server_close()
