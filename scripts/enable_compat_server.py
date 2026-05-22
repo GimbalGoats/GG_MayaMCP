@@ -19,6 +19,7 @@ import traceback
 
 DEFAULT_PORT = 7001
 BUFFER_SIZE = 65536
+INITIAL_COMMAND_TIMEOUT = 30.0
 COMMAND_IDLE_TIMEOUT = 0.05
 
 _server = None
@@ -36,7 +37,7 @@ class _ReusableThreadingTCPServer(socketserver.ThreadingTCPServer):
 
 class _CompatRequestHandler(socketserver.BaseRequestHandler):
     def handle(self):
-        self.request.settimeout(None)
+        self.request.settimeout(INITIAL_COMMAND_TIMEOUT)
 
         while True:
             command = self._receive_command()

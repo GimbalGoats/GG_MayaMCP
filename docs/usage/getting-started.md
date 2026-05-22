@@ -87,15 +87,26 @@ from this repo. It closes the built-in `commandPort` on `:7001` if needed and
 starts a localhost-only Python TCP server on the same port.
 
 The compatibility helper is not installed by normal wheel installs. If the test
-machine does not have a source checkout, run this in Maya's Python tab using
-the release tag, branch, or commit you are testing. Replace `<ref>` with that
-exact Git ref:
+machine does not have a source checkout, download the helper from the release
+tag, branch, or commit you are testing. Prefer a release tag or commit SHA over
+a moving branch name. Replace `<ref>` with that exact Git ref, then run this in
+Maya's Python tab:
 
 ```python
+import pathlib
+import tempfile
 import urllib.request
 
 url = "https://raw.githubusercontent.com/GimbalGoats/GG_MayaMCP/<ref>/scripts/enable_compat_server.py"
-exec(urllib.request.urlopen(url).read().decode("utf-8"))
+target = pathlib.Path(tempfile.gettempdir()) / "enable_compat_server.py"
+target.write_text(urllib.request.urlopen(url).read().decode("utf-8"), encoding="utf-8")
+print(f"Downloaded compatibility helper to: {target}")
+```
+
+Open the downloaded file and inspect it before running. After inspection, run:
+
+```python
+exec(open(r"<downloaded-file-path>", encoding="utf-8").read())
 ```
 
 After that, start the MCP server normally. The client still connects to
