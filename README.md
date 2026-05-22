@@ -83,6 +83,11 @@ cmds.commandPort(
 )
 ```
 
+On Maya 2022/2024, Maya MCP automatically bootstraps its packaged
+compatibility server if the built-in commandPort accepts commands but returns
+empty responses. This also covers a bare default MEL port opened with only
+`cmds.commandPort(name=":7001")`.
+
 ### 3. Start the server
 
 ```bash

@@ -81,12 +81,13 @@ return empty responses while Maya's Script Editor logs:
 TypeError: a bytes-like object is required, not 'str'
 ```
 
-For those versions, open the built-in `commandPort` using the normal setup
-above. If Maya accepts commands but returns empty responses, Maya MCP
-automatically sends a packaged bootstrap command through the built-in
-`commandPort`, starts the compatibility server inside Maya, reconnects to the
-same `localhost:7001` port, verifies responses, and then sends the requested
-command.
+For those versions, open the built-in `commandPort` normally. The recommended
+setup above uses `sourceType="python"`, but the automatic fallback also supports
+a bare default port opened with only `cmds.commandPort(name=":7001")`, which
+Maya treats as MEL. If Maya accepts commands but returns empty responses, Maya
+MCP sends a packaged bootstrap command through the built-in `commandPort`,
+starts the compatibility server inside Maya, reconnects to the same
+`localhost:7001` port, verifies responses, and then sends the requested command.
 
 Set `MAYA_MCP_DISABLE_COMPAT_BOOTSTRAP=1` before starting Maya MCP to disable
 automatic fallback.

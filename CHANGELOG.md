@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Auto-bootstrap the Maya compatibility server when Maya 2022/2024 commandPort accepts commands but returns empty responses.
+- Auto-bootstrap the Maya compatibility server when Maya 2022/2024 commandPort accepts commands but returns empty responses, including bare default MEL commandPorts.
 
 ### Documentation
 

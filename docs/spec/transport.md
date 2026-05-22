@@ -179,6 +179,8 @@ The automatic fallback:
 - sends a small response probe before user commands
 - sends a packaged compatibility server bootstrap through the built-in
   `commandPort` when the probe also returns empty
+- supports both Python-source commandPorts and bare default MEL commandPorts by
+  trying a MEL `python(...)` bootstrap first, then a raw Python bootstrap
 - closes the built-in `commandPort` on the chosen port inside Maya
 - reconnects to the same host and port
 - verifies the replacement listener with another response probe before sending
