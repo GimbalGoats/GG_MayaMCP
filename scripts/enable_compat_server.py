@@ -12,6 +12,7 @@ for Maya 2022/2024 commandPort response encoding failures.
 
 import contextlib
 import io
+import socket
 import socketserver
 import sys
 import threading
@@ -22,8 +23,8 @@ BUFFER_SIZE = 65536
 INITIAL_COMMAND_TIMEOUT = 30.0
 COMMAND_IDLE_TIMEOUT = 0.05
 
-_server = None
-_server_thread = None
+_server = globals().get("_server")
+_server_thread = globals().get("_server_thread")
 _execution_globals = {
     "__name__": "__maya_mcp_compat_server__",
     "__builtins__": __builtins__,
@@ -65,7 +66,7 @@ class _CompatRequestHandler(socketserver.BaseRequestHandler):
             while True:
                 try:
                     chunk = self.request.recv(BUFFER_SIZE)
-                except TimeoutError:
+                except socket.timeout:  # noqa: UP041 - Maya 2022 may not alias this to TimeoutError.
                     break
                 if not chunk:
                     return None

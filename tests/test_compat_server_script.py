@@ -40,6 +40,40 @@ def _read_compat_response(client: socket.socket) -> str:
     return b"".join(chunks).decode("utf-8").strip()
 
 
+def test_compat_server_uses_socket_timeout_as_command_delimiter() -> None:
+    """Legacy socket.timeout variants still mark the end of a command."""
+    module = _load_compat_server_script()
+
+    class LegacySocketTimeout(Exception):
+        pass
+
+    class FakeRequest:
+        def __init__(self) -> None:
+            self.timeouts: list[float | None] = []
+            self.calls = 0
+
+        def settimeout(self, timeout: float | None) -> None:
+            self.timeouts.append(timeout)
+
+        def recv(self, size: int) -> bytes:
+            self.calls += 1
+            if self.calls == 1:
+                return b"print('ready')\n"
+            raise LegacySocketTimeout
+
+    handler = object.__new__(module._CompatRequestHandler)
+    handler.request = FakeRequest()
+    original_timeout = module.socket.timeout
+
+    try:
+        module.socket.timeout = LegacySocketTimeout
+        assert handler._receive_command() == "print('ready')"
+    finally:
+        module.socket.timeout = original_timeout
+
+    assert handler.request.timeouts == [module.COMMAND_IDLE_TIMEOUT, None]
+
+
 def test_compat_server_executes_multiline_commands_on_persistent_socket() -> None:
     """Compatibility server accepts multiline commands and keeps the socket open."""
     module = _load_compat_server_script()
@@ -61,6 +95,26 @@ def test_compat_server_executes_multiline_commands_on_persistent_socket() -> Non
         server.shutdown()
         server.server_close()
         thread.join(timeout=2.0)
+
+
+def test_compat_server_reexecution_preserves_running_server_handle() -> None:
+    """Re-running the script can still stop the previously started server."""
+    module = _load_compat_server_script()
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "enable_compat_server.py"
+
+    module.start_compat_server(0)
+    host, port = module._server.server_address
+
+    try:
+        exec(script_path.read_text(encoding="utf-8"), module.__dict__)
+        assert module._server is not None
+        module.stop_compat_server()
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            probe.bind((host, port))
+    finally:
+        if module._server is not None:
+            module.stop_compat_server()
 
 
 def test_compat_server_returns_tracebacks() -> None:
