@@ -33,8 +33,10 @@ import inspect
 import logging
 import os
 import socket
+import tempfile
 import threading
 import time
+from pathlib import Path
 
 from maya_mcp import maya_compat_server
 from maya_mcp.errors import (
@@ -173,8 +175,82 @@ def _escape_mel_string(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
+def _write_compat_server_bootstrap_file(port: int) -> str:
+    """Write a fallback Maya-side bootstrap file and return its filesystem path."""
+    compat_source = inspect.getsource(maya_compat_server)
+    with tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        prefix="maya_mcp_compat_bootstrap_",
+        suffix=".py",
+        delete=False,
+    ) as bootstrap_file:
+        bootstrap_path = bootstrap_file.name
+        bootstrap_file.write(
+            "import os\n"
+            "import types\n"
+            "_maya_mcp_compat_server = types.ModuleType('_maya_mcp_compat_server')\n"
+            f"exec({compat_source!r}, _maya_mcp_compat_server.__dict__)\n"
+            f"_maya_mcp_compat_server.bootstrap_compat_server(port={port!r})\n"
+            "try:\n"
+            f"    os.remove({bootstrap_path!r})\n"
+            "except OSError:\n"
+            "    pass\n"
+        )
+    return bootstrap_path
+
+
+def _build_python_file_exec_command(path: str) -> str:
+    """Build a short Python command that executes a source file by path."""
+    return (
+        f"exec(compile(open({path!r}, encoding='utf-8').read(), "
+        f"{path!r}, 'exec'))"
+    )
+
+
+def _get_compat_server_source_path() -> str | None:
+    """Return the installed compat-server source path when it is readable."""
+    source_path = getattr(maya_compat_server, "__file__", None)
+    if not source_path:
+        return None
+    source_file = Path(source_path).resolve()
+    return str(source_file) if source_file.is_file() else None
+
+
+def _build_compat_server_path_python_bootstrap(path: str, port: int) -> str:
+    """Build a short Python command that imports the compat server from disk."""
+    return (
+        "import importlib.util as _maya_mcp_iu;"
+        f"_maya_mcp_p={path!r};"
+        "_maya_mcp_s=_maya_mcp_iu.spec_from_file_location("
+        "'_maya_mcp_compat_server',_maya_mcp_p);"
+        "assert _maya_mcp_s is not None and _maya_mcp_s.loader is not None;"
+        "_maya_mcp_m=_maya_mcp_iu.module_from_spec(_maya_mcp_s);"
+        "_maya_mcp_s.loader.exec_module(_maya_mcp_m);"
+        f"_maya_mcp_m.bootstrap_compat_server(port={port!r})"
+    )
+
+
 def _build_compat_server_python_bootstrap(port: int) -> str:
     """Build Python code that starts the packaged compat server inside Maya."""
+    source_path = _get_compat_server_source_path()
+    if source_path is not None:
+        return _build_compat_server_path_python_bootstrap(source_path, port)
+
+    bootstrap_path = _write_compat_server_bootstrap_file(port)
+    return _build_python_file_exec_command(bootstrap_path)
+
+
+def _build_compat_server_bootstrap_commands(port: int) -> tuple[str, ...]:
+    """Build bootstrap commands for MEL-default and Python commandPorts."""
+    python_bootstrap = _build_compat_server_python_bootstrap(port)
+    escaped_python_bootstrap = _escape_mel_string(python_bootstrap)
+    mel_bootstrap = f'python("{escaped_python_bootstrap}")'
+    return (mel_bootstrap, python_bootstrap)
+
+
+def _build_compat_server_inline_python_bootstrap(port: int) -> str:
+    """Build an inline Python bootstrap for tests and manual debugging."""
     compat_source = inspect.getsource(maya_compat_server)
     return (
         "import types\n"
@@ -182,14 +258,6 @@ def _build_compat_server_python_bootstrap(port: int) -> str:
         f"exec({compat_source!r}, _maya_mcp_compat_server.__dict__)\n"
         f"_maya_mcp_compat_server.bootstrap_compat_server(port={port!r})\n"
     )
-
-
-def _build_compat_server_bootstrap_commands(port: int) -> tuple[str, ...]:
-    """Build bootstrap commands for MEL-default and Python commandPorts."""
-    python_bootstrap = _build_compat_server_python_bootstrap(port)
-    escaped_python_bootstrap = _escape_mel_string(repr(python_bootstrap))
-    mel_bootstrap = f'python("exec({escaped_python_bootstrap})")'
-    return (mel_bootstrap, python_bootstrap)
 
 
 def get_client() -> CommandPortClient:

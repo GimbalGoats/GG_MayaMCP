@@ -20,6 +20,7 @@ from maya_mcp.errors import MayaTimeoutError, MayaUnavailableError
 from maya_mcp.transport.commandport import (
     CommandPortClient,
     _build_compat_server_bootstrap_commands,
+    _build_compat_server_python_bootstrap,
     _parse_maya_response,
 )
 from maya_mcp.types import ConnectionConfig, ConnectionStatus
@@ -306,11 +307,29 @@ class TestCommandPortClientExecute:
         """Bootstrap includes a MEL wrapper first and raw Python fallback second."""
         mel_bootstrap, python_bootstrap = _build_compat_server_bootstrap_commands(7001)
 
-        assert mel_bootstrap.startswith('python("exec(')
+        assert mel_bootstrap.startswith('python("')
         assert "bootstrap_compat_server(port=7001)" in mel_bootstrap
-        assert "\\n" in mel_bootstrap
-        assert python_bootstrap.startswith("import types")
+        assert "maya_compat_server.py" in mel_bootstrap
+        assert len(mel_bootstrap) < 4096
+        assert python_bootstrap.startswith("import importlib.util")
         assert "bootstrap_compat_server(port=7001)" in python_bootstrap
+        assert "maya_compat_server.py" in python_bootstrap
+        assert len(python_bootstrap) < 4096
+
+    def test_compat_bootstrap_uses_temp_file_when_source_path_is_unavailable(self) -> None:
+        """A short temp-file command is available when module __file__ is missing."""
+        with (
+            patch("maya_mcp.transport.commandport._get_compat_server_source_path", return_value=None),
+            patch(
+                "maya_mcp.transport.commandport._write_compat_server_bootstrap_file",
+                return_value="/tmp/maya_mcp_compat_bootstrap_test.py",
+            ),
+        ):
+            python_bootstrap = _build_compat_server_python_bootstrap(7001)
+
+        assert python_bootstrap.startswith("exec(compile(open(")
+        assert "maya_mcp_compat_bootstrap_" in python_bootstrap
+        assert len(python_bootstrap) < 4096
 
     def test_execute_success(self) -> None:
         """Successful execution returns response."""

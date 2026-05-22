@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Tightened Maya commandPort compatibility probing and deferred the Maya 2024 compatibility server port takeover so auto-bootstrap is not fooled by echoed commands and can rebind port 7001 after the built-in commandPort releases it.
+- Tightened Maya commandPort compatibility probing, switched auto-bootstrap to a short file-path import command, and deferred the Maya 2024 compatibility server port takeover so auto-bootstrap is not fooled by echoed commands or commandPort buffer limits and can rebind port 7001 after the built-in commandPort releases it.
 - Auto-bootstrap the Maya compatibility server when Maya 2022/2024 commandPort accepts commands but returns empty responses, including bare default MEL commandPorts.
 
 ### Documentation
