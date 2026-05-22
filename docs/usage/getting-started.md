@@ -87,12 +87,13 @@ from this repo. It closes the built-in `commandPort` on `:7001` if needed and
 starts a localhost-only Python TCP server on the same port.
 
 If the test machine does not have a source checkout, run this in Maya's Python
-tab using the branch or tag you installed:
+tab using the release tag, branch, or commit you are testing. Replace `<ref>`
+with that exact Git ref:
 
 ```python
 import urllib.request
 
-url = "https://raw.githubusercontent.com/GimbalGoats/GG_MayaMCP/fix/maya-2024-commandport-compat/scripts/enable_compat_server.py"
+url = "https://raw.githubusercontent.com/GimbalGoats/GG_MayaMCP/<ref>/scripts/enable_compat_server.py"
 exec(urllib.request.urlopen(url).read().decode("utf-8"))
 ```
 
