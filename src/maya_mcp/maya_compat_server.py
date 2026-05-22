@@ -102,11 +102,15 @@ def _close_builtin_commandport(port):
     try:
         import maya.cmds as cmds
 
-        port_name = f":{port}"
+        port_suffix = f":{port}"
         existing_ports = cmds.commandPort(query=True, listPorts=True) or []
-        if port_name in existing_ports:
-            cmds.commandPort(name=port_name, close=True)
-            print(f"Closed built-in commandPort on {port_name}")
+        for port_name in existing_ports:
+            if str(port_name).strip().endswith(port_suffix):
+                try:
+                    cmds.commandPort(name=port_name, close=True)
+                    print(f"Closed built-in commandPort on {port_name}")
+                except RuntimeError as exc:
+                    print(f"Could not close built-in commandPort {port_name}: {exc}")
     except RuntimeError as exc:
         print(f"Could not close built-in commandPort: {exc}")
     except ImportError:

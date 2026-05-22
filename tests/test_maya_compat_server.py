@@ -8,9 +8,10 @@ import socket
 import sys
 import threading
 import types
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from types import ModuleType
 
 
@@ -140,6 +141,70 @@ def test_bootstrap_compat_server_defers_start_until_current_command_returns(monk
     assert len(deferred_calls) == 1
     deferred_calls[0]()
     assert start_calls == [7001]
+
+
+def test_close_builtin_commandport_closes_host_prefixed_port(monkeypatch: Any) -> None:
+    """Maya may list commandPorts as localhost:port instead of :port."""
+    module = _load_compat_server_module()
+    closed_ports: list[object] = []
+
+    class FakeMayaModule(types.ModuleType):
+        cmds: FakeMayaCmdsModule
+
+    class FakeMayaCmdsModule(types.ModuleType):
+        commandPort: Callable[..., list[str] | None]
+
+    maya_module = FakeMayaModule("maya")
+    maya_cmds_module = FakeMayaCmdsModule("maya.cmds")
+
+    def command_port(**kwargs: object) -> list[str] | None:
+        if kwargs.get("query") and kwargs.get("listPorts"):
+            return ["localhost:7001", ":7002"]
+        if kwargs.get("close"):
+            closed_ports.append(kwargs["name"])
+        return None
+
+    maya_cmds_module.commandPort = command_port
+    maya_module.cmds = maya_cmds_module
+    monkeypatch.setitem(sys.modules, "maya", maya_module)
+    monkeypatch.setitem(sys.modules, "maya.cmds", maya_cmds_module)
+
+    module._close_builtin_commandport(7001)
+
+    assert closed_ports == ["localhost:7001"]
+
+
+def test_close_builtin_commandport_continues_after_close_failure(monkeypatch: Any) -> None:
+    """One failing close does not prevent closing another matching port name."""
+    module = _load_compat_server_module()
+    close_attempts: list[object] = []
+
+    class FakeMayaModule(types.ModuleType):
+        cmds: FakeMayaCmdsModule
+
+    class FakeMayaCmdsModule(types.ModuleType):
+        commandPort: Callable[..., list[str] | None]
+
+    maya_module = FakeMayaModule("maya")
+    maya_cmds_module = FakeMayaCmdsModule("maya.cmds")
+
+    def command_port(**kwargs: object) -> list[str] | None:
+        if kwargs.get("query") and kwargs.get("listPorts"):
+            return ["localhost:7001", "127.0.0.1:7001"]
+        if kwargs.get("close"):
+            close_attempts.append(kwargs["name"])
+            if kwargs["name"] == "localhost:7001":
+                raise RuntimeError("already closing")
+        return None
+
+    maya_cmds_module.commandPort = command_port
+    maya_module.cmds = maya_cmds_module
+    monkeypatch.setitem(sys.modules, "maya", maya_module)
+    monkeypatch.setitem(sys.modules, "maya.cmds", maya_cmds_module)
+
+    module._close_builtin_commandport(7001)
+
+    assert close_attempts == ["localhost:7001", "127.0.0.1:7001"]
 
 
 def test_create_compat_server_retries_while_commandport_releases_port(monkeypatch) -> None:
