@@ -17,7 +17,11 @@ import pytest
 
 import maya_mcp.transport.commandport as transport_module
 from maya_mcp.errors import MayaTimeoutError, MayaUnavailableError
-from maya_mcp.transport.commandport import CommandPortClient, _parse_maya_response
+from maya_mcp.transport.commandport import (
+    CommandPortClient,
+    _build_compat_server_bootstrap_commands,
+    _parse_maya_response,
+)
 from maya_mcp.types import ConnectionConfig, ConnectionStatus
 
 
@@ -297,6 +301,16 @@ class TestCommandPortClientDisconnect:
 
 class TestCommandPortClientExecute:
     """Tests for CommandPortClient.execute()."""
+
+    def test_compat_bootstrap_commands_support_mel_and_python_ports(self) -> None:
+        """Bootstrap includes a MEL wrapper first and raw Python fallback second."""
+        mel_bootstrap, python_bootstrap = _build_compat_server_bootstrap_commands(7001)
+
+        assert mel_bootstrap.startswith('python("exec(')
+        assert "start_compat_server(port=7001)" in mel_bootstrap
+        assert "\\n" in mel_bootstrap
+        assert python_bootstrap.startswith("import types")
+        assert "start_compat_server(port=7001)" in python_bootstrap
 
     def test_execute_success(self) -> None:
         """Successful execution returns response."""
@@ -621,12 +635,21 @@ class TestCommandPortClientExecute:
             ]
             still_broken_socket = MagicMock()
             still_broken_socket.recv.side_effect = [TimeoutError()]
-            mock_socket_class.side_effect = [broken_socket, still_broken_socket]
+            raw_fallback_socket = MagicMock()
+            raw_fallback_socket.recv.side_effect = [TimeoutError()]
+            still_broken_after_raw_socket = MagicMock()
+            still_broken_after_raw_socket.recv.side_effect = [TimeoutError()]
+            mock_socket_class.side_effect = [
+                broken_socket,
+                still_broken_socket,
+                raw_fallback_socket,
+                still_broken_after_raw_socket,
+            ]
 
             with pytest.raises(MayaUnavailableError, match="did not produce command responses"):
                 client.ensure_response_compatible()
 
-        assert mock_socket_class.call_count == 2
+        assert mock_socket_class.call_count == 4
 
     def test_bootstrap_send_failure_is_translated(self) -> None:
         """Bootstrap send failures clean up and return public Maya errors."""
@@ -658,12 +681,21 @@ class TestCommandPortClientExecute:
             ]
             wrong_listener_socket = MagicMock()
             wrong_listener_socket.recv.side_effect = [b"wrong listener", TimeoutError()]
-            mock_socket_class.side_effect = [broken_socket, wrong_listener_socket]
+            raw_fallback_socket = MagicMock()
+            raw_fallback_socket.recv.side_effect = [TimeoutError()]
+            still_wrong_listener_socket = MagicMock()
+            still_wrong_listener_socket.recv.side_effect = [b"wrong listener", TimeoutError()]
+            mock_socket_class.side_effect = [
+                broken_socket,
+                wrong_listener_socket,
+                raw_fallback_socket,
+                still_wrong_listener_socket,
+            ]
 
             with pytest.raises(MayaUnavailableError, match="unexpected probe output"):
                 client.ensure_response_compatible()
 
-        assert mock_socket_class.call_count == 2
+        assert mock_socket_class.call_count == 4
 
     def test_disconnect_resets_compat_bootstrap_attempt(self) -> None:
         """A new Maya session can bootstrap even after a previous attempt."""

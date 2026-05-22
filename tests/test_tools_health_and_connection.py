@@ -79,6 +79,7 @@ class TestMayaConnect:
         mock_client = MagicMock()
         mock_client.config.host = "localhost"
         mock_client.config.port = 7001
+        mock_client.ensure_response_compatible.return_value = True
 
         with patch("maya_mcp.tools.connection.get_client", return_value=mock_client):
             result = maya_connect()
@@ -96,6 +97,7 @@ class TestMayaConnect:
         mock_client = MagicMock()
         mock_client.config.host = "localhost"
         mock_client.config.port = 7001
+        mock_client.ensure_response_compatible.return_value = True
         mock_client.connect.side_effect = MayaUnavailableError(
             message="Connection refused",
             host="localhost",

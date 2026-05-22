@@ -159,7 +159,12 @@ def _parse_maya_response(raw_response: str) -> str:
     return "\n".join(dict.fromkeys(filtered))
 
 
-def _build_compat_server_bootstrap(port: int) -> str:
+def _escape_mel_string(value: str) -> str:
+    """Escape text for a double-quoted MEL string literal."""
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _build_compat_server_python_bootstrap(port: int) -> str:
     """Build Python code that starts the packaged compat server inside Maya."""
     compat_source = inspect.getsource(maya_compat_server)
     return (
@@ -168,6 +173,14 @@ def _build_compat_server_bootstrap(port: int) -> str:
         f"exec({compat_source!r}, _maya_mcp_compat_server.__dict__)\n"
         f"_maya_mcp_compat_server.start_compat_server(port={port!r})\n"
     )
+
+
+def _build_compat_server_bootstrap_commands(port: int) -> tuple[str, ...]:
+    """Build bootstrap commands for MEL-default and Python commandPorts."""
+    python_bootstrap = _build_compat_server_python_bootstrap(port)
+    escaped_python_bootstrap = _escape_mel_string(repr(python_bootstrap))
+    mel_bootstrap = f'python("exec({escaped_python_bootstrap})")'
+    return (mel_bootstrap, python_bootstrap)
 
 
 def get_client() -> CommandPortClient:
@@ -458,7 +471,7 @@ class CommandPortClient:
                     attempts=0,
                     last_error=str(exc),
                 ) from exc
-            if probe_response == _COMPAT_PROBE_TOKEN:
+            if _COMPAT_PROBE_TOKEN in probe_response:
                 self._response_compatibility_checked = True
                 return True
 
@@ -466,8 +479,6 @@ class CommandPortClient:
                 logger.debug(
                     "Maya commandPort probe returned unexpected output: %s", probe_response
                 )
-                self._response_compatibility_checked = True
-                return True
 
             return self._bootstrap_compat_server()
 
@@ -594,81 +605,104 @@ class CommandPortClient:
 
     def _bootstrap_compat_server(self) -> bool:
         """Start the Maya-side compatibility server through the current commandPort."""
-        if self._compat_bootstrap_disabled() or self._compat_bootstrap_attempted:
+        if self._compat_bootstrap_disabled():
             return False
+        if self._compat_bootstrap_attempted:
+            raise MayaUnavailableError(
+                message="Maya compatibility server bootstrap was already attempted",
+                host=self.config.host,
+                port=self.config.port,
+                attempts=0,
+                last_error="Compatibility bootstrap did not produce usable command responses",
+            )
 
         self._compat_bootstrap_attempted = True
-        bootstrap_command = _build_compat_server_bootstrap(self.config.port)
         logger.warning(
             "Maya commandPort returned empty responses; attempting compatibility server bootstrap"
         )
 
-        try:
-            self._send_command(
-                bootstrap_command,
-                response_timeout=_COMPAT_BOOTSTRAP_RESPONSE_TIMEOUT_SECONDS,
-            )
-        except _CommandSocketError as exc:
-            if not exc.send_completed:
+        last_probe_error = "Compatibility bootstrap did not produce command responses"
+        bootstrap_commands = _build_compat_server_bootstrap_commands(self.config.port)
+
+        for bootstrap_command in bootstrap_commands:
+            try:
+                self._send_command(
+                    bootstrap_command,
+                    response_timeout=_COMPAT_BOOTSTRAP_RESPONSE_TIMEOUT_SECONDS,
+                )
+            except _CommandSocketError as exc:
+                if not exc.send_completed:
+                    self._handle_socket_error()
+                    raise MayaUnavailableError(
+                        message="Lost connection to Maya while sending compatibility server bootstrap",
+                        host=self.config.host,
+                        port=self.config.port,
+                        attempts=0,
+                        last_error=str(exc),
+                    ) from exc
+            except TimeoutError:
+                pass
+
+            self._cleanup_socket()
+            time.sleep(_COMPAT_BOOTSTRAP_DELAY_SECONDS)
+            self.connect()
+
+            try:
+                probe_response = self._send_command(
+                    _COMPAT_PROBE_COMMAND,
+                    response_timeout=self.config.command_timeout,
+                )
+            except TimeoutError as exc:
                 self._handle_socket_error()
-                raise MayaUnavailableError(
-                    message="Lost connection to Maya while sending compatibility server bootstrap",
-                    host=self.config.host,
-                    port=self.config.port,
-                    attempts=0,
-                    last_error=str(exc),
-                ) from exc
-        except TimeoutError:
-            pass
+                last_probe_error = "Maya compatibility server response probe timed out"
+                if bootstrap_command == bootstrap_commands[-1]:
+                    raise MayaTimeoutError(
+                        message="Maya compatibility server response probe timed out",
+                        timeout_seconds=self.config.command_timeout,
+                        operation="compatibility bootstrap",
+                    ) from exc
+                self.connect()
+                continue
+            except OSError as exc:
+                self._handle_socket_error()
+                last_probe_error = str(exc)
+                if bootstrap_command == bootstrap_commands[-1]:
+                    raise MayaUnavailableError(
+                        message="Lost connection to Maya compatibility server after bootstrap",
+                        host=self.config.host,
+                        port=self.config.port,
+                        attempts=0,
+                        last_error=str(exc),
+                    ) from exc
+                self.connect()
+                continue
 
-        self._cleanup_socket()
-        time.sleep(_COMPAT_BOOTSTRAP_DELAY_SECONDS)
-        self.connect()
+            if probe_response == _COMPAT_PROBE_TOKEN:
+                self._response_compatibility_checked = True
+                return True
 
-        try:
-            probe_response = self._send_command(
-                _COMPAT_PROBE_COMMAND,
-                response_timeout=self.config.command_timeout,
+            self._handle_socket_error()
+            last_probe_error = (
+                probe_response or "Empty response after compatibility server bootstrap"
             )
-        except TimeoutError as exc:
-            self._handle_socket_error()
-            raise MayaTimeoutError(
-                message="Maya compatibility server response probe timed out",
-                timeout_seconds=self.config.command_timeout,
-                operation="compatibility bootstrap",
-            ) from exc
-        except OSError as exc:
-            self._handle_socket_error()
-            raise MayaUnavailableError(
-                message="Lost connection to Maya compatibility server after bootstrap",
-                host=self.config.host,
-                port=self.config.port,
-                attempts=0,
-                last_error=str(exc),
-            ) from exc
+            if bootstrap_command != bootstrap_commands[-1]:
+                self.connect()
+                continue
 
-        if not probe_response:
-            self._handle_socket_error()
-            raise MayaUnavailableError(
-                message="Maya compatibility server bootstrap did not produce command responses",
-                host=self.config.host,
-                port=self.config.port,
-                attempts=0,
-                last_error="Empty response after compatibility server bootstrap",
-            )
-
-        if probe_response != _COMPAT_PROBE_TOKEN:
-            self._handle_socket_error()
-            raise MayaUnavailableError(
-                message="Maya compatibility server bootstrap returned unexpected probe output",
-                host=self.config.host,
-                port=self.config.port,
-                attempts=0,
-                last_error=probe_response,
-            )
-
-        self._response_compatibility_checked = True
-        return True
+        unexpected_probe = not last_probe_error.startswith(
+            ("Compatibility bootstrap", "Empty response", "Maya compatibility server")
+        )
+        raise MayaUnavailableError(
+            message=(
+                "Maya compatibility server bootstrap returned unexpected probe output"
+                if unexpected_probe
+                else "Maya compatibility server bootstrap did not produce command responses"
+            ),
+            host=self.config.host,
+            port=self.config.port,
+            attempts=0,
+            last_error=last_probe_error,
+        )
 
     def _compat_bootstrap_disabled(self) -> bool:
         value = os.environ.get(_COMPAT_BOOTSTRAP_DISABLE_ENV, "")

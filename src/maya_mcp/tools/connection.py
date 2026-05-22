@@ -66,12 +66,12 @@ def maya_connect(
 
     try:
         client.connect()
-        client.ensure_response_compatible()
+        connected = bool(client.ensure_response_compatible())
         return {
-            "connected": True,
+            "connected": connected,
             "host": host,
             "port": port,
-            "error": None,
+            "error": None if connected else "Maya commandPort responses are not usable",
         }
     except (MayaTimeoutError, MayaUnavailableError) as e:
         return {
