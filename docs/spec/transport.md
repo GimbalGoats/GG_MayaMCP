@@ -28,11 +28,11 @@ Its implementation lives in `src/maya_mcp/transport/commandport.py`.
 
 Maya MCP normally talks to Maya's built-in `commandPort`. For Maya versions
 where Autodesk's Python 3 `CommandPort.py` response writer is broken, the
-project also ships a Maya-side compatibility server helper at
-`scripts/enable_compat_server.py`. That helper runs inside Maya, binds only to
-`127.0.0.1`, executes received Python commands on Maya's main thread, and
-returns captured stdout/stderr over TCP using the same port expected by the MCP
-transport.
+transport can bootstrap a packaged Maya-side compatibility server through the
+initial built-in `commandPort`. The compatibility server runs inside Maya, binds
+only to `127.0.0.1`, executes received Python commands on Maya's main thread,
+and returns captured stdout/stderr over TCP using the same port expected by the
+MCP transport.
 
 ## Purpose
 
@@ -166,16 +166,28 @@ cmds.commandPort(
 
 ## Maya 2022/2024 Compatibility Server
 
-Use `scripts/enable_compat_server.py` instead of the built-in `commandPort` when
-Maya logs this Autodesk-side response error:
+Maya MCP can automatically start its compatibility server when the built-in
+`commandPort` accepts commands but returns empty responses because Maya logs
+this Autodesk-side response error:
 
 ```text
 TypeError: a bytes-like object is required, not 'str'
 ```
 
-The compatibility helper:
+The automatic fallback:
 
-- closes the built-in `commandPort` on the chosen port if it is open
+- sends a small response probe before user commands
+- sends a packaged compatibility server bootstrap through the built-in
+  `commandPort` when the probe also returns empty
+- closes the built-in `commandPort` on the chosen port inside Maya
+- reconnects to the same host and port
+- verifies the replacement listener with another response probe before sending
+  the user command
+
+Set `MAYA_MCP_DISABLE_COMPAT_BOOTSTRAP=1` to disable automatic fallback.
+
+The compatibility server:
+
 - binds to `127.0.0.1` only
 - keeps the MCP server process outside Maya
 - executes commands on Maya's main thread through `maya.utils`
@@ -187,7 +199,7 @@ listener, not the MCP-facing tool surface.
 
 Compatibility server requests use the same persistent socket shape as
 `CommandPortClient`: send a UTF-8 command and leave the socket open while
-waiting for the response. The helper treats a short idle period as the end of a
+waiting for the response. The server treats a short idle period as the end of a
 command, so probe clients should not call `shutdown(SHUT_WR)` after sending a
 command.
 

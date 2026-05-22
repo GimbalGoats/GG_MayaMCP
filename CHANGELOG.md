@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Auto-bootstrap the Maya compatibility server when Maya 2022/2024 commandPort accepts commands but returns empty responses.
+
 ### Documentation
 
 - Added README badges and clearer release-asset guidance for finding the

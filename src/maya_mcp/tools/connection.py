@@ -10,7 +10,7 @@ from typing import Literal
 
 from typing_extensions import TypedDict
 
-from maya_mcp.errors import MayaUnavailableError
+from maya_mcp.errors import MayaTimeoutError, MayaUnavailableError
 from maya_mcp.transport import get_client
 
 
@@ -66,13 +66,14 @@ def maya_connect(
 
     try:
         client.connect()
+        client.ensure_response_compatible()
         return {
             "connected": True,
             "host": host,
             "port": port,
             "error": None,
         }
-    except MayaUnavailableError as e:
+    except (MayaTimeoutError, MayaUnavailableError) as e:
         return {
             "connected": False,
             "host": host,

@@ -29,11 +29,14 @@ Note:
 from __future__ import annotations
 
 import contextlib
+import inspect
 import logging
+import os
 import socket
 import threading
 import time
 
+from maya_mcp import maya_compat_server
 from maya_mcp.errors import (
     MayaTimeoutError,
     MayaUnavailableError,
@@ -49,6 +52,20 @@ logger = logging.getLogger(__name__)
 
 # Buffer size for socket receive
 BUFFER_SIZE = 65536
+_COMPAT_PROBE_TOKEN = "__maya_mcp_response_probe__"
+_COMPAT_PROBE_COMMAND = f"print({_COMPAT_PROBE_TOKEN!r})"
+_COMPAT_BOOTSTRAP_DELAY_SECONDS = 0.2
+_COMPAT_BOOTSTRAP_RESPONSE_TIMEOUT_SECONDS = 2.0
+_COMPAT_BOOTSTRAP_DISABLE_ENV = "MAYA_MCP_DISABLE_COMPAT_BOOTSTRAP"
+
+
+class _CommandSocketError(OSError):
+    """Socket error annotated with whether the command was already sent."""
+
+    def __init__(self, original: OSError, *, send_completed: bool) -> None:
+        super().__init__(str(original))
+        self.send_completed = send_completed
+
 
 # Module-level client instance for singleton pattern
 _client: CommandPortClient | None = None
@@ -142,6 +159,17 @@ def _parse_maya_response(raw_response: str) -> str:
     return "\n".join(dict.fromkeys(filtered))
 
 
+def _build_compat_server_bootstrap(port: int) -> str:
+    """Build Python code that starts the packaged compat server inside Maya."""
+    compat_source = inspect.getsource(maya_compat_server)
+    return (
+        "import types\n"
+        "_maya_mcp_compat_server = types.ModuleType('_maya_mcp_compat_server')\n"
+        f"exec({compat_source!r}, _maya_mcp_compat_server.__dict__)\n"
+        f"_maya_mcp_compat_server.start_compat_server(port={port!r})\n"
+    )
+
+
 def get_client() -> CommandPortClient:
     """Get the global CommandPortClient instance.
 
@@ -231,6 +259,8 @@ class CommandPortClient:
         self.state = ClientState(config=self.config)
         self._socket: socket.socket | None = None
         self._lock = threading.RLock()
+        self._compat_bootstrap_attempted = False
+        self._response_compatibility_checked = False
 
     def connect(self) -> bool:
         """Establish connection to Maya commandPort.
@@ -355,6 +385,92 @@ class CommandPortClient:
         with self._lock:
             return self._execute_with_retry(command, allow_retry=True)
 
+    def ensure_response_compatible(self) -> bool:
+        """Ensure Maya's commandPort response path can return command output.
+
+        Returns:
+            True if command responses are usable after the check.
+        """
+        with self._lock:
+            if self._compat_bootstrap_disabled() or self._response_compatibility_checked:
+                return True
+
+            if self._socket is None:
+                self.connect()
+
+            try:
+                probe_response = self._send_command(
+                    _COMPAT_PROBE_COMMAND,
+                    response_timeout=self.config.command_timeout,
+                )
+            except _CommandSocketError as exc:
+                self._handle_socket_error()
+                if exc.send_completed:
+                    self.connect()
+                    return self._bootstrap_compat_server()
+                self.connect()
+                try:
+                    probe_response = self._send_command(
+                        _COMPAT_PROBE_COMMAND,
+                        response_timeout=self.config.command_timeout,
+                    )
+                except TimeoutError as retry_exc:
+                    self._handle_socket_error()
+                    raise MayaTimeoutError(
+                        message="Maya commandPort response probe timed out",
+                        timeout_seconds=self.config.command_timeout,
+                        operation="compatibility probe",
+                    ) from retry_exc
+                except _CommandSocketError as retry_exc:
+                    self._handle_socket_error()
+                    if retry_exc.send_completed:
+                        self.connect()
+                        return self._bootstrap_compat_server()
+                    raise MayaUnavailableError(
+                        message="Lost connection to Maya during commandPort response probe",
+                        host=self.config.host,
+                        port=self.config.port,
+                        attempts=0,
+                        last_error=str(retry_exc),
+                    ) from retry_exc
+                except OSError as retry_exc:
+                    self._handle_socket_error()
+                    raise MayaUnavailableError(
+                        message="Lost connection to Maya during commandPort response probe",
+                        host=self.config.host,
+                        port=self.config.port,
+                        attempts=0,
+                        last_error=str(retry_exc),
+                    ) from retry_exc
+            except TimeoutError as exc:
+                self._handle_socket_error()
+                raise MayaTimeoutError(
+                    message="Maya commandPort response probe timed out",
+                    timeout_seconds=self.config.command_timeout,
+                    operation="compatibility probe",
+                ) from exc
+            except OSError as exc:
+                self._handle_socket_error()
+                raise MayaUnavailableError(
+                    message="Lost connection to Maya during commandPort response probe",
+                    host=self.config.host,
+                    port=self.config.port,
+                    attempts=0,
+                    last_error=str(exc),
+                ) from exc
+            if probe_response == _COMPAT_PROBE_TOKEN:
+                self._response_compatibility_checked = True
+                return True
+
+            if probe_response:
+                logger.debug(
+                    "Maya commandPort probe returned unexpected output: %s", probe_response
+                )
+                self._response_compatibility_checked = True
+                return True
+
+            return self._bootstrap_compat_server()
+
     def _execute_with_retry(self, command: str, *, allow_retry: bool) -> str:
         """Execute a command with optional reconnect-and-retry on send failure.
 
@@ -369,6 +485,8 @@ class CommandPortClient:
         if self._socket is None:
             self.connect()
 
+        self.ensure_response_compatible()
+
         if self._socket is None:
             raise MayaUnavailableError(
                 message="Not connected to Maya",
@@ -377,52 +495,8 @@ class CommandPortClient:
                 attempts=0,
             )
 
-        send_completed = False
         try:
-            # Set command timeout
-            self._socket.settimeout(self.config.command_timeout)
-
-            # Prepare command
-            command = command.strip()
-            logger.debug("Executing command (%d chars)", len(command))
-
-            # Maya commandPort requires a newline to execute the command
-            if not command.endswith("\n"):
-                command += "\n"
-
-            command_bytes = command.encode("utf-8")
-            self._socket.sendall(command_bytes)
-            send_completed = True
-
-            # Receive response — use command_timeout for the first chunk (Maya
-            # may take a while to process) and a short follow-up timeout for
-            # subsequent chunks once data starts flowing.
-            response_parts: list[bytes] = []
-            self._socket.settimeout(self.config.command_timeout)
-            try:
-                first_chunk = self._socket.recv(BUFFER_SIZE)
-                if first_chunk:
-                    response_parts.append(first_chunk)
-                    # Data started flowing — switch to a short timeout to
-                    # collect any remaining fragments without a long wait.
-                    self._socket.settimeout(0.05)
-                    while True:
-                        try:
-                            chunk = self._socket.recv(BUFFER_SIZE)
-                            if not chunk:
-                                break
-                            response_parts.append(chunk)
-                        except TimeoutError:
-                            break
-            except TimeoutError:
-                # No response at all within command_timeout
-                pass
-
-            raw_response = b"".join(response_parts).decode("utf-8").strip()
-
-            # Parse Maya's response format to extract actual output
-            response = _parse_maya_response(raw_response)
-
+            response = self._send_command(command)
             # Update state on success
             self.state.update_contact()
             self.state.last_error = None
@@ -441,13 +515,13 @@ class CommandPortClient:
             ) from exc
 
         except (ConnectionResetError, BrokenPipeError, OSError) as e:
-            phase = "receive" if send_completed else "send"
+            phase = "receive" if isinstance(e, _CommandSocketError) and e.send_completed else "send"
             error_msg = f"Connection lost during {phase}: {e}"
             self.state.last_error = error_msg
             self._handle_socket_error()
 
             # Only retry on send-phase errors — the command was never delivered
-            if not send_completed and allow_retry:
+            if phase == "send" and allow_retry:
                 logger.warning("Connection lost during send, reconnecting: %s", e)
                 try:
                     self.connect()
@@ -463,6 +537,142 @@ class CommandPortClient:
                 attempts=0,
                 last_error=error_msg,
             ) from e
+
+    def _send_command(self, command: str, *, response_timeout: float | None = None) -> str:
+        """Send one command over an already connected socket and parse its response."""
+        if self._socket is None:
+            raise MayaUnavailableError(
+                message="Not connected to Maya",
+                host=self.config.host,
+                port=self.config.port,
+                attempts=0,
+            )
+
+        send_completed = False
+        try:
+            self._socket.settimeout(self.config.command_timeout)
+
+            command = command.strip()
+            logger.debug("Executing command (%d chars)", len(command))
+
+            if not command.endswith("\n"):
+                command += "\n"
+
+            self._socket.sendall(command.encode("utf-8"))
+            send_completed = True
+
+            response_parts: list[bytes] = []
+            self._socket.settimeout(response_timeout or self.config.command_timeout)
+            try:
+                first_chunk = self._socket.recv(BUFFER_SIZE)
+                if not first_chunk:
+                    raise _CommandSocketError(
+                        ConnectionResetError("Connection closed before response"),
+                        send_completed=True,
+                    )
+                response_parts.append(first_chunk)
+                self._socket.settimeout(0.05)
+                while True:
+                    try:
+                        chunk = self._socket.recv(BUFFER_SIZE)
+                        if not chunk:
+                            break
+                        response_parts.append(chunk)
+                    except TimeoutError:
+                        break
+            except TimeoutError:
+                pass
+
+            raw_response = b"".join(response_parts).decode("utf-8").strip()
+            return _parse_maya_response(raw_response)
+        except TimeoutError:
+            raise
+        except _CommandSocketError:
+            raise
+        except OSError as exc:
+            raise _CommandSocketError(exc, send_completed=send_completed) from exc
+
+    def _bootstrap_compat_server(self) -> bool:
+        """Start the Maya-side compatibility server through the current commandPort."""
+        if self._compat_bootstrap_disabled() or self._compat_bootstrap_attempted:
+            return False
+
+        self._compat_bootstrap_attempted = True
+        bootstrap_command = _build_compat_server_bootstrap(self.config.port)
+        logger.warning(
+            "Maya commandPort returned empty responses; attempting compatibility server bootstrap"
+        )
+
+        try:
+            self._send_command(
+                bootstrap_command,
+                response_timeout=_COMPAT_BOOTSTRAP_RESPONSE_TIMEOUT_SECONDS,
+            )
+        except _CommandSocketError as exc:
+            if not exc.send_completed:
+                self._handle_socket_error()
+                raise MayaUnavailableError(
+                    message="Lost connection to Maya while sending compatibility server bootstrap",
+                    host=self.config.host,
+                    port=self.config.port,
+                    attempts=0,
+                    last_error=str(exc),
+                ) from exc
+        except TimeoutError:
+            pass
+
+        self._cleanup_socket()
+        time.sleep(_COMPAT_BOOTSTRAP_DELAY_SECONDS)
+        self.connect()
+
+        try:
+            probe_response = self._send_command(
+                _COMPAT_PROBE_COMMAND,
+                response_timeout=self.config.command_timeout,
+            )
+        except TimeoutError as exc:
+            self._handle_socket_error()
+            raise MayaTimeoutError(
+                message="Maya compatibility server response probe timed out",
+                timeout_seconds=self.config.command_timeout,
+                operation="compatibility bootstrap",
+            ) from exc
+        except OSError as exc:
+            self._handle_socket_error()
+            raise MayaUnavailableError(
+                message="Lost connection to Maya compatibility server after bootstrap",
+                host=self.config.host,
+                port=self.config.port,
+                attempts=0,
+                last_error=str(exc),
+            ) from exc
+
+        if not probe_response:
+            self._handle_socket_error()
+            raise MayaUnavailableError(
+                message="Maya compatibility server bootstrap did not produce command responses",
+                host=self.config.host,
+                port=self.config.port,
+                attempts=0,
+                last_error="Empty response after compatibility server bootstrap",
+            )
+
+        if probe_response != _COMPAT_PROBE_TOKEN:
+            self._handle_socket_error()
+            raise MayaUnavailableError(
+                message="Maya compatibility server bootstrap returned unexpected probe output",
+                host=self.config.host,
+                port=self.config.port,
+                attempts=0,
+                last_error=probe_response,
+            )
+
+        self._response_compatibility_checked = True
+        return True
+
+    def _compat_bootstrap_disabled(self) -> bool:
+        value = os.environ.get(_COMPAT_BOOTSTRAP_DISABLE_ENV, "")
+        return value.lower() in {"1", "true", "yes", "on"}
 
     def is_connected(self) -> bool:
         """Check if currently connected to Maya.
@@ -546,6 +756,8 @@ class CommandPortClient:
                 retry_base_delay=self.config.retry_base_delay,
             )
             self.state.config = self.config
+            self._compat_bootstrap_attempted = False
+            self._response_compatibility_checked = False
 
     def _cleanup_socket(self) -> None:
         """Clean up the socket connection."""
@@ -553,6 +765,8 @@ class CommandPortClient:
             with contextlib.suppress(OSError):
                 self._socket.close()
             self._socket = None
+            self._response_compatibility_checked = False
+            self._compat_bootstrap_attempted = False
 
     def _handle_socket_error(self) -> None:
         """Handle a socket error by cleaning up and updating state."""

@@ -1,23 +1,20 @@
-"""Tests for the Maya-side compatibility server helper script."""
+"""Tests for the Maya-side compatibility server module."""
 
 from __future__ import annotations
 
-import importlib.util
+import importlib
 import socket
 import threading
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from types import ModuleType
 
 
-def _load_compat_server_script() -> Any:
-    script_path = Path(__file__).resolve().parents[1] / "scripts" / "enable_compat_server.py"
-    spec = importlib.util.spec_from_file_location("enable_compat_server", script_path)
-    assert spec is not None
-    assert spec.loader is not None
+def _load_compat_server_module() -> ModuleType:
+    import maya_mcp.maya_compat_server as compat_server
 
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return importlib.reload(compat_server)
 
 
 def _read_compat_response(client: socket.socket) -> str:
@@ -42,7 +39,7 @@ def _read_compat_response(client: socket.socket) -> str:
 
 def test_compat_server_uses_socket_timeout_as_command_delimiter() -> None:
     """Legacy socket.timeout variants still mark the end of a command."""
-    module = _load_compat_server_script()
+    module = _load_compat_server_module()
 
     class LegacySocketTimeout(Exception):
         pass
@@ -76,7 +73,7 @@ def test_compat_server_uses_socket_timeout_as_command_delimiter() -> None:
 
 def test_compat_server_executes_multiline_commands_on_persistent_socket() -> None:
     """Compatibility server accepts multiline commands and keeps the socket open."""
-    module = _load_compat_server_script()
+    module = _load_compat_server_module()
     server = module._ReusableThreadingTCPServer(("127.0.0.1", 0), module._CompatRequestHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -98,15 +95,14 @@ def test_compat_server_executes_multiline_commands_on_persistent_socket() -> Non
 
 
 def test_compat_server_reexecution_preserves_running_server_handle() -> None:
-    """Re-running the script can still stop the previously started server."""
-    module = _load_compat_server_script()
-    script_path = Path(__file__).resolve().parents[1] / "scripts" / "enable_compat_server.py"
+    """Re-executing the module can still stop the previously started server."""
+    module = _load_compat_server_module()
 
     module.start_compat_server(0)
     host, port = module._server.server_address
 
     try:
-        exec(script_path.read_text(encoding="utf-8"), module.__dict__)
+        importlib.reload(module)
         assert module._server is not None
         module.stop_compat_server()
 
@@ -119,7 +115,7 @@ def test_compat_server_reexecution_preserves_running_server_handle() -> None:
 
 def test_compat_server_returns_tracebacks() -> None:
     """Execution failures are returned to the client instead of killing the handler."""
-    module = _load_compat_server_script()
+    module = _load_compat_server_module()
 
     output = module._execute_in_maya("raise RuntimeError('boom')")
 

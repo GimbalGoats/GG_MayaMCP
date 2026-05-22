@@ -81,36 +81,15 @@ return empty responses while Maya's Script Editor logs:
 TypeError: a bytes-like object is required, not 'str'
 ```
 
-For those versions, use the compatibility server instead of Maya's built-in
-`commandPort`. In Maya's Script Editor, run `scripts/enable_compat_server.py`
-from this repo. It closes the built-in `commandPort` on `:7001` if needed and
-starts a localhost-only Python TCP server on the same port.
+For those versions, open the built-in `commandPort` using the normal setup
+above. If Maya accepts commands but returns empty responses, Maya MCP
+automatically sends a packaged bootstrap command through the built-in
+`commandPort`, starts the compatibility server inside Maya, reconnects to the
+same `localhost:7001` port, verifies responses, and then sends the requested
+command.
 
-The compatibility helper is not installed by normal wheel installs. If the test
-machine does not have a source checkout, download the helper from the release
-tag, branch, or commit you are testing. Prefer a release tag or commit SHA over
-a moving branch name. Replace `<ref>` with that exact Git ref, then run this in
-Maya's Python tab:
-
-```python
-import pathlib
-import tempfile
-import urllib.request
-
-url = "https://raw.githubusercontent.com/GimbalGoats/GG_MayaMCP/<ref>/scripts/enable_compat_server.py"
-target = pathlib.Path(tempfile.gettempdir()) / "enable_compat_server.py"
-target.write_text(urllib.request.urlopen(url).read().decode("utf-8"), encoding="utf-8")
-print(f"Downloaded compatibility helper to: {target}")
-```
-
-Open the downloaded file and inspect it before running. After inspection, run:
-
-```python
-exec(open(r"<downloaded-file-path>", encoding="utf-8").read())
-```
-
-After that, start the MCP server normally. The client still connects to
-`localhost:7001`.
+Set `MAYA_MCP_DISABLE_COMPAT_BOOTSTRAP=1` before starting Maya MCP to disable
+automatic fallback.
 
 ## 3. Start the MCP Server
 
@@ -202,8 +181,8 @@ If the server starts but tools cannot connect:
 - call `maya.connect` explicitly once
 - restart Maya after changing `commandPort` setup
 - restart the MCP server after changing local code in a source checkout
-- on Maya 2022/2024, use the compatibility server above if Maya logs the
-  `bytes-like object` `CommandPort.py` error
+- on Maya 2022/2024, leave automatic compatibility bootstrap enabled if Maya
+  logs the `bytes-like object` `CommandPort.py` error
 
 ## Where To Go Next
 

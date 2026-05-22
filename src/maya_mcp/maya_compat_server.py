@@ -1,13 +1,9 @@
-"""Start a Maya MCP compatibility server inside Maya.
+"""Maya-side compatibility server for broken commandPort response writers.
 
-Run this script in Maya's Script Editor (Python tab) on Maya versions where
-Autodesk's built-in commandPort returns empty responses or logs:
-
-    TypeError: a bytes-like object is required, not 'str'
-
-The compatibility server listens on localhost:7001 by default and executes
-incoming Python commands on Maya's main thread. It is intended as a workaround
-for Maya 2022/2024 commandPort response encoding failures.
+This module is designed to be executed inside Maya. The outside-Maya transport
+can send this source through Maya's built-in commandPort when that port accepts
+commands but returns empty responses because Autodesk's Python 3 response writer
+is broken.
 """
 
 import contextlib
@@ -85,7 +81,7 @@ def _execute_in_maya(command):
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             try:
                 exec(command, _execution_globals)
-            except BaseException:
+            except Exception:
                 traceback.print_exc()
 
         return stdout.getvalue() + stderr.getvalue()
