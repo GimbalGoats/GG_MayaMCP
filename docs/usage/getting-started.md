@@ -86,9 +86,10 @@ For those versions, use the compatibility server instead of Maya's built-in
 from this repo. It closes the built-in `commandPort` on `:7001` if needed and
 starts a localhost-only Python TCP server on the same port.
 
-If the test machine does not have a source checkout, run this in Maya's Python
-tab using the release tag, branch, or commit you are testing. Replace `<ref>`
-with that exact Git ref:
+The compatibility helper is not installed by normal wheel installs. If the test
+machine does not have a source checkout, run this in Maya's Python tab using
+the release tag, branch, or commit you are testing. Replace `<ref>` with that
+exact Git ref:
 
 ```python
 import urllib.request

@@ -68,7 +68,6 @@ include = [
     "/src",
     "/tests",
     "/docs",
-    "/scripts",
 ]
 
 # Ruff configuration
