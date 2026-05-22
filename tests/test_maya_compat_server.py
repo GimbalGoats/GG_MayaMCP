@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import errno
 import importlib
 import socket
+import sys
 import threading
+import types
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -111,6 +114,56 @@ def test_compat_server_reexecution_preserves_running_server_handle() -> None:
     finally:
         if module._server is not None:
             module.stop_compat_server()
+
+
+def test_bootstrap_compat_server_defers_start_until_current_command_returns(monkeypatch) -> None:
+    """Auto-bootstrap avoids binding while Maya's built-in commandPort is active."""
+    module = _load_compat_server_module()
+    deferred_calls = []
+    start_calls = []
+
+    maya_module = types.ModuleType("maya")
+    maya_utils_module = types.ModuleType("maya.utils")
+
+    def execute_deferred(callback):
+        deferred_calls.append(callback)
+
+    maya_utils_module.executeDeferred = execute_deferred
+    maya_module.utils = maya_utils_module
+    monkeypatch.setitem(sys.modules, "maya", maya_module)
+    monkeypatch.setitem(sys.modules, "maya.utils", maya_utils_module)
+    monkeypatch.setattr(module, "start_compat_server", lambda port: start_calls.append(port))
+
+    module.bootstrap_compat_server(7001)
+
+    assert start_calls == []
+    assert len(deferred_calls) == 1
+    deferred_calls[0]()
+    assert start_calls == [7001]
+
+
+def test_create_compat_server_retries_while_commandport_releases_port(monkeypatch) -> None:
+    """Port handoff tolerates transient address-in-use errors."""
+    module = _load_compat_server_module()
+    attempts = []
+    sleep_calls = []
+    fake_server = object()
+
+    def server_factory(*_args):
+        attempts.append(None)
+        if len(attempts) < 3:
+            raise OSError(errno.EADDRINUSE, "Address already in use")
+        return fake_server
+
+    monkeypatch.setattr(module, "_ReusableThreadingTCPServer", server_factory)
+    monkeypatch.setattr(module.time, "sleep", lambda seconds: sleep_calls.append(seconds))
+
+    assert module._create_compat_server(7001) is fake_server
+    assert len(attempts) == 3
+    assert sleep_calls == [
+        module.BIND_RETRY_DELAY_SECONDS,
+        module.BIND_RETRY_DELAY_SECONDS,
+    ]
 
 
 def test_compat_server_returns_tracebacks() -> None:

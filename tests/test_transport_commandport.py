@@ -307,10 +307,10 @@ class TestCommandPortClientExecute:
         mel_bootstrap, python_bootstrap = _build_compat_server_bootstrap_commands(7001)
 
         assert mel_bootstrap.startswith('python("exec(')
-        assert "start_compat_server(port=7001)" in mel_bootstrap
+        assert "bootstrap_compat_server(port=7001)" in mel_bootstrap
         assert "\\n" in mel_bootstrap
         assert python_bootstrap.startswith("import types")
-        assert "start_compat_server(port=7001)" in python_bootstrap
+        assert "bootstrap_compat_server(port=7001)" in python_bootstrap
 
     def test_execute_success(self) -> None:
         """Successful execution returns response."""
@@ -504,18 +504,55 @@ class TestCommandPortClientExecute:
             call.args[0].decode("utf-8") for call in broken_socket.sendall.call_args_list
         ]
         assert len(sent_commands) == 2
-        assert "__maya_mcp_response_probe__" in sent_commands[0]
-        assert "start_compat_server(port=7001)" in sent_commands[1]
+        assert "__maya_mcp_response_probe__" not in sent_commands[0]
+        assert "'__maya_mcp_' + 'response_probe__'" in sent_commands[0]
+        assert "bootstrap_compat_server(port=7001)" in sent_commands[1]
         broken_timeouts = [call.args[0] for call in broken_socket.settimeout.call_args_list]
         assert client.config.command_timeout in broken_timeouts
         assert transport_module._COMPAT_BOOTSTRAP_RESPONSE_TIMEOUT_SECONDS in broken_timeouts
         assert compat_socket.sendall.call_count == 2
-        assert "__maya_mcp_response_probe__" in compat_socket.sendall.call_args_list[0].args[
+        assert "__maya_mcp_response_probe__" not in compat_socket.sendall.call_args_list[0].args[
             0
         ].decode("utf-8")
+        assert "'__maya_mcp_' + 'response_probe__'" in compat_socket.sendall.call_args_list[
+            0
+        ].args[0].decode("utf-8")
         assert "print('bootstrapped')" in compat_socket.sendall.call_args_list[1].args[0].decode(
             "utf-8"
         )
+
+    def test_ensure_response_compatible_rejects_echoed_probe_literal(self) -> None:
+        """Echoing the probe command literal is not a valid command response."""
+        client = CommandPortClient(retry_base_delay=0.01)
+
+        with (
+            patch("socket.socket") as mock_socket_class,
+            patch("maya_mcp.transport.commandport.time.sleep"),
+        ):
+            echo_only_socket = MagicMock()
+            echo_only_socket.recv.side_effect = [
+                b"print('__maya_mcp_response_probe__')",
+                TimeoutError(),
+                TimeoutError(),
+            ]
+            compat_socket = MagicMock()
+            compat_socket.recv.side_effect = [
+                b"__maya_mcp_response_probe__",
+                TimeoutError(),
+            ]
+            mock_socket_class.side_effect = [echo_only_socket, compat_socket]
+
+            result = client.ensure_response_compatible()
+
+        assert result is True
+        assert mock_socket_class.call_count == 2
+        assert "bootstrap_compat_server(port=7001)" in echo_only_socket.sendall.call_args_list[
+            1
+        ].args[0].decode("utf-8")
+
+    def test_probe_command_does_not_embed_full_probe_token(self) -> None:
+        """Command echo cannot satisfy the probe by containing the sentinel."""
+        assert transport_module._COMPAT_PROBE_TOKEN not in transport_module._COMPAT_PROBE_COMMAND
 
     def test_ensure_response_compatible_retries_probe_send_failure(self) -> None:
         """A stale socket before any user command reconnects and retries the probe."""
@@ -582,7 +619,7 @@ class TestCommandPortClientExecute:
             result = client.ensure_response_compatible()
 
         assert result is True
-        assert "start_compat_server(port=7001)" in reopened_builtin_socket.sendall.call_args.args[
+        assert "bootstrap_compat_server(port=7001)" in reopened_builtin_socket.sendall.call_args.args[
             0
         ].decode("utf-8")
 
@@ -616,7 +653,7 @@ class TestCommandPortClientExecute:
         assert result == "ok"
         eof_socket.sendall.assert_called_once()
         reopened_builtin_socket.sendall.assert_called_once()
-        assert "start_compat_server(port=7001)" in reopened_builtin_socket.sendall.call_args.args[
+        assert "bootstrap_compat_server(port=7001)" in reopened_builtin_socket.sendall.call_args.args[
             0
         ].decode("utf-8")
 

@@ -7,17 +7,21 @@ is broken.
 """
 
 import contextlib
+import errno
 import io
 import socket
 import socketserver
 import sys
 import threading
+import time
 import traceback
 
 DEFAULT_PORT = 7001
 BUFFER_SIZE = 65536
 INITIAL_COMMAND_TIMEOUT = 30.0
 COMMAND_IDLE_TIMEOUT = 0.05
+BIND_RETRY_ATTEMPTS = 30
+BIND_RETRY_DELAY_SECONDS = 0.1
 
 _server = globals().get("_server")
 _server_thread = globals().get("_server_thread")
@@ -109,6 +113,24 @@ def _close_builtin_commandport(port):
         pass
 
 
+def _is_address_in_use(exc):
+    return getattr(exc, "errno", None) in {errno.EADDRINUSE, 10048}
+
+
+def _create_compat_server(port):
+    last_error = None
+    for attempt in range(BIND_RETRY_ATTEMPTS):
+        try:
+            return _ReusableThreadingTCPServer(("127.0.0.1", port), _CompatRequestHandler)
+        except OSError as exc:
+            last_error = exc
+            if not _is_address_in_use(exc) or attempt == BIND_RETRY_ATTEMPTS - 1:
+                raise
+            time.sleep(BIND_RETRY_DELAY_SECONDS)
+
+    raise last_error
+
+
 def start_compat_server(port=DEFAULT_PORT):
     """Start the Maya MCP compatibility server.
 
@@ -120,13 +142,28 @@ def start_compat_server(port=DEFAULT_PORT):
     stop_compat_server()
     _close_builtin_commandport(port)
 
-    _server = _ReusableThreadingTCPServer(("127.0.0.1", port), _CompatRequestHandler)
+    _server = _create_compat_server(port)
     _server_thread = threading.Thread(target=_server.serve_forever)
     _server_thread.daemon = True
     _server_thread.start()
 
     print(f"Maya MCP compatibility server opened on localhost:{port}")
     print("Leave Maya running, then start the MCP server normally.")
+
+
+def bootstrap_compat_server(port=DEFAULT_PORT):
+    """Start the compatibility server after the current Maya command returns."""
+
+    def deferred_start():
+        start_compat_server(port)
+
+    try:
+        import maya.utils as maya_utils
+
+        maya_utils.executeDeferred(deferred_start)
+        print(f"Maya MCP compatibility server scheduled on localhost:{port}")
+    except ImportError:
+        deferred_start()
 
 
 def stop_compat_server():

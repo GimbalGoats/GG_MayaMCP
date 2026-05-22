@@ -53,7 +53,7 @@ logger = logging.getLogger(__name__)
 # Buffer size for socket receive
 BUFFER_SIZE = 65536
 _COMPAT_PROBE_TOKEN = "__maya_mcp_response_probe__"
-_COMPAT_PROBE_COMMAND = f"print({_COMPAT_PROBE_TOKEN!r})"
+_COMPAT_PROBE_COMMAND = "print('__maya_mcp_' + 'response_probe__')"
 _COMPAT_BOOTSTRAP_DELAY_SECONDS = 0.2
 _COMPAT_BOOTSTRAP_RESPONSE_TIMEOUT_SECONDS = 2.0
 _COMPAT_BOOTSTRAP_DISABLE_ENV = "MAYA_MCP_DISABLE_COMPAT_BOOTSTRAP"
@@ -159,6 +159,15 @@ def _parse_maya_response(raw_response: str) -> str:
     return "\n".join(dict.fromkeys(filtered))
 
 
+def _is_compat_probe_response(response: str) -> bool:
+    """Return True only when the probe token appears as command output."""
+    if not response:
+        return False
+
+    parts = response.replace("\x00", "\n").splitlines()
+    return any(part.strip() == _COMPAT_PROBE_TOKEN for part in parts)
+
+
 def _escape_mel_string(value: str) -> str:
     """Escape text for a double-quoted MEL string literal."""
     return value.replace("\\", "\\\\").replace('"', '\\"')
@@ -171,7 +180,7 @@ def _build_compat_server_python_bootstrap(port: int) -> str:
         "import types\n"
         "_maya_mcp_compat_server = types.ModuleType('_maya_mcp_compat_server')\n"
         f"exec({compat_source!r}, _maya_mcp_compat_server.__dict__)\n"
-        f"_maya_mcp_compat_server.start_compat_server(port={port!r})\n"
+        f"_maya_mcp_compat_server.bootstrap_compat_server(port={port!r})\n"
     )
 
 
@@ -471,7 +480,7 @@ class CommandPortClient:
                     attempts=0,
                     last_error=str(exc),
                 ) from exc
-            if _COMPAT_PROBE_TOKEN in probe_response:
+            if _is_compat_probe_response(probe_response):
                 self._response_compatibility_checked = True
                 return True
 
@@ -677,7 +686,7 @@ class CommandPortClient:
                 self.connect()
                 continue
 
-            if probe_response == _COMPAT_PROBE_TOKEN:
+            if _is_compat_probe_response(probe_response):
                 self._response_compatibility_checked = True
                 return True
 
