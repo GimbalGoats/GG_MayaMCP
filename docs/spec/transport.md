@@ -188,6 +188,10 @@ The automatic fallback:
   the takeover runs through `maya.utils.executeDeferred`, so it completes only
   once Maya's main loop goes idle and can take several seconds on a busy
   session
+- distinguishes a dead listener from a broken response writer: the bootstrap
+  writes a proof-of-execution marker file in the shared temp directory, and a
+  missing marker after all probes fail produces an explicit "commandPort is not
+  executing commands, reopen it or restart Maya" error
 
 Set `MAYA_MCP_DISABLE_COMPAT_BOOTSTRAP=1` to disable automatic fallback.
 

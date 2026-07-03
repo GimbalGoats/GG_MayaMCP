@@ -242,6 +242,17 @@ def _build_compat_server_python_bootstrap(port: int) -> str:
     return _build_python_file_exec_command(bootstrap_path)
 
 
+def _compat_bootstrap_marker_exists(port: int) -> bool:
+    """Return True when Maya wrote the marker proving the bootstrap executed."""
+    return Path(maya_compat_server._bootstrap_marker_path(port)).is_file()
+
+
+def _clear_compat_bootstrap_marker(port: int) -> None:
+    """Remove a stale bootstrap marker so its existence reflects this attempt."""
+    with contextlib.suppress(OSError):
+        Path(maya_compat_server._bootstrap_marker_path(port)).unlink()
+
+
 def _build_compat_server_bootstrap_commands(port: int) -> tuple[str, ...]:
     """Build bootstrap commands for MEL-default and Python commandPorts."""
     python_bootstrap = _build_compat_server_python_bootstrap(port)
@@ -714,6 +725,7 @@ class CommandPortClient:
         re-established between sends.
         """
         bootstrap_commands = _build_compat_server_bootstrap_commands(self.config.port)
+        _clear_compat_bootstrap_marker(self.config.port)
 
         for bootstrap_command in bootstrap_commands:
             if self._socket is None:
@@ -792,6 +804,24 @@ class CommandPortClient:
                 failure_kind = "empty"
                 failure_detail = "Empty response after compatibility server bootstrap"
 
+        if failure_kind in {"empty", "connection"} and not _compat_bootstrap_marker_exists(
+            self.config.port
+        ):
+            # Maya never wrote the bootstrap marker: the listener accepted the
+            # command but did not execute it, so no wire-delivered bootstrap
+            # can recover this state.
+            raise MayaUnavailableError(
+                message=(
+                    "Maya did not appear to execute the compatibility bootstrap; "
+                    "the commandPort accepts connections but is not executing "
+                    "commands. Reopen the commandPort in Maya's Script Editor "
+                    "(or restart Maya), then reconnect."
+                ),
+                host=self.config.host,
+                port=self.config.port,
+                attempts=0,
+                last_error=failure_detail,
+            )
         if failure_kind == "timeout":
             raise MayaTimeoutError(
                 message="Maya compatibility server response probe timed out",

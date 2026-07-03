@@ -15,6 +15,7 @@ the bootstrap command itself returned.
 from __future__ import annotations
 
 import contextlib
+import pathlib
 import socketserver
 import sys
 import threading
@@ -24,7 +25,7 @@ from typing import Any
 
 import pytest
 
-from maya_mcp.maya_compat_server import _GLOBAL_HANDLE_NAME
+from maya_mcp.maya_compat_server import _GLOBAL_HANDLE_NAME, _bootstrap_marker_path
 from maya_mcp.transport.commandport import CommandPortClient
 
 # How long the fake Maya waits before running executeDeferred callbacks. Long
@@ -127,6 +128,7 @@ def broken_maya(monkeypatch: pytest.MonkeyPatch) -> Any:
             broken_server.shutdown()
             broken_server.server_close()
         serve_thread.join(timeout=2.0)
+        pathlib.Path(_bootstrap_marker_path(port)).unlink(missing_ok=True)
 
 
 def test_execute_recovers_from_broken_commandport_with_slow_deferred(broken_maya: Any) -> None:
@@ -145,6 +147,8 @@ def test_execute_recovers_from_broken_commandport_with_slow_deferred(broken_maya
         assert result == "recovered-output"
         # The built-in port was replaced, not worked around on another port.
         assert not broken_maya.builtin_port_open.is_set()
+        # Maya-side execution left the proof-of-execution marker behind.
+        assert pathlib.Path(_bootstrap_marker_path(broken_maya.port)).is_file()
 
         # The replacement listener keeps serving follow-up commands.
         assert client.execute("value = 40 + 2\nprint(value)") == "42"

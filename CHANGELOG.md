@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The compatibility bootstrap now writes a proof-of-execution marker file inside Maya, so a commandPort listener that accepts connections without executing anything (stale or half-dead port) produces an actionable "reopen the commandPort or restart Maya" error instead of a generic lost-connection failure.
 - Compatibility auto-bootstrap now delivers both bootstrap variants up front and polls the port for the replacement listener instead of probing once, so `maya.utils.executeDeferred` takeovers that finish after the first probe (busy Maya main loop) no longer abort the bootstrap.
 - Re-running the compatibility server bootstrap in the same Maya session now replaces the running compatibility server instead of colliding with it on the port bind.
 - Tightened Maya commandPort compatibility probing, switched auto-bootstrap to a short file-path import command, and deferred the Maya 2024 compatibility server port takeover so auto-bootstrap is not fooled by echoed commands or commandPort buffer limits and can rebind port 7001 after the built-in commandPort releases it.

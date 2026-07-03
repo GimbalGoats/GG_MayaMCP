@@ -9,9 +9,11 @@ is broken.
 import contextlib
 import errno
 import io
+import pathlib
 import socket
 import socketserver
 import sys
+import tempfile
 import threading
 import time
 import traceback
@@ -169,8 +171,24 @@ def start_compat_server(port=DEFAULT_PORT):
     print("Leave Maya running, then start the MCP server normally.")
 
 
+def _bootstrap_marker_path(port: int) -> str:
+    """Path of the marker file proving Maya executed the bootstrap command."""
+    return str(pathlib.Path(tempfile.gettempdir()) / f"maya_mcp_bootstrap_{port}.marker")
+
+
+def _write_bootstrap_marker(port: int) -> None:
+    with contextlib.suppress(OSError):
+        pathlib.Path(_bootstrap_marker_path(port)).write_text(
+            "maya-mcp compatibility bootstrap executed\n", encoding="utf-8"
+        )
+
+
 def bootstrap_compat_server(port=DEFAULT_PORT):
     """Start the compatibility server after the current Maya command returns."""
+    # Written before anything can fail: its existence tells the MCP-side client
+    # that Maya really executed this bootstrap (the transport cannot observe
+    # that over the broken commandPort response path).
+    _write_bootstrap_marker(port)
 
     def deferred_start():
         start_compat_server(port)

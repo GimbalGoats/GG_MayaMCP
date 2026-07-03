@@ -708,6 +708,8 @@ class TestCommandPortClientExecute:
     def test_bootstrap_requires_working_replacement_listener(self, monkeypatch) -> None:
         """Bootstrap success is verified with a post-reconnect probe."""
         monkeypatch.setattr(transport_module, "_COMPAT_BOOTSTRAP_PROBE_ATTEMPTS", 2)
+        # Maya executed the bootstrap (marker written), but the takeover failed.
+        monkeypatch.setattr(transport_module, "_compat_bootstrap_marker_exists", lambda _port: True)
         client = CommandPortClient(retry_base_delay=0.01)
 
         with (
@@ -754,6 +756,33 @@ class TestCommandPortClientExecute:
                 client.ensure_response_compatible()
 
         assert client.is_connected() is False
+
+    def test_bootstrap_without_marker_reports_dead_commandport(self, monkeypatch) -> None:
+        """A listener that never executes the bootstrap gets an actionable error."""
+        monkeypatch.setattr(transport_module, "_COMPAT_BOOTSTRAP_PROBE_ATTEMPTS", 1)
+        monkeypatch.setattr(
+            transport_module, "_compat_bootstrap_marker_exists", lambda _port: False
+        )
+        client = CommandPortClient(retry_base_delay=0.01)
+
+        with (
+            patch("socket.socket") as mock_socket_class,
+            patch("maya_mcp.transport.commandport.time.sleep"),
+        ):
+            # The dead listener accepts every connection and closes it
+            # immediately without reading or executing anything.
+            def dead_listener_socket() -> MagicMock:
+                dead_socket = MagicMock()
+                dead_socket.recv.return_value = b""
+                return dead_socket
+
+            mock_socket_class.side_effect = [dead_listener_socket() for _ in range(6)]
+
+            with pytest.raises(MayaUnavailableError, match="did not appear to execute") as exc_info:
+                client.ensure_response_compatible()
+
+        assert "not executing" in exc_info.value.message
+        assert "Reopen the commandPort" in exc_info.value.message
 
     def test_bootstrap_rejects_unexpected_probe_output(self, monkeypatch) -> None:
         """Post-bootstrap verification requires the exact probe token."""

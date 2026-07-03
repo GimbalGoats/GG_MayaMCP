@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import errno
 import importlib
+import pathlib
 import socket
 import sys
 import threading
@@ -163,12 +164,20 @@ def test_bootstrap_compat_server_defers_start_until_current_command_returns(monk
     monkeypatch.setitem(sys.modules, "maya.utils", maya_utils_module)
     monkeypatch.setattr(module, "start_compat_server", lambda port: start_calls.append(port))
 
-    module.bootstrap_compat_server(7001)
+    marker_path = pathlib.Path(module._bootstrap_marker_path(7001))
+    marker_path.unlink(missing_ok=True)
 
-    assert start_calls == []
-    assert len(deferred_calls) == 1
-    deferred_calls[0]()
-    assert start_calls == [7001]
+    try:
+        module.bootstrap_compat_server(7001)
+
+        assert start_calls == []
+        assert len(deferred_calls) == 1
+        # Proof-of-execution marker is written before the deferred start runs.
+        assert marker_path.is_file()
+        deferred_calls[0]()
+        assert start_calls == [7001]
+    finally:
+        marker_path.unlink(missing_ok=True)
 
 
 def test_close_builtin_commandport_closes_host_prefixed_port(monkeypatch: Any) -> None:
