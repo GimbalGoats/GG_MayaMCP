@@ -92,6 +92,29 @@ starts the compatibility server inside Maya, reconnects to the same
 Set `MAYA_MCP_DISABLE_COMPAT_BOOTSTRAP=1` before starting Maya MCP to disable
 automatic fallback.
 
+#### Manual compatibility server start
+
+The automatic fallback delivers its bootstrap *through* the built-in
+`commandPort`, so it can only work when Maya executes commands received on that
+port. If connecting fails with `Maya did not appear to execute the
+compatibility bootstrap`, the built-in port is accepting connections without
+executing anything, and no wire-delivered bootstrap can recover it. Start the
+compatibility server directly in Maya's Script Editor (Python tab) instead:
+
+```python
+import sys
+
+sys.path.insert(0, r"C:\path\to\GG_MayaMCP\src")  # source checkout; omit if maya-mcp is importable
+from maya_mcp import maya_compat_server
+
+maya_compat_server.start_compat_server(7001)
+```
+
+This closes any built-in `commandPort` on `:7001` and binds the compatibility
+server on `127.0.0.1:7001` immediately — no wire bootstrap involved. The Script
+Editor prints `Maya MCP compatibility server opened on localhost:7001` on
+success. Then connect the MCP server normally.
+
 ## 3. Start the MCP Server
 
 Installed package:
