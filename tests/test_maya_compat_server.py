@@ -117,6 +117,34 @@ def test_compat_server_reexecution_preserves_running_server_handle() -> None:
             module.stop_compat_server()
 
 
+def _load_fresh_compat_module_instance(name: str) -> ModuleType:
+    import importlib.util
+
+    import maya_mcp.maya_compat_server as compat_server
+
+    spec = importlib.util.spec_from_file_location(name, compat_server.__file__)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_start_compat_server_replaces_server_from_another_module_instance() -> None:
+    """Auto-bootstrap re-runs load fresh module instances; they must not collide."""
+    module_a = _load_fresh_compat_module_instance("_compat_instance_a")
+    module_b = _load_fresh_compat_module_instance("_compat_instance_b")
+
+    module_a.start_compat_server(0)
+    port = module_a._server.server_address[1]
+
+    try:
+        module_b.start_compat_server(port)
+        assert module_b._server.server_address[1] == port
+    finally:
+        module_b.stop_compat_server()
+        module_a.stop_compat_server()
+
+
 def test_bootstrap_compat_server_defers_start_until_current_command_returns(monkeypatch) -> None:
     """Auto-bootstrap avoids binding while Maya's built-in commandPort is active."""
     module = _load_compat_server_module()

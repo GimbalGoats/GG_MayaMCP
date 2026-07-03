@@ -319,7 +319,9 @@ class TestCommandPortClientExecute:
     def test_compat_bootstrap_uses_temp_file_when_source_path_is_unavailable(self) -> None:
         """A short temp-file command is available when module __file__ is missing."""
         with (
-            patch("maya_mcp.transport.commandport._get_compat_server_source_path", return_value=None),
+            patch(
+                "maya_mcp.transport.commandport._get_compat_server_source_path", return_value=None
+            ),
             patch(
                 "maya_mcp.transport.commandport._write_compat_server_bootstrap_file",
                 return_value="/tmp/maya_mcp_compat_bootstrap_test.py",
@@ -506,6 +508,8 @@ class TestCommandPortClientExecute:
                 TimeoutError(),  # Probe command returned no response
                 ConnectionResetError("closed"),  # Built-in commandPort closed during bootstrap
             ]
+            second_builtin_socket = MagicMock()
+            second_builtin_socket.recv.side_effect = [TimeoutError()]
             compat_socket = MagicMock()
             compat_socket.recv.side_effect = [
                 b"__maya_mcp_response_probe__",
@@ -513,12 +517,16 @@ class TestCommandPortClientExecute:
                 b"bootstrapped",
                 TimeoutError(),
             ]
-            mock_socket_class.side_effect = [broken_socket, compat_socket]
+            mock_socket_class.side_effect = [
+                broken_socket,
+                second_builtin_socket,
+                compat_socket,
+            ]
 
             result = client.execute("print('bootstrapped')")
 
         assert result == "bootstrapped"
-        assert mock_socket_class.call_count == 2
+        assert mock_socket_class.call_count == 3
         sent_commands = [
             call.args[0].decode("utf-8") for call in broken_socket.sendall.call_args_list
         ]
@@ -529,13 +537,17 @@ class TestCommandPortClientExecute:
         broken_timeouts = [call.args[0] for call in broken_socket.settimeout.call_args_list]
         assert client.config.command_timeout in broken_timeouts
         assert transport_module._COMPAT_BOOTSTRAP_RESPONSE_TIMEOUT_SECONDS in broken_timeouts
+        # Both bootstrap variants are delivered before probing the replacement.
+        assert "bootstrap_compat_server(port=7001)" in second_builtin_socket.sendall.call_args.args[
+            0
+        ].decode("utf-8")
         assert compat_socket.sendall.call_count == 2
         assert "__maya_mcp_response_probe__" not in compat_socket.sendall.call_args_list[0].args[
             0
         ].decode("utf-8")
-        assert "'__maya_mcp_' + 'response_probe__'" in compat_socket.sendall.call_args_list[
+        assert "'__maya_mcp_' + 'response_probe__'" in compat_socket.sendall.call_args_list[0].args[
             0
-        ].args[0].decode("utf-8")
+        ].decode("utf-8")
         assert "print('bootstrapped')" in compat_socket.sendall.call_args_list[1].args[0].decode(
             "utf-8"
         )
@@ -554,17 +566,23 @@ class TestCommandPortClientExecute:
                 TimeoutError(),
                 TimeoutError(),
             ]
+            second_builtin_socket = MagicMock()
+            second_builtin_socket.recv.side_effect = [TimeoutError()]
             compat_socket = MagicMock()
             compat_socket.recv.side_effect = [
                 b"__maya_mcp_response_probe__",
                 TimeoutError(),
             ]
-            mock_socket_class.side_effect = [echo_only_socket, compat_socket]
+            mock_socket_class.side_effect = [
+                echo_only_socket,
+                second_builtin_socket,
+                compat_socket,
+            ]
 
             result = client.ensure_response_compatible()
 
         assert result is True
-        assert mock_socket_class.call_count == 2
+        assert mock_socket_class.call_count == 3
         assert "bootstrap_compat_server(port=7001)" in echo_only_socket.sendall.call_args_list[
             1
         ].args[0].decode("utf-8")
@@ -623,6 +641,8 @@ class TestCommandPortClientExecute:
             eof_builtin_socket.recv.return_value = b""
             reopened_builtin_socket = MagicMock()
             reopened_builtin_socket.recv.side_effect = [TimeoutError()]
+            second_builtin_socket = MagicMock()
+            second_builtin_socket.recv.side_effect = [TimeoutError()]
             compat_socket = MagicMock()
             compat_socket.recv.side_effect = [
                 b"__maya_mcp_response_probe__",
@@ -632,13 +652,18 @@ class TestCommandPortClientExecute:
                 stale_socket,
                 eof_builtin_socket,
                 reopened_builtin_socket,
+                second_builtin_socket,
                 compat_socket,
             ]
 
             result = client.ensure_response_compatible()
 
         assert result is True
-        assert "bootstrap_compat_server(port=7001)" in reopened_builtin_socket.sendall.call_args.args[
+        assert (
+            "bootstrap_compat_server(port=7001)"
+            in reopened_builtin_socket.sendall.call_args.args[0].decode("utf-8")
+        )
+        assert "bootstrap_compat_server(port=7001)" in second_builtin_socket.sendall.call_args.args[
             0
         ].decode("utf-8")
 
@@ -654,6 +679,8 @@ class TestCommandPortClientExecute:
             eof_socket.recv.return_value = b""
             reopened_builtin_socket = MagicMock()
             reopened_builtin_socket.recv.side_effect = [TimeoutError()]
+            second_builtin_socket = MagicMock()
+            second_builtin_socket.recv.side_effect = [TimeoutError()]
             compat_socket = MagicMock()
             compat_socket.recv.side_effect = [
                 b"__maya_mcp_response_probe__",
@@ -664,6 +691,7 @@ class TestCommandPortClientExecute:
             mock_socket_class.side_effect = [
                 eof_socket,
                 reopened_builtin_socket,
+                second_builtin_socket,
                 compat_socket,
             ]
 
@@ -672,12 +700,14 @@ class TestCommandPortClientExecute:
         assert result == "ok"
         eof_socket.sendall.assert_called_once()
         reopened_builtin_socket.sendall.assert_called_once()
-        assert "bootstrap_compat_server(port=7001)" in reopened_builtin_socket.sendall.call_args.args[
-            0
-        ].decode("utf-8")
+        assert (
+            "bootstrap_compat_server(port=7001)"
+            in reopened_builtin_socket.sendall.call_args.args[0].decode("utf-8")
+        )
 
-    def test_bootstrap_requires_working_replacement_listener(self) -> None:
+    def test_bootstrap_requires_working_replacement_listener(self, monkeypatch) -> None:
         """Bootstrap success is verified with a post-reconnect probe."""
+        monkeypatch.setattr(transport_module, "_COMPAT_BOOTSTRAP_PROBE_ATTEMPTS", 2)
         client = CommandPortClient(retry_base_delay=0.01)
 
         with (
@@ -687,25 +717,28 @@ class TestCommandPortClientExecute:
             broken_socket = MagicMock()
             broken_socket.recv.side_effect = [
                 TimeoutError(),  # Probe command returned no response
-                TimeoutError(),  # Bootstrap command returned no response
+                TimeoutError(),  # MEL bootstrap command returned no response
             ]
-            still_broken_socket = MagicMock()
-            still_broken_socket.recv.side_effect = [TimeoutError()]
             raw_fallback_socket = MagicMock()
             raw_fallback_socket.recv.side_effect = [TimeoutError()]
-            still_broken_after_raw_socket = MagicMock()
-            still_broken_after_raw_socket.recv.side_effect = [TimeoutError()]
+            still_broken_socket = MagicMock()
+            still_broken_socket.recv.side_effect = [TimeoutError()]
+            still_broken_retry_socket = MagicMock()
+            still_broken_retry_socket.recv.side_effect = [TimeoutError()]
             mock_socket_class.side_effect = [
                 broken_socket,
-                still_broken_socket,
                 raw_fallback_socket,
-                still_broken_after_raw_socket,
+                still_broken_socket,
+                still_broken_retry_socket,
             ]
 
             with pytest.raises(MayaUnavailableError, match="did not produce command responses"):
                 client.ensure_response_compatible()
 
         assert mock_socket_class.call_count == 4
+        assert "bootstrap_compat_server(port=7001)" in raw_fallback_socket.sendall.call_args.args[
+            0
+        ].decode("utf-8")
 
     def test_bootstrap_send_failure_is_translated(self) -> None:
         """Bootstrap send failures clean up and return public Maya errors."""
@@ -722,8 +755,9 @@ class TestCommandPortClientExecute:
 
         assert client.is_connected() is False
 
-    def test_bootstrap_rejects_unexpected_probe_output(self) -> None:
+    def test_bootstrap_rejects_unexpected_probe_output(self, monkeypatch) -> None:
         """Post-bootstrap verification requires the exact probe token."""
+        monkeypatch.setattr(transport_module, "_COMPAT_BOOTSTRAP_PROBE_ATTEMPTS", 2)
         client = CommandPortClient(retry_base_delay=0.01)
 
         with (
@@ -733,18 +767,18 @@ class TestCommandPortClientExecute:
             broken_socket = MagicMock()
             broken_socket.recv.side_effect = [
                 TimeoutError(),  # Probe command returned no response
-                TimeoutError(),  # Bootstrap command returned no response
+                TimeoutError(),  # MEL bootstrap command returned no response
             ]
-            wrong_listener_socket = MagicMock()
-            wrong_listener_socket.recv.side_effect = [b"wrong listener", TimeoutError()]
             raw_fallback_socket = MagicMock()
             raw_fallback_socket.recv.side_effect = [TimeoutError()]
+            wrong_listener_socket = MagicMock()
+            wrong_listener_socket.recv.side_effect = [b"wrong listener", TimeoutError()]
             still_wrong_listener_socket = MagicMock()
             still_wrong_listener_socket.recv.side_effect = [b"wrong listener", TimeoutError()]
             mock_socket_class.side_effect = [
                 broken_socket,
-                wrong_listener_socket,
                 raw_fallback_socket,
+                wrong_listener_socket,
                 still_wrong_listener_socket,
             ]
 

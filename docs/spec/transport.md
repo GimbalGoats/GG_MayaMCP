@@ -180,11 +180,14 @@ The automatic fallback:
 - sends a packaged compatibility server bootstrap through the built-in
   `commandPort` when the probe also returns empty
 - supports both Python-source commandPorts and bare default MEL commandPorts by
-  trying a MEL `python(...)` bootstrap first, then a raw Python bootstrap
+  sending a MEL `python(...)` bootstrap and a raw Python bootstrap; the
+  wrong-interpreter variant only produces a harmless error inside Maya
 - closes the built-in `commandPort` on the chosen port inside Maya
 - reconnects to the same host and port
-- verifies the replacement listener with another response probe before sending
-  the user command
+- polls the port with response probes until the replacement listener answers;
+  the takeover runs through `maya.utils.executeDeferred`, so it completes only
+  once Maya's main loop goes idle and can take several seconds on a busy
+  session
 
 Set `MAYA_MCP_DISABLE_COMPAT_BOOTSTRAP=1` to disable automatic fallback.
 

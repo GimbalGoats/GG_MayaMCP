@@ -23,8 +23,21 @@ COMMAND_IDLE_TIMEOUT = 0.05
 BIND_RETRY_ATTEMPTS = 30
 BIND_RETRY_DELAY_SECONDS = 0.1
 
-_server = globals().get("_server")
-_server_thread = globals().get("_server_thread")
+# Auto-bootstrap can execute this module more than once in the same Maya
+# session, each time as a fresh module instance. The running server handle is
+# registered on ``sys`` so any instance can stop the previous server instead of
+# colliding with it on the port bind.
+_GLOBAL_HANDLE_NAME = "_maya_mcp_compat_server_handle"
+
+
+def _registered_handle():
+    handle = getattr(sys, _GLOBAL_HANDLE_NAME, None)
+    if isinstance(handle, tuple) and len(handle) == 2:
+        return handle
+    return (None, None)
+
+
+_server, _server_thread = _registered_handle()
 _execution_globals = {
     "__name__": "__maya_mcp_compat_server__",
     "__builtins__": __builtins__,
@@ -150,6 +163,7 @@ def start_compat_server(port=DEFAULT_PORT):
     _server_thread = threading.Thread(target=_server.serve_forever)
     _server_thread.daemon = True
     _server_thread.start()
+    setattr(sys, _GLOBAL_HANDLE_NAME, (_server, _server_thread))
 
     print(f"Maya MCP compatibility server opened on localhost:{port}")
     print("Leave Maya running, then start the MCP server normally.")
@@ -174,11 +188,16 @@ def stop_compat_server():
     """Stop the compatibility server if it is running."""
     global _server, _server_thread
 
-    if _server is None:
+    server, _thread = _registered_handle()
+    if server is None:
+        server = _server
+    if server is None:
         return
 
-    _server.shutdown()
-    _server.server_close()
+    server.shutdown()
+    server.server_close()
+    with contextlib.suppress(AttributeError):
+        delattr(sys, _GLOBAL_HANDLE_NAME)
     _server = None
     _server_thread = None
     print("Maya MCP compatibility server stopped")
@@ -186,7 +205,8 @@ def stop_compat_server():
 
 def compat_server_status():
     """Return and print whether the compatibility server is running."""
-    running = _server is not None
+    server, _thread = _registered_handle()
+    running = server is not None or _server is not None
     status = "running" if running else "stopped"
     print(f"Maya MCP compatibility server is {status}")
     return running

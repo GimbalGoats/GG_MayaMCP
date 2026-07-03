@@ -56,8 +56,12 @@ logger = logging.getLogger(__name__)
 BUFFER_SIZE = 65536
 _COMPAT_PROBE_TOKEN = "__maya_mcp_response_probe__"
 _COMPAT_PROBE_COMMAND = "print('__maya_mcp_' + 'response_probe__')"
-_COMPAT_BOOTSTRAP_DELAY_SECONDS = 0.2
 _COMPAT_BOOTSTRAP_RESPONSE_TIMEOUT_SECONDS = 2.0
+# The bootstrap starts the compat server through maya.utils.executeDeferred,
+# which only runs once Maya's main loop goes idle. Poll the port instead of
+# probing once so a busy Maya still gets a chance to complete the takeover.
+_COMPAT_BOOTSTRAP_PROBE_ATTEMPTS = 12
+_COMPAT_BOOTSTRAP_PROBE_DELAY_SECONDS = 0.5
 _COMPAT_BOOTSTRAP_DISABLE_ENV = "MAYA_MCP_DISABLE_COMPAT_BOOTSTRAP"
 
 
@@ -202,10 +206,7 @@ def _write_compat_server_bootstrap_file(port: int) -> str:
 
 def _build_python_file_exec_command(path: str) -> str:
     """Build a short Python command that executes a source file by path."""
-    return (
-        f"exec(compile(open({path!r}, encoding='utf-8').read(), "
-        f"{path!r}, 'exec'))"
-    )
+    return f"exec(compile(open({path!r}, encoding='utf-8').read(), {path!r}, 'exec'))"
 
 
 def _get_compat_server_source_path() -> str | None:
@@ -444,6 +445,7 @@ class CommandPortClient:
         with self._lock:
             was_connected = self._socket is not None
             self._cleanup_socket()
+            self._compat_bootstrap_attempted = False
             self.state.status = ConnectionStatus.OFFLINE
             if was_connected:
                 logger.info("Disconnected from Maya")
@@ -698,10 +700,31 @@ class CommandPortClient:
             "Maya commandPort returned empty responses; attempting compatibility server bootstrap"
         )
 
-        last_probe_error = "Compatibility bootstrap did not produce command responses"
+        self._send_compat_bootstrap_commands()
+        return self._await_compat_server()
+
+    def _send_compat_bootstrap_commands(self) -> None:
+        """Send every bootstrap variant through the (broken) built-in commandPort.
+
+        The MEL variant covers bare default MEL commandPorts and the Python
+        variant covers ``sourceType="python"`` ports. The wrong-interpreter
+        variant only produces a syntax/name error inside Maya, so both are sent
+        before waiting for the compat server takeover. Each command usually
+        kills its connection (Maya's broken response writer), so the socket is
+        re-established between sends.
+        """
         bootstrap_commands = _build_compat_server_bootstrap_commands(self.config.port)
 
         for bootstrap_command in bootstrap_commands:
+            if self._socket is None:
+                try:
+                    self.connect()
+                except MayaUnavailableError as exc:
+                    # The port may already be mid-takeover from a previous
+                    # bootstrap command; let the probe polling decide.
+                    logger.debug("Could not reconnect to send bootstrap variant: %s", exc)
+                    return
+
             try:
                 self._send_command(
                     bootstrap_command,
@@ -721,64 +744,78 @@ class CommandPortClient:
                 pass
 
             self._cleanup_socket()
-            time.sleep(_COMPAT_BOOTSTRAP_DELAY_SECONDS)
-            self.connect()
+
+    def _await_compat_server(self) -> bool:
+        """Poll the configured port until the compat server answers the probe."""
+        failure_kind = "empty"
+        failure_detail = "Compatibility bootstrap did not produce command responses"
+
+        for _ in range(_COMPAT_BOOTSTRAP_PROBE_ATTEMPTS):
+            time.sleep(_COMPAT_BOOTSTRAP_PROBE_DELAY_SECONDS)
+
+            if self._socket is None:
+                try:
+                    self.connect()
+                except MayaUnavailableError as exc:
+                    failure_kind = "connection"
+                    failure_detail = str(exc.last_error or exc)
+                    continue
 
             try:
                 probe_response = self._send_command(
                     _COMPAT_PROBE_COMMAND,
-                    response_timeout=self.config.command_timeout,
+                    response_timeout=_COMPAT_BOOTSTRAP_RESPONSE_TIMEOUT_SECONDS,
                 )
-            except TimeoutError as exc:
+            except TimeoutError:
                 self._handle_socket_error()
-                last_probe_error = "Maya compatibility server response probe timed out"
-                if bootstrap_command == bootstrap_commands[-1]:
-                    raise MayaTimeoutError(
-                        message="Maya compatibility server response probe timed out",
-                        timeout_seconds=self.config.command_timeout,
-                        operation="compatibility bootstrap",
-                    ) from exc
-                self.connect()
+                failure_kind = "timeout"
+                failure_detail = "Maya compatibility server response probe timed out"
                 continue
             except OSError as exc:
                 self._handle_socket_error()
-                last_probe_error = str(exc)
-                if bootstrap_command == bootstrap_commands[-1]:
-                    raise MayaUnavailableError(
-                        message="Lost connection to Maya compatibility server after bootstrap",
-                        host=self.config.host,
-                        port=self.config.port,
-                        attempts=0,
-                        last_error=str(exc),
-                    ) from exc
-                self.connect()
+                failure_kind = "connection"
+                failure_detail = str(exc)
                 continue
 
             if _is_compat_probe_response(probe_response):
                 self._response_compatibility_checked = True
+                # Allow a fresh bootstrap if this Maya session later restarts
+                # with a broken commandPort again.
+                self._compat_bootstrap_attempted = False
                 return True
 
             self._handle_socket_error()
-            last_probe_error = (
-                probe_response or "Empty response after compatibility server bootstrap"
-            )
-            if bootstrap_command != bootstrap_commands[-1]:
-                self.connect()
-                continue
+            if probe_response:
+                failure_kind = "unexpected"
+                failure_detail = probe_response
+            else:
+                failure_kind = "empty"
+                failure_detail = "Empty response after compatibility server bootstrap"
 
-        unexpected_probe = not last_probe_error.startswith(
-            ("Compatibility bootstrap", "Empty response", "Maya compatibility server")
-        )
+        if failure_kind == "timeout":
+            raise MayaTimeoutError(
+                message="Maya compatibility server response probe timed out",
+                timeout_seconds=_COMPAT_BOOTSTRAP_RESPONSE_TIMEOUT_SECONDS,
+                operation="compatibility bootstrap",
+            )
+        if failure_kind == "connection":
+            raise MayaUnavailableError(
+                message="Lost connection to Maya compatibility server after bootstrap",
+                host=self.config.host,
+                port=self.config.port,
+                attempts=0,
+                last_error=failure_detail,
+            )
         raise MayaUnavailableError(
             message=(
                 "Maya compatibility server bootstrap returned unexpected probe output"
-                if unexpected_probe
+                if failure_kind == "unexpected"
                 else "Maya compatibility server bootstrap did not produce command responses"
             ),
             host=self.config.host,
             port=self.config.port,
             attempts=0,
-            last_error=last_probe_error,
+            last_error=failure_detail,
         )
 
     def _compat_bootstrap_disabled(self) -> bool:
@@ -876,8 +913,11 @@ class CommandPortClient:
             with contextlib.suppress(OSError):
                 self._socket.close()
             self._socket = None
+            # A new connection may reach a different Maya session, so re-probe.
+            # The bootstrap-attempted guard intentionally survives socket
+            # cleanup: it must block repeated bootstrap attempts across the
+            # reconnects that happen inside the bootstrap flow itself.
             self._response_compatibility_checked = False
-            self._compat_bootstrap_attempted = False
 
     def _handle_socket_error(self) -> None:
         """Handle a socket error by cleaning up and updating state."""
