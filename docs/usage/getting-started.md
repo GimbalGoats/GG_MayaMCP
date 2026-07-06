@@ -60,7 +60,7 @@ except RuntimeError:
 cmds.commandPort(
     name=":7001",
     sourceType="python",
-    echoOutput=True,
+    echoOutput=False,
     noreturn=False,
     bufferSize=16384,
 )
@@ -68,26 +68,29 @@ cmds.commandPort(
 
 This opens the default port that Maya MCP expects: `localhost:7001`.
 
+Keep `echoOutput=False`. On Python 3 (Maya 2022+) Autodesk's `CommandPort.py`
+crashes with `echoOutput=True` before it runs your command, so the port accepts
+connections but executes nothing. Maya MCP's compatibility server captures
+command output on its own, so echo is unnecessary.
+
 If you prefer using the helper script from this repo, use `scripts/enable_commandport.py`.
 
 ### Maya 2022/2024 compatibility workaround
 
-Some Maya 2022 and Maya 2024 installs have a Python 3 bug in Autodesk's
-`CommandPort.py` response writer. The usual symptom is that `maya.connect`
-succeeds, but tools such as `scene.info`, `nodes.list`, or `selection.get`
-return empty responses while Maya's Script Editor logs:
+Maya 2022 and Maya 2024 run Python 3, where Autodesk's `CommandPort.py` cannot
+return `print()` output to the client. With `echoOutput=True` the port crashes
+before running your command (Script Editor logs
+`TypeError: a bytes-like object is required, not 'str'`), so it accepts
+connections but executes nothing — always open the port with `echoOutput=False`
+as shown above. Even then, the built-in port returns only each statement's
+result, not captured stdout, and Maya MCP's tools communicate via
+`print(json.dumps(...))`.
 
-```text
-TypeError: a bytes-like object is required, not 'str'
-```
-
-For those versions, open the built-in `commandPort` normally. The recommended
-setup above uses `sourceType="python"`, but the automatic fallback also supports
-a bare default port opened with only `cmds.commandPort(name=":7001")`, which
-Maya treats as MEL. If Maya accepts commands but returns empty responses, Maya
-MCP sends a packaged bootstrap command through the built-in `commandPort`,
-starts the compatibility server inside Maya, reconnects to the same
-`localhost:7001` port, verifies responses, and then sends the requested command.
+To bridge that, Maya MCP sends a packaged bootstrap command through the built-in
+`commandPort`, starts a compatibility server inside Maya that captures
+stdout/stderr directly, reconnects to the same `localhost:7001` port, verifies
+responses, and then sends the requested command. This is automatic; you only
+need to open the port with `echoOutput=False`.
 
 Set `MAYA_MCP_DISABLE_COMPAT_BOOTSTRAP=1` before starting Maya MCP to disable
 automatic fallback.

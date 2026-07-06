@@ -88,12 +88,16 @@ def _start_command_port() -> None:
         print(f"[MCP] commandPort already open on {port_name}")
         return
 
-    # Open the port
+    # Open the port. echoOutput must be False: on Python 3 (Maya 2022+)
+    # Autodesk's CommandPort.py crashes while flushing its echo queue (it writes
+    # str to a binary socket) before the received command runs, so an
+    # echoOutput=True port accepts connections but executes nothing. The MCP
+    # compatibility server captures command output without relying on echo.
     try:
         cmds.commandPort(
             name=port_name,
             sourceType="python",
-            echoOutput=True,
+            echoOutput=False,
         )
         print(f"[MCP] commandPort opened on {port_name}")
     except RuntimeError as e:

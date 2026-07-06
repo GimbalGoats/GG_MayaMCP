@@ -34,18 +34,25 @@ def enable_commandport(port: int = 7001, source_type: str = "python") -> None:
     except RuntimeError:
         pass
 
-    # Open new commandPort
+    # Open new commandPort.
+    #
+    # echoOutput MUST be False. On Python 3 (Maya 2022+) Autodesk's
+    # CommandPort.py crashes while flushing its echo queue -- it writes str to a
+    # binary socket -- at the top of every connection, before the received
+    # command runs, which makes the port accept connections but silently execute
+    # nothing. The Maya MCP compatibility server captures command output itself,
+    # so echo is not needed.
     cmds.commandPort(
         name=port_name,
         sourceType=source_type,
-        echoOutput=True,
+        echoOutput=False,
         noreturn=False,
         bufferSize=16384,
     )
 
     print(f"commandPort opened on localhost{port_name}")
     print(f"  Source type: {source_type}")
-    print("  Echo output: enabled")
+    print("  Echo output: disabled (required for Python 3 / Maya 2022+)")
     print()
     print("Maya MCP server can now connect to Maya.")
     print(f"To disable: cmds.commandPort(name=':{port}', close=True)")

@@ -268,6 +268,44 @@ def test_create_compat_server_retries_while_commandport_releases_port(monkeypatc
     ]
 
 
+def test_create_compat_server_retries_windows_access_denied(monkeypatch) -> None:
+    """Windows refuses the rebind with WSAEACCES (10013) during socket teardown."""
+    module = _load_compat_server_module()
+    attempts = []
+    fake_server = object()
+
+    def server_factory(*_args):
+        attempts.append(None)
+        if len(attempts) < 3:
+            # PermissionError is what Python raises for WSAEACCES; carry the
+            # Windows-native code on ``winerror`` as it appears in the wild.
+            exc = PermissionError(errno.EACCES, "forbidden by access permissions")
+            exc.winerror = 10013
+            raise exc
+        return fake_server
+
+    monkeypatch.setattr(module, "_ReusableThreadingTCPServer", server_factory)
+    monkeypatch.setattr(module.time, "sleep", lambda _seconds: None)
+
+    assert module._create_compat_server(7001) is fake_server
+    assert len(attempts) == 3
+
+
+def test_is_address_in_use_recognizes_teardown_errors() -> None:
+    """Both the address-in-use and access-denied teardown codes are retryable."""
+    module = _load_compat_server_module()
+
+    assert module._is_address_in_use(OSError(errno.EADDRINUSE, "in use"))
+    assert module._is_address_in_use(OSError(10048, "WSAEADDRINUSE"))
+    assert module._is_address_in_use(OSError(10013, "WSAEACCES"))
+    assert module._is_address_in_use(OSError(errno.EACCES, "access"))
+    winerror_exc = OSError(errno.EACCES, "access")
+    winerror_exc.winerror = 10013
+    assert module._is_address_in_use(winerror_exc)
+    # An unrelated error must not be retried.
+    assert not module._is_address_in_use(OSError(errno.ECONNREFUSED, "refused"))
+
+
 def test_compat_server_returns_tracebacks() -> None:
     """Execution failures are returned to the client instead of killing the handler."""
     module = _load_compat_server_module()

@@ -158,27 +158,34 @@ except RuntimeError:
 cmds.commandPort(
     name=":7001",
     sourceType="python",
-    echoOutput=True,
+    echoOutput=False,
     noreturn=False,
     bufferSize=16384,
 )
 ```
 
+`echoOutput` must be `False`. On Python 3 (Maya 2022+) Autodesk's
+`CommandPort.py` crashes while flushing its echo queue — it writes `str` to a
+binary socket — at the top of every connection, *before* the received command
+runs, so an `echoOutput=True` port accepts connections but executes nothing. The
+compatibility server captures command output itself and does not need echo.
+
 ## Maya 2022/2024 Compatibility Server
 
-Maya MCP can automatically start its compatibility server when the built-in
-`commandPort` accepts commands but returns empty responses because Maya logs
-this Autodesk-side response error:
-
-```text
-TypeError: a bytes-like object is required, not 'str'
-```
+On Python 3 (Maya 2022+) the built-in `commandPort` cannot return `print()`
+output to the client. With `echoOutput=True` Autodesk's `CommandPort.py` crashes
+before running the command at all (see the recommended setup above); with the
+required `echoOutput=False` it runs commands but only returns each statement's
+*result*, not captured stdout. Maya MCP's tool protocol relies on
+`print(json.dumps(...))`, so the transport starts a packaged compatibility server
+inside Maya that captures stdout/stderr directly.
 
 The automatic fallback:
 
 - sends a small response probe before user commands
 - sends a packaged compatibility server bootstrap through the built-in
-  `commandPort` when the probe also returns empty
+  `commandPort` when the probe returns empty (the expected result on an
+  `echoOutput=False` port)
 - supports both Python-source commandPorts and bare default MEL commandPorts by
   sending a MEL `python(...)` bootstrap and a raw Python bootstrap; the
   wrong-interpreter variant only produces a harmless error inside Maya
@@ -188,6 +195,10 @@ The automatic fallback:
   the takeover runs through `maya.utils.executeDeferred`, so it completes only
   once Maya's main loop goes idle and can take several seconds on a busy
   session
+- retries its port bind through the Windows socket-teardown window: right after
+  the built-in `commandPort` closes, Windows can refuse the rebind with
+  `WSAEACCES` (10013) or `WSAEADDRINUSE` (10048) until the old socket is fully
+  released, so the bind is retried on both
 - distinguishes a dead listener from a broken response writer: the bootstrap
   writes a proof-of-execution marker file in the shared temp directory, and a
   missing marker after all probes fail produces an explicit "commandPort is not

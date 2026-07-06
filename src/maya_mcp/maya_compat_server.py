@@ -22,7 +22,7 @@ DEFAULT_PORT = 7001
 BUFFER_SIZE = 65536
 INITIAL_COMMAND_TIMEOUT = 30.0
 COMMAND_IDLE_TIMEOUT = 0.05
-BIND_RETRY_ATTEMPTS = 30
+BIND_RETRY_ATTEMPTS = 50
 BIND_RETRY_DELAY_SECONDS = 0.1
 
 # Auto-bootstrap can execute this module more than once in the same Maya
@@ -133,7 +133,15 @@ def _close_builtin_commandport(port):
 
 
 def _is_address_in_use(exc):
-    return getattr(exc, "errno", None) in {errno.EADDRINUSE, 10048}
+    # Retry the bind while a prior socket on the same port is still tearing down.
+    # Windows returns WSAEADDRINUSE (10048) while the old socket is still bound
+    # and WSAEACCES (10013) during teardown even with SO_REUSEADDR set -- which is
+    # exactly the window right after closing Maya's built-in commandPort. Python
+    # may surface these as the raw WSA code in errno/winerror or as the mapped
+    # POSIX errno (EADDRINUSE / EACCES), so check every form.
+    err = getattr(exc, "errno", None)
+    winerr = getattr(exc, "winerror", None)
+    return err in {errno.EADDRINUSE, errno.EACCES, 10048, 10013} or winerr in {10048, 10013}
 
 
 def _create_compat_server(port):
