@@ -23,7 +23,9 @@ Example:
 
 Note:
     This module does NOT import any Maya modules. All communication
-    happens via TCP socket.
+    happens via TCP socket. The commandPort must be opened with
+    ``echoOutput=False`` (see ``_wrap_command`` for why); commands are wrapped
+    so their stdout returns over the port's value channel.
 """
 
 from __future__ import annotations
@@ -71,18 +73,15 @@ def _is_noise_line(part: str) -> bool:
 def _parse_maya_response(raw_response: str) -> str:
     """Parse Maya commandPort response to extract the actual output.
 
-    Maya's commandPort with echoOutput=True returns responses in a format like::
+    With commands wrapped by ``_wrap_command`` the port returns the captured
+    stdout as the expression value, framed with null bytes/newlines, e.g.::
 
-        'None\\n\\x00<actual_output>\\n\\x00\\n\\n\\x00'
+        '{"success": true}\\n\\n\\x00'
 
-    With echoOutput=True, Maya may echo the output twice, resulting in::
-
-        '{"success": true}\\n{"success": true}'
-
-    Some Maya commands (e.g. ``cmds.file()``) produce their own output before
-    our ``print(json.dumps(result))`` statement.  In those cases the response
-    contains multiple non-empty parts and the JSON payload may not be the first
-    one.
+    This helper stays defensive: it also tolerates the older ``echoOutput=True``
+    shapes (a leading ``None`` return value, duplicated JSON, or Maya log lines
+    interleaved before the payload) so callers get the JSON regardless of which
+    part of the stream it lands in.
 
     Strategy:
         1. Split by null bytes / newlines, strip whitespace, drop empty / "None".
@@ -140,6 +139,57 @@ def _parse_maya_response(raw_response: str) -> str:
     # useful lines preserves command output when Maya logs unrelated text on the
     # same commandPort stream.
     return "\n".join(dict.fromkeys(filtered))
+
+
+def _wrap_command(command: str) -> str:
+    """Wrap a Python command so its stdout returns over the commandPort.
+
+    The commandPort must be opened with ``echoOutput=False``. On Maya 2024
+    (Python 3) opening it with ``echoOutput=True`` bricks the port: Maya's
+    ``CommandPort.py`` drains a command-output queue and writes a ``str`` to a
+    binary socket, raising ``TypeError`` before the command ever runs, and the
+    crash re-poisons the shared queue faster than it drains. ``echoOutput=False``
+    bypasses that broken echo path entirely.
+
+    The catch is that with ``echoOutput=False`` the port no longer echoes stdout,
+    and every tool delivers its result via ``print(json.dumps(result))``. The
+    port still has a *return-value channel*, but only for a **single expression**
+    — a multi-statement block executes and returns ``None``, and each command
+    runs in a fresh namespace, so a persistent helper is not an option.
+
+    So we fold the whole command into one expression: an ``exec`` of the original
+    (multi-statement) code, run inside a throwaway namespace, with stdout
+    redirected to a buffer whose contents become the expression's value. The
+    original code is embedded verbatim via ``repr`` (safe escaping, single
+    physical line, and — unlike base64 — it keeps literal substrings intact for
+    tests and logs). stdout is restored in a ``finally`` so a raising command
+    cannot leave Maya's stdout hijacked; the exception then propagates and Maya
+    returns its message, which the caller surfaces as a parse failure.
+
+    Args:
+        command: The Python command to run in Maya (ends in ``print(...)``).
+
+    Returns:
+        A single-expression Python string to send over the commandPort.
+    """
+    body_lines = command.splitlines() or ["pass"]
+    inner = (
+        "import sys as __mcp_sys, io as __mcp_io\n"
+        "__mcp_buf = __mcp_io.StringIO()\n"
+        "__mcp_old = __mcp_sys.stdout\n"
+        "__mcp_sys.stdout = __mcp_buf\n"
+        "try:\n"
+        + "".join(f"    {line}\n" for line in body_lines)
+        + "finally:\n"
+        "    __mcp_sys.stdout = __mcp_old\n"
+        "__mcp_result__ = __mcp_buf.getvalue()\n"
+    )
+    return (
+        "(lambda __mcp_ns: (exec(compile("
+        + repr(inner)
+        + ", '<maya-mcp>', 'exec'), __mcp_ns), "
+        "__mcp_ns.get('__mcp_result__', ''))[1])({})"
+    )
 
 
 def get_client() -> CommandPortClient:
@@ -386,11 +436,17 @@ class CommandPortClient:
             command = command.strip()
             logger.debug("Executing command (%d chars)", len(command))
 
-            # Maya commandPort requires a newline to execute the command
-            if not command.endswith("\n"):
-                command += "\n"
+            # Wrap so the command's stdout returns over the commandPort's
+            # value channel. Required because the port is opened with
+            # echoOutput=False (Maya 2024 bricks with echoOutput=True). See
+            # _wrap_command for the full rationale.
+            wire_command = _wrap_command(command)
 
-            command_bytes = command.encode("utf-8")
+            # Maya commandPort requires a newline to execute the command
+            if not wire_command.endswith("\n"):
+                wire_command += "\n"
+
+            command_bytes = wire_command.encode("utf-8")
             self._socket.sendall(command_bytes)
             send_completed = True
 

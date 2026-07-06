@@ -97,7 +97,9 @@ If it expires, Maya MCP raises `MayaTimeoutError`.
 
 ## Response Handling
 
-Maya `commandPort` can echo output, include null bytes, or return duplicate JSON fragments when `echoOutput=True`.
+The commandPort is opened with `echoOutput=False` (see [Maya 2024 note](#maya-2024-echooutput)). With echo disabled the port does not stream stdout back, so the transport wraps every command as a single expression that captures the command's stdout and returns it over the port's value channel. Tool code is unchanged — it still ends in `print(json.dumps(result))`.
+
+Responses can still include null bytes, and the parser also tolerates the older `echoOutput=True` shapes (leading `None`, duplicate JSON, interleaved Maya log lines).
 
 The transport normalizes that noise before tool code sees the result:
 
@@ -150,11 +152,15 @@ except RuntimeError:
 cmds.commandPort(
     name=":7001",
     sourceType="python",
-    echoOutput=True,
+    echoOutput=False,
     noreturn=False,
     bufferSize=16384,
 )
 ```
+
+### Maya 2024 `echoOutput`
+
+`echoOutput` **must** be `False`. On Maya 2024 (Python 3), opening the port with `echoOutput=True` bricks it: Maya's `CommandPort.py` drains a command-output queue and writes a `str` to the binary socket, raising `TypeError` before the command runs, and the crash re-poisons the shared queue faster than it drains. The port then accepts connections but executes nothing. `echoOutput=False` bypasses that path; the transport captures stdout itself (see [Response Handling](#response-handling)).
 
 ## Operational Notes
 

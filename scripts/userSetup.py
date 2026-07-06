@@ -88,12 +88,13 @@ def _start_command_port() -> None:
         print(f"[MCP] commandPort already open on {port_name}")
         return
 
-    # Open the port
+    # Open the port. echoOutput MUST be False: echoOutput=True bricks the port
+    # on Maya 2024 (Python 3). The MCP server captures stdout itself.
     try:
         cmds.commandPort(
             name=port_name,
             sourceType="python",
-            echoOutput=True,
+            echoOutput=False,
         )
         print(f"[MCP] commandPort opened on {port_name}")
     except RuntimeError as e:

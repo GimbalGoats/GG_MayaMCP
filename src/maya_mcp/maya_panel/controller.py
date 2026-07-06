@@ -67,7 +67,7 @@ def is_command_port_open(port: int = DEFAULT_PORT) -> bool:
 def open_command_port(
     port: int = DEFAULT_PORT,
     source_type: str = "python",
-    echo_output: bool = True,
+    echo_output: bool = False,
 ) -> bool:
     """Open Maya's commandPort on the specified port.
 
@@ -76,7 +76,9 @@ def open_command_port(
     Args:
         port: Port number to open (1-65535).
         source_type: Command interpreter ("python" or "mel").
-        echo_output: If True, send command output back to client.
+        echo_output: Whether Maya echoes command stdout back over the port.
+            Must stay False: echoOutput=True bricks the port on Maya 2024. The
+            MCP server captures stdout itself, so echo is not needed.
 
     Returns:
         True if the port is now open (either opened or was already open).

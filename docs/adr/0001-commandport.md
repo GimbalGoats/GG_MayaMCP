@@ -90,11 +90,13 @@ except RuntimeError:
 cmds.commandPort(
     name=":7001",
     sourceType="python",
-    echoOutput=True,
+    echoOutput=False,
     noreturn=False,
     bufferSize=16384,
 )
 ```
+
+`echoOutput` must be `False`: on Maya 2024 `echoOutput=True` bricks the port. The transport wraps commands to return stdout over the port's value channel instead.
 
 ## Related Documents
 

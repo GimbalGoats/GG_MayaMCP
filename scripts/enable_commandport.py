@@ -34,18 +34,21 @@ def enable_commandport(port: int = 7001, source_type: str = "python") -> None:
     except RuntimeError:
         pass
 
-    # Open new commandPort
+    # Open new commandPort.
+    # echoOutput MUST be False: on Maya 2024 (Python 3) echoOutput=True bricks
+    # the port (a str is written to the binary socket before the command runs).
+    # The MCP server captures stdout itself, so echo is not needed.
     cmds.commandPort(
         name=port_name,
         sourceType=source_type,
-        echoOutput=True,
+        echoOutput=False,
         noreturn=False,
         bufferSize=16384,
     )
 
     print(f"commandPort opened on localhost{port_name}")
     print(f"  Source type: {source_type}")
-    print("  Echo output: enabled")
+    print("  Echo output: disabled (required for Maya 2024)")
     print()
     print("Maya MCP server can now connect to Maya.")
     print(f"To disable: cmds.commandPort(name=':{port}', close=True)")

@@ -82,11 +82,13 @@ except RuntimeError:
 cmds.commandPort(
     name=":7001",
     sourceType="python",
-    echoOutput=True,
+    echoOutput=False,
     noreturn=False,
     bufferSize=16384,
 )
 ```
+
+> `echoOutput` must stay `False` — `echoOutput=True` bricks the port on Maya 2024.
 
 3. Start the server
 

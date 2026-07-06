@@ -94,11 +94,13 @@ except RuntimeError:
 cmds.commandPort(
     name=":7001",
     sourceType="python",
-    echoOutput=True,
+    echoOutput=False,
     noreturn=False,
     bufferSize=16384,
 )
 ```
+
+> Keep `echoOutput=False` — `echoOutput=True` bricks the port on Maya 2024.
 
 The port number must match the Claude Desktop extension setting.
 

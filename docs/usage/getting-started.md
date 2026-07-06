@@ -60,13 +60,19 @@ except RuntimeError:
 cmds.commandPort(
     name=":7001",
     sourceType="python",
-    echoOutput=True,
+    echoOutput=False,
     noreturn=False,
     bufferSize=16384,
 )
 ```
 
 This opens the default port that Maya MCP expects: `localhost:7001`.
+
+!!! warning "Keep `echoOutput=False`"
+    On Maya 2024, opening the port with `echoOutput=True` bricks it — the port
+    accepts connections but never executes commands. Maya MCP captures command
+    output itself, so echo is not needed. Always open the port with
+    `echoOutput=False`.
 
 If you prefer using the helper script from this repo, use `scripts/enable_commandport.py`.
 

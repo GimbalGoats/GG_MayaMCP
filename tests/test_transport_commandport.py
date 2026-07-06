@@ -10,6 +10,8 @@ These tests verify the CommandPortClient's behavior including:
 
 from __future__ import annotations
 
+import json
+import sys
 import threading
 from unittest.mock import MagicMock, patch
 
@@ -17,7 +19,11 @@ import pytest
 
 import maya_mcp.transport.commandport as transport_module
 from maya_mcp.errors import MayaTimeoutError, MayaUnavailableError
-from maya_mcp.transport.commandport import CommandPortClient, _parse_maya_response
+from maya_mcp.transport.commandport import (
+    CommandPortClient,
+    _parse_maya_response,
+    _wrap_command,
+)
 from maya_mcp.types import ConnectionConfig, ConnectionStatus
 
 
@@ -96,6 +102,59 @@ class TestParseMayaResponse:
         raw_response = "None\n\x00first\n\x00second\n\x00first\n\x00"
 
         assert _parse_maya_response(raw_response) == "first\nsecond"
+
+
+class TestWrapCommand:
+    """Tests for _wrap_command.
+
+    The wrapper is pure Python, so evaluating it in-process reproduces exactly
+    what Maya's commandPort does: it evaluates the wrapper expression and the
+    result value is what returns over the socket. That value must be the
+    command's captured stdout.
+    """
+
+    def test_wrapped_is_a_single_physical_line(self) -> None:
+        """The wire command must be one expression (the port only returns one)."""
+        wrapped = _wrap_command("import json\nprint(json.dumps({'a': 1}))")
+        assert "\n" not in wrapped
+
+    def test_wrapped_returns_captured_stdout(self) -> None:
+        """Evaluating the wrapper yields what the command printed."""
+        assert eval(_wrap_command("print('hello')")) == "hello\n"
+
+    def test_wrapped_returns_json_payload(self) -> None:
+        """A realistic tool command round-trips its JSON via the value channel."""
+        command = "import json\nprint(json.dumps({'ok': True, 'items': [1, 2, 3]}))"
+        result = eval(_wrap_command(command))
+        assert json.loads(result) == {"ok": True, "items": [1, 2, 3]}
+
+    def test_wrapped_handles_tricky_escaping(self) -> None:
+        """Quotes, backslashes and unicode in the command survive wrapping."""
+        payload = {"quote": 'say "hi"', "path": "C:\\temp", "u": "café"}
+        command = f"import json\nprint(json.dumps({payload!r}))"
+        result = eval(_wrap_command(command))
+        assert json.loads(result) == payload
+
+    def test_wrapped_restores_stdout(self) -> None:
+        """stdout is left untouched after a successful command."""
+        original = sys.stdout
+        eval(_wrap_command("print('x')"))
+        assert sys.stdout is original
+
+    def test_wrapped_propagates_errors_and_restores_stdout(self) -> None:
+        """A raising command propagates its error and still restores stdout."""
+        original = sys.stdout
+        with pytest.raises(ValueError, match="boom"):
+            eval(_wrap_command("raise ValueError('boom')"))
+        assert sys.stdout is original
+
+    def test_wrapped_preserves_literal_substrings(self) -> None:
+        """Command text stays visible in the payload (unlike base64)."""
+        assert "second" in _wrap_command("print('second')")
+
+    def test_wrapped_empty_command_is_valid(self) -> None:
+        """An empty command produces a valid expression, not a syntax error."""
+        assert eval(_wrap_command("")) == ""
 
 
 class TestGlobalClient:

@@ -77,11 +77,13 @@ except RuntimeError:
 cmds.commandPort(
     name=":7001",
     sourceType="python",
-    echoOutput=True,
+    echoOutput=False,
     noreturn=False,
     bufferSize=16384,
 )
 ```
+
+> **Keep `echoOutput=False`.** On Maya 2024, `echoOutput=True` bricks the port (it accepts connections but never runs commands). Maya MCP captures command output itself, so echo is not needed.
 
 ### 3. Start the server
 

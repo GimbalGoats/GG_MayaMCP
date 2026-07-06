@@ -7,10 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Maya 2024 compatibility: open the commandPort with `echoOutput=False`.
+  On Maya 2024 (Python 3), `echoOutput=True` bricks the port — Maya's
+  `CommandPort.py` writes a `str` to the binary socket while draining its
+  command-output queue, raising `TypeError` before the command runs, and the
+  crash re-poisons the shared queue faster than it drains, so the port accepts
+  connections but executes nothing. With echo disabled the port no longer
+  streams stdout, so the transport now wraps each command as a single
+  expression that captures its stdout and returns it over the port's
+  value channel. Tool code is unchanged.
+
 ### Documentation
 
 - Added README badges and clearer release-asset guidance for finding the
   Claude Desktop MCPB package.
+- Documented that the commandPort must be opened with `echoOutput=False` and
+  why (Maya 2024 bricking).
 
 ## [0.5.0] - 2026-04-30
 
