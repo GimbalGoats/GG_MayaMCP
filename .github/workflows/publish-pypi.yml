@@ -133,3 +133,59 @@ jobs:
           path: dist
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  publish-mcp-registry:
+    name: Publish to Official MCP Registry
+    needs: publish
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check registry release version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version="${RELEASE_TAG#v}"
+          test "$(jq -r '.version' server.json)" = "$version"
+          test "$(jq -r '.packages[0].version' server.json)" = "$version"
+      - name: Wait for PyPI ownership metadata
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version="${RELEASE_TAG#v}"
+          for attempt in {1..12}; do
+            if VERSION="$version" python - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          with urllib.request.urlopen("https://pypi.org/pypi/maya-mcp/json", timeout=15) as response:
+              package = json.load(response)
+
+          assert package["info"]["version"] == os.environ["VERSION"]
+          assert "mcp-name: io.github.GimbalGoats/maya-mcp" in package["info"]["description"]
+          PY
+            then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "PyPI did not expose the release and MCP ownership marker in time" >&2
+          exit 1
+      - name: Install MCP Registry publisher
+        env:
+          MCP_PUBLISHER_VERSION: v1.8.0
+          MCP_PUBLISHER_SHA256: 1370446bbe74d562608e8005a6ccce02d146a661fbd78674e11cc70b9618d6cf
+        run: |
+          curl --fail --show-error --silent --location \
+            "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz" \
+            --output mcp-publisher.tar.gz
+          echo "${MCP_PUBLISHER_SHA256}  mcp-publisher.tar.gz" | sha256sum --check --strict
+          tar xzf mcp-publisher.tar.gz mcp-publisher
+      - name: Authenticate to Official MCP Registry
+        run: ./mcp-publisher login github-oidc
+      - name: Publish server metadata
+        run: ./mcp-publisher publish

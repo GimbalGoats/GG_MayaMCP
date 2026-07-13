@@ -1,7 +1,7 @@
 site_name: Maya MCP
-site_description: MCP server for controlling Autodesk Maya via commandPort
+site_description: Open-source local MCP server for controlling Autodesk Maya with 71 typed tools
 site_author: Maya MCP Contributors
-site_url: https://GimbalGoats.github.io/GG_MayaMCP
+site_url: https://gimbalgoats.github.io/GG_MayaMCP/
 
 repo_name: GimbalGoats/GG_MayaMCP
 repo_url: https://github.com/GimbalGoats/GG_MayaMCP
@@ -101,6 +101,8 @@ nav:
   - Project:
       - Docs Home: index.md
       - Privacy Policy: privacy.md
+      - Distribution: distribution.md
+      - Discoverability Plan: research/maya-mcp-discoverability.md
       - PRD: prd.md
   - Decisions:
       - ADR-0001 CommandPort: adr/0001-commandport.md
@@ -110,4 +112,4 @@ extra:
     - icon: fontawesome/brands/github
       link: https://github.com/GimbalGoats/GG_MayaMCP
 
-copyright: Copyright &copy; 2025 Maya MCP Contributors
+copyright: Copyright &copy; 2025-2026 Maya MCP Contributors

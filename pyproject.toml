@@ -12,7 +12,19 @@ requires-python = ">=3.10,!=3.10.0"
 authors = [
     { name = "Maya MCP Contributors" }
 ]
-keywords = ["maya", "mcp", "autodesk", "3d", "animation", "vfx"]
+keywords = [
+    "maya",
+    "autodesk-maya",
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "3d",
+    "animation",
+    "rigging",
+    "vfx",
+    "claude",
+    "codex",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -52,7 +64,7 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/GimbalGoats/GG_MayaMCP"
+Homepage = "https://gimbalgoats.github.io/GG_MayaMCP/"
 Documentation = "https://gimbalgoats.github.io/GG_MayaMCP/"
 Repository = "https://github.com/GimbalGoats/GG_MayaMCP"
 Issues = "https://github.com/GimbalGoats/GG_MayaMCP/issues"

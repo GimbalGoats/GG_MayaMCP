@@ -7,12 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added Official MCP Registry metadata, PyPI ownership proof, release-time OIDC publishing, and synchronization tests.
+- Added an Autodesk Design and Make Marketplace manifest generated and tested against all 71 live MCP tools.
+
 ### Fixed
 
 - Restored reliable commandPort responses on Maya 2024 with an exact-version compatibility policy while preserving the existing Maya 2025-and-later path.
 
 ### Documentation
 
+- Added a distribution runbook, Autodesk and Anthropic submission details, improved search metadata, and a crawler sitemap hint.
+- Documented Maya 2024 and later as the currently supported Maya release range.
 - Added README badges and clearer release-asset guidance for finding the
   Claude Desktop MCPB package.
 

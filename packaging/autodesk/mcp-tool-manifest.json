@@ -1,0 +1,303 @@
+{
+  "mcp_manifest_version": "1.0",
+  "app_model": "A",
+  "mcp_spec_version": "2025-11-25",
+  "server": {
+    "name": "maya-mcp",
+    "transport": "stdio"
+  },
+  "tools": [
+    {
+      "name": "animation.delete_keyframes",
+      "description": "Delete keyframes in a time range for attribute(s)."
+    },
+    {
+      "name": "animation.get_keyframes",
+      "description": "Query keyframes for attribute(s) on a node within optional time range."
+    },
+    {
+      "name": "animation.get_time_range",
+      "description": "Get playback range, animation range, and current time."
+    },
+    {
+      "name": "animation.set_keyframe",
+      "description": "Set keyframe on attribute(s) at current or specified time."
+    },
+    {
+      "name": "animation.set_time",
+      "description": "Set the current time (go to a specific frame)."
+    },
+    {
+      "name": "animation.set_time_range",
+      "description": "Set the playback and animation range."
+    },
+    {
+      "name": "attributes.get",
+      "description": "Get one or more attribute values from a Maya node."
+    },
+    {
+      "name": "attributes.set",
+      "description": "Set one or more attribute values on a Maya node."
+    },
+    {
+      "name": "connections.connect",
+      "description": "Connect two attributes in Maya."
+    },
+    {
+      "name": "connections.disconnect",
+      "description": "Disconnect attributes in Maya."
+    },
+    {
+      "name": "connections.get",
+      "description": "Get detailed connection information for specific attributes on a node."
+    },
+    {
+      "name": "connections.history",
+      "description": "List construction/deformation history on a node."
+    },
+    {
+      "name": "connections.list",
+      "description": "List connections on a Maya node with direction and type filters."
+    },
+    {
+      "name": "curve.cvs",
+      "description": "Query CV positions from a NURBS curve with offset/limit pagination."
+    },
+    {
+      "name": "curve.info",
+      "description": "Get NURBS curve information: degree, spans, form, CV count, knots, length, bounding box."
+    },
+    {
+      "name": "health.check",
+      "description": "Check the health status of the Maya connection."
+    },
+    {
+      "name": "maya.connect",
+      "description": "Establish a connection to Maya's commandPort."
+    },
+    {
+      "name": "maya.disconnect",
+      "description": "Close the connection to Maya."
+    },
+    {
+      "name": "mesh.evaluate",
+      "description": "Analyze mesh topology for issues: non-manifold edges, lamina faces, holes, and border edges."
+    },
+    {
+      "name": "mesh.info",
+      "description": "Get mesh statistics: vertex/face/edge counts, bounding box, UV status."
+    },
+    {
+      "name": "mesh.vertices",
+      "description": "Query vertex positions from a mesh with offset/limit pagination."
+    },
+    {
+      "name": "modeling.bevel",
+      "description": "Bevel edges or vertices with offset, segments, and fraction options."
+    },
+    {
+      "name": "modeling.boolean",
+      "description": "Perform a boolean operation (union, difference, intersection) on two meshes."
+    },
+    {
+      "name": "modeling.bridge",
+      "description": "Bridge between edge loops to create connecting faces."
+    },
+    {
+      "name": "modeling.center_pivot",
+      "description": "Center the pivot point on nodes."
+    },
+    {
+      "name": "modeling.combine",
+      "description": "Combine multiple meshes into a single mesh."
+    },
+    {
+      "name": "modeling.create_polygon_primitive",
+      "description": "Create a polygon primitive (cube, sphere, cylinder, cone, torus, plane) with configurable dimensions, subdivisions, and axis."
+    },
+    {
+      "name": "modeling.delete_faces",
+      "description": "Delete polygon faces from a mesh."
+    },
+    {
+      "name": "modeling.delete_history",
+      "description": "Delete construction history from nodes or the entire scene."
+    },
+    {
+      "name": "modeling.extrude_faces",
+      "description": "Extrude polygon faces with local translation, offset, and division options."
+    },
+    {
+      "name": "modeling.freeze_transforms",
+      "description": "Freeze (reset) transforms on nodes, applying current values as identity."
+    },
+    {
+      "name": "modeling.insert_edge_loop",
+      "description": "Insert an edge loop at the specified edge using polySplitRing."
+    },
+    {
+      "name": "modeling.merge_vertices",
+      "description": "Merge vertices on a mesh within a distance threshold."
+    },
+    {
+      "name": "modeling.move_components",
+      "description": "Move mesh components (vertices, edges, faces) by relative translation or to an absolute position."
+    },
+    {
+      "name": "modeling.separate",
+      "description": "Separate a combined mesh into individual meshes."
+    },
+    {
+      "name": "modeling.set_pivot",
+      "description": "Set the pivot point of a node to an explicit position."
+    },
+    {
+      "name": "nodes.create",
+      "description": "Create a new node in Maya with optional name, parent, and initial attributes."
+    },
+    {
+      "name": "nodes.delete",
+      "description": "Delete one or more nodes from the Maya scene."
+    },
+    {
+      "name": "nodes.duplicate",
+      "description": "Duplicate one or more nodes."
+    },
+    {
+      "name": "nodes.info",
+      "description": "Get comprehensive information about a Maya node in a single call."
+    },
+    {
+      "name": "nodes.list",
+      "description": "List nodes in the Maya scene, optionally filtered by type."
+    },
+    {
+      "name": "nodes.parent",
+      "description": "Reparent one or more nodes in the Maya hierarchy."
+    },
+    {
+      "name": "nodes.rename",
+      "description": "Rename one or more nodes in the Maya scene."
+    },
+    {
+      "name": "scene.export",
+      "description": "Export scene content to a file."
+    },
+    {
+      "name": "scene.import",
+      "description": "Import a file into the current Maya scene."
+    },
+    {
+      "name": "scene.info",
+      "description": "Get information about the current Maya scene."
+    },
+    {
+      "name": "scene.new",
+      "description": "Create a new empty Maya scene."
+    },
+    {
+      "name": "scene.open",
+      "description": "Open a Maya scene file."
+    },
+    {
+      "name": "scene.redo",
+      "description": "Redo the last undone operation in Maya."
+    },
+    {
+      "name": "scene.save",
+      "description": "Save the current scene."
+    },
+    {
+      "name": "scene.save_as",
+      "description": "Save the scene to a new file path."
+    },
+    {
+      "name": "scene.undo",
+      "description": "Undo the last operation in Maya."
+    },
+    {
+      "name": "script.execute",
+      "description": "Execute a Python script file in Maya from an allowed MAYA_MCP_SCRIPT_DIRS directory."
+    },
+    {
+      "name": "script.list",
+      "description": "List available Python scripts from configured MAYA_MCP_SCRIPT_DIRS directories."
+    },
+    {
+      "name": "script.run",
+      "description": "Execute raw Python or MEL code in Maya."
+    },
+    {
+      "name": "selection.clear",
+      "description": "Clear the Maya selection (deselect all)."
+    },
+    {
+      "name": "selection.convert_components",
+      "description": "Convert the current selection to a different component type (vertex, edge, or face)."
+    },
+    {
+      "name": "selection.get",
+      "description": "Get the current selection in Maya."
+    },
+    {
+      "name": "selection.get_components",
+      "description": "Get currently selected mesh components grouped by type (vertices, edges, faces)."
+    },
+    {
+      "name": "selection.set",
+      "description": "Set the Maya selection."
+    },
+    {
+      "name": "selection.set_components",
+      "description": "Select mesh components (vertices, edges, or faces) using Maya notation (e.g., 'pCube1.vtx[0:10]', 'pSphere1.e[5]', 'pPlane1.f[0:99]')."
+    },
+    {
+      "name": "shading.assign_material",
+      "description": "Assign a material to meshes or face components."
+    },
+    {
+      "name": "shading.create_material",
+      "description": "Create a material (lambert, blinn, phong, standardSurface) with an associated shading group and optional color."
+    },
+    {
+      "name": "shading.set_material_color",
+      "description": "Set a color attribute on a material (e.g., color, baseColor, transparency)."
+    },
+    {
+      "name": "skin.bind",
+      "description": "Bind a mesh to a skeleton with influence options."
+    },
+    {
+      "name": "skin.copy_weights",
+      "description": "Copy skin weights from one mesh to another using surface and influence association methods."
+    },
+    {
+      "name": "skin.influences",
+      "description": "List influences (joints) on a skin cluster with index mapping."
+    },
+    {
+      "name": "skin.unbind",
+      "description": "Detach a skin cluster from a mesh, removing skin deformation."
+    },
+    {
+      "name": "skin.weights.get",
+      "description": "Get per-vertex skin weights with offset/limit pagination."
+    },
+    {
+      "name": "skin.weights.set",
+      "description": "Set per-vertex skin weights with optional normalization."
+    },
+    {
+      "name": "viewport.capture",
+      "description": "Capture a single viewport frame as inline image content using Maya playblast."
+    }
+  ],
+  "resources": [],
+  "prompts": [],
+  "external_endpoints": [],
+  "autodesk_apis_used": [
+    "Autodesk Maya commandPort",
+    "Autodesk Maya Python commands (maya.cmds)"
+  ],
+  "ai_llm_providers": []
+}

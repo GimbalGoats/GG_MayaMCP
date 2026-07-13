@@ -1,13 +1,14 @@
 ---
 summary: "Friendly docs home for installing Maya MCP, connecting a client, and finding the right reference page."
+title: "Maya MCP Server for Autodesk Maya"
 read_when:
   - When first orienting to Maya MCP.
   - When you want the fastest path to install, connect, and use the server.
 ---
 
-# Maya MCP
+# Maya MCP Server for Autodesk Maya
 
-Maya MCP is a local MCP server for controlling Autodesk Maya through Maya's `commandPort`.
+Maya MCP is an open-source, local MCP server for controlling Autodesk Maya through Maya's `commandPort`.
 
 It is designed for practical AI-assisted Maya work:
 
@@ -111,5 +112,6 @@ These are the rules that shape the whole project:
 - [Transport Specification](spec/transport.md): connection lifecycle, retries, errors
 - [Security Specification](spec/security.md): localhost-only and script-execution trust model
 - [Privacy Policy](privacy.md): data handling for local server and Claude Desktop extension use
+- [Distribution and Marketplace Publishing](distribution.md): Official MCP Registry, Autodesk, and Anthropic release runbook
 - [API Reference](api/reference.md): generated Python API docs
 - [PRD](prd.md): scope and planned direction
