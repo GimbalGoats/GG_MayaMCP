@@ -74,10 +74,14 @@ try:
 except RuntimeError:
     pass
 
+# Maya 2024 cannot echo command output, so the port must not try; every other
+# version echoes normally. This picks the right setting automatically.
+echo_output = cmds.about(version=True) != "2024"
+
 cmds.commandPort(
     name=":7001",
     sourceType="python",
-    echoOutput=False,
+    echoOutput=echo_output,
     noreturn=False,
     bufferSize=16384,
 )

@@ -88,14 +88,17 @@ def _start_command_port() -> None:
         print(f"[MCP] commandPort already open on {port_name}")
         return
 
-    # Open the port. echoOutput must stay False: the MCP transport reads command
-    # output from its own helper's return value, and an echoing port duplicates
-    # that value on the wire, which the transport rejects.
+    # Maya 2024 cannot echo command output: it writes str to a binary socket, so
+    # the port stops responding after the first command that prints. The MCP
+    # transport uses a different protocol there and needs echo off. Every other
+    # version echoes correctly and uses it.
+    echo_output = str(cmds.about(version=True)) != "2024"
+
     try:
         cmds.commandPort(
             name=port_name,
             sourceType="python",
-            echoOutput=False,
+            echoOutput=echo_output,
         )
         print(f"[MCP] commandPort opened on {port_name}")
     except RuntimeError as e:

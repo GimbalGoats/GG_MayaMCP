@@ -10,9 +10,11 @@ To enable Maya commandPort, run in Maya's Script Editor:
         cmds.commandPort(name=":7001", close=True)
     except RuntimeError:
         pass
-    cmds.commandPort(name=":7001", sourceType="python", echoOutput=False)
+    echo_output = cmds.about(version=True) != "2024"
+    cmds.commandPort(name=":7001", sourceType="python", echoOutput=echo_output)
 
-echoOutput must be False; the transport rejects an echoing port.
+echoOutput must be False on Maya 2024 (its echo path is broken) and True on every
+other version (the transport reads the echoed stream there).
 """
 
 from __future__ import annotations

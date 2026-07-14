@@ -11,30 +11,33 @@ The client handles:
     - Retry with exponential backoff
     - Error translation to typed exceptions
 
-Open the port with ``echoOutput=False``::
+There are two protocols, chosen per session from the Maya version:
 
-    cmds.commandPort(name=":7001", sourceType="python", echoOutput=False)
+**Every version except 2024** uses the original path, unchanged. Open the port
+with ``echoOutput=True``; commands are sent verbatim and Maya echoes their
+output back, which ``_parse_maya_response`` cleans up.
 
-Commands do not travel over the wire as-is. Maya's commandPort only returns a
-value when what it receives is a single bare expression, so each command is
-base64-encoded and handed to a helper installed in Maya's ``__main__``, which
-runs it, captures its stdout, and returns a JSON envelope. Callers see none of
-this: ``execute()`` returns the command's stdout, so a command ending in
-``print(json.dumps(result))`` still gets that JSON back. See
-``_MAYA_HELPER_SOURCE`` for why this indirection is necessary.
+**Maya 2024 only** uses a helper protocol, because 2024 cannot echo command
+output at all: Maya's ``CommandPort.py`` writes it to the socket as ``str``
+rather than ``bytes``, so the first command that prints anything raises inside
+Maya's echo writer and the port stops responding to everything afterwards.
+Open the port with ``echoOutput=False`` and nothing goes near that code. Since
+the port then sends nothing back except an expression's value -- and only for a
+*single bare expression* -- commands are base64-encoded and handed to a helper
+installed in Maya's ``__main__``, which runs them, captures stdout, and returns
+a JSON envelope. See ``_MAYA_HELPER_SOURCE`` for the full rationale.
 
-Because the helper captures stdout, commands print nothing and Maya's echo path
-never runs, so this transport works against a port opened either way. That
-matters on Maya 2024, where ``echoOutput=True`` is actively broken: Maya's
-``CommandPort.py`` writes command output to the socket as ``str`` rather than
-``bytes``, so the first command that prints anything raises inside Maya's echo
-writer and poisons the port for every later command. ``echoOutput=False`` is
-still the documented setting -- it avoids that machinery entirely, and on older
-Maya versions a working echo would duplicate the helper's return value on the
-wire (see ``_require_envelope``).
+The version is read once per connection with a bare expression that produces no
+stdout, so the probe itself is safe on a broken 2024 echo port. Anything that is
+not 2024 -- including a version Maya declines to report -- takes the original
+path.
+
+Callers see none of this. ``execute()`` returns the command's output either way,
+so a command ending in ``print(json.dumps(result))`` gets that JSON back on
+every version, and tool modules never learn which protocol ran.
 
 Example:
-    Basic usage::
+    Basic usage (identical on every Maya version)::
 
         from maya_mcp.transport import CommandPortClient
 
@@ -78,6 +81,114 @@ BUFFER_SIZE = 65536
 # Module-level client instance for singleton pattern
 _client: CommandPortClient | None = None
 _client_lock = threading.Lock()
+
+# ---------------------------------------------------------------------------
+# Legacy protocol (every Maya version except 2024)
+#
+# Maya echoes command output back over the port, so tools' print(json.dumps(...))
+# arrives on the stream and only needs cleaning up. Verified working on Maya
+# 2025.3: over a persistent connection an echoOutput=True port answers
+# 'None\x00{"command_index": 0}\x00\n\x00' -- exactly the shape below.
+# ---------------------------------------------------------------------------
+
+_MAYA_COMMANDPORT_NOISE_LINES = {
+    "Arnold renderer not loaded.",
+    "The MtoA plug-in needed for this scene is not loaded.",
+    "Make sure Autoload is on in the Plug-in Manager.",
+    "See this article for more detail.",
+    "https://www.autodesk.com/maya-arnold-not-available-error",
+}
+
+
+def _is_noise_line(part: str) -> bool:
+    """Return True for known Maya commandPort noise lines."""
+    return part in _MAYA_COMMANDPORT_NOISE_LINES
+
+
+def _parse_maya_response(raw_response: str) -> str:
+    """Parse Maya commandPort response to extract the actual output.
+
+    Maya's commandPort with echoOutput=True returns responses in a format like::
+
+        'None\\n\\x00<actual_output>\\n\\x00\\n\\n\\x00'
+
+    With echoOutput=True, Maya may echo the output twice, resulting in::
+
+        '{"success": true}\\n{"success": true}'
+
+    Some Maya commands (e.g. ``cmds.file()``) produce their own output before
+    our ``print(json.dumps(result))`` statement.  In those cases the response
+    contains multiple non-empty parts and the JSON payload may not be the first
+    one.
+
+    Strategy:
+        1. Split by null bytes / newlines, strip whitespace, drop empty / "None".
+        2. Find all JSON-like parts (start with ``{`` or ``[``).
+        3. If multiple identical JSON parts exist (echoOutput duplication), return one.
+        4. Drop known Maya startup/plugin warning lines that can arrive on the
+           commandPort stream before command output.
+        5. Prefer the **last** unique JSON part, because our ``print(json.dumps(...))``
+           is always the final statement.
+        6. Fall back to the unique non-empty non-JSON parts joined by newline.
+
+    Args:
+        raw_response: Raw response string from Maya commandPort.
+
+    Returns:
+        The extracted output string, or empty string if no output found.
+
+    Example:
+        >>> _parse_maya_response('None\\n\\x00{"test": 1}\\n\\x00\\n\\n\\x00')
+        '{"test": 1}'
+        >>> _parse_maya_response('None\\n\\x00\\n\\x00{"ok": true}\\n\\x00')
+        '{"ok": true}'
+        >>> _parse_maya_response('{"success": true}\\n{"success": true}')
+        '{"success": true}'
+    """
+    if not raw_response:
+        return ""
+
+    # Remove null bytes and split into parts
+    parts = raw_response.replace("\x00", "\n").split("\n")
+
+    # Filter out empty strings and 'None' (from print() return)
+    filtered = [
+        p.strip()
+        for p in parts
+        if p.strip() and p.strip() != "None" and not _is_noise_line(p.strip())
+    ]
+
+    if not filtered:
+        return ""
+
+    # Find all JSON-like parts
+    json_parts = [p for p in filtered if p.startswith(("{", "["))]
+
+    if json_parts:
+        # Deduplicate: if all JSON parts are identical, return just one
+        # This handles echoOutput duplication
+        unique_json = list(dict.fromkeys(json_parts))  # Preserve order, remove dups
+        if len(unique_json) == 1:
+            return unique_json[0]
+        # If different, return the last one (our print is always last)
+        return unique_json[-1]
+
+    # Fall back to unique non-empty parts for non-JSON responses. Returning all
+    # useful lines preserves command output when Maya logs unrelated text on the
+    # same commandPort stream.
+    return "\n".join(dict.fromkeys(filtered))
+
+
+# ---------------------------------------------------------------------------
+# Maya 2024 protocol
+# ---------------------------------------------------------------------------
+
+# The single Maya version whose commandPort cannot echo command output.
+HELPER_MAYA_VERSION = "2024"
+
+# Bare expression used to pick a protocol. Safe on every version and on a port
+# opened either way: it produces no stdout, so nothing touches Maya's echo path.
+_VERSION_EXPRESSION = '__import__("maya").cmds.about(version=True)'
 
 # Protocol version of the Maya-side helper. Bump when _MAYA_HELPER_SOURCE
 # changes shape so a stale helper left in Maya by an older server is replaced.
@@ -189,6 +300,25 @@ def _response_parts(raw_response: str) -> list[str]:
     """Split a raw commandPort response into stripped, non-empty parts."""
     parts = raw_response.replace("\x00", "\n").split("\n")
     return [part.strip() for part in parts if part.strip()]
+
+
+def _parse_version(raw_response: str) -> str | None:
+    """Pull the Maya version out of a response to ``_VERSION_EXPRESSION``.
+
+    Args:
+        raw_response: Raw response string from Maya commandPort.
+
+    Returns:
+        The version Maya reported (e.g. ``"2024"``), or None if unrecognisable.
+
+    Example:
+        >>> _parse_version('2024\\n\\x00')
+        '2024'
+    """
+    for part in _response_parts(raw_response):
+        if part[:4].isdigit():
+            return part
+    return None
 
 
 def _find_envelopes(raw_response: str) -> list[dict[str, object]]:
@@ -305,6 +435,8 @@ class CommandPortClient:
         self.state = ClientState(config=self.config)
         self._socket: socket.socket | None = None
         self._lock = threading.RLock()
+        # None until this session's Maya reports its version. True only on 2024.
+        self._uses_helper: bool | None = None
 
     def connect(self) -> bool:
         """Establish connection to Maya commandPort.
@@ -404,22 +536,26 @@ class CommandPortClient:
             return was_connected
 
     def execute(self, command: str) -> str:
-        """Execute a Python command in Maya and return whatever it printed.
+        """Execute a Python command in Maya and return its output.
 
-        The command is run through the Maya-side helper (installed on first use)
-        and its stdout is captured and returned, so a command ending in
-        ``print(json.dumps(result))`` gets that JSON back exactly as before.
+        On every Maya version except 2024 the command is sent as-is and Maya's
+        echoed output is parsed, exactly as it always has been. On Maya 2024,
+        where the port cannot echo output, the command is routed through a
+        Maya-side helper instead. Either way the return value is the same: the
+        command's output, so a command ending in ``print(json.dumps(result))``
+        gets that JSON back.
 
         Args:
             command: Python code to execute in Maya.
 
         Returns:
-            Whatever the command wrote to stdout, stripped.
+            The command's output, stripped.
 
         Raises:
             MayaUnavailableError: Cannot connect to Maya.
-            MayaCommandError: Command raised inside Maya, or the port speaks a
-                protocol this client cannot use (e.g. opened with echoOutput=True).
+            MayaCommandError: Command raised inside Maya (Maya 2024 only -- the
+                legacy path cannot distinguish an error from output), or the
+                port returned nothing usable.
             MayaTimeoutError: Command timed out.
 
         Example:
@@ -428,9 +564,54 @@ class CommandPortClient:
             ["pCube1", "pSphere1"]
         """
         with self._lock:
-            return self._run_command(command)
+            if self._uses_helper is None:
+                self._uses_helper = self._detect_needs_helper()
+            if self._uses_helper:
+                return self._run_command_via_helper(command)
+            return self._run_command_legacy(command)
 
-    def _run_command(self, command: str) -> str:
+    def _detect_needs_helper(self) -> bool:
+        """Ask Maya its version and decide which protocol this session speaks.
+
+        Only Maya 2024 needs the helper. Every other version echoes command
+        output correctly, so it keeps the original path untouched.
+
+        A version Maya will not report is treated as "not 2024": the legacy path
+        is what every other version has always used, so it is the safer default.
+        """
+        raw = self._send_expression(_VERSION_EXPRESSION, allow_retry=True)
+        version = _parse_version(raw)
+
+        if version is None:
+            logger.warning(
+                "Could not read Maya version (response %r); using the standard "
+                "commandPort protocol",
+                raw[:100],
+            )
+            return False
+
+        needs_helper = version == HELPER_MAYA_VERSION
+        logger.info(
+            "Maya %s detected; using the %s commandPort protocol",
+            version,
+            "2024 helper" if needs_helper else "standard",
+        )
+        return needs_helper
+
+    def _run_command_legacy(self, command: str) -> str:
+        """Send a command unmodified and parse Maya's echoed output.
+
+        This is main's original behaviour, kept byte-for-byte for every Maya
+        version other than 2024.
+        """
+        raw = self._send_expression(command, allow_retry=True)
+        response = _parse_maya_response(raw)
+        self.state.update_contact()
+        self.state.last_error = None
+        logger.debug("Command completed (%d chars response)", len(response))
+        return response
+
+    def _run_command_via_helper(self, command: str) -> str:
         """Send one command through the helper and unwrap its envelope.
 
         Rather than probing for the helper on every connection, this sends the
@@ -700,6 +881,9 @@ class CommandPortClient:
             with contextlib.suppress(OSError):
                 self._socket.close()
             self._socket = None
+        # Re-detect on the next connection: the Maya behind this port may have
+        # been restarted as a different version.
+        self._uses_helper = None
 
     def _handle_socket_error(self) -> None:
         """Handle a socket error by cleaning up and updating state."""

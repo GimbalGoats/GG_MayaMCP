@@ -34,20 +34,25 @@ def enable_commandport(port: int = 7001, source_type: str = "python") -> None:
     except RuntimeError:
         pass
 
-    # Open new commandPort. echoOutput must stay False: the MCP transport reads
-    # command output from its own helper's return value, and an echoing port
-    # duplicates that value on the wire, which the transport rejects.
+    # Maya 2024 cannot echo command output: it writes str to a binary socket, so
+    # the port stops responding after the first command that prints. The MCP
+    # transport uses a different protocol there and needs echo off. Every other
+    # version echoes correctly and uses it.
+    maya_version = str(cmds.about(version=True))
+    echo_output = maya_version != "2024"
+
     cmds.commandPort(
         name=port_name,
         sourceType=source_type,
-        echoOutput=False,
+        echoOutput=echo_output,
         noreturn=False,
         bufferSize=16384,
     )
 
     print(f"commandPort opened on localhost{port_name}")
+    print(f"  Maya version: {maya_version}")
     print(f"  Source type: {source_type}")
-    print("  Echo output: disabled")
+    print(f"  Echo output: {'enabled' if echo_output else 'disabled (Maya 2024)'}")
     print()
     print("Maya MCP server can now connect to Maya.")
     print(f"To disable: cmds.commandPort(name=':{port}', close=True)")

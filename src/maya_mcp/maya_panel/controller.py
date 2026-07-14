@@ -23,6 +23,10 @@ from __future__ import annotations
 
 import logging
 
+# Single source of truth for the one Maya version that needs echo off. Importing
+# the transport is safe here: it imports no Maya modules.
+from maya_mcp.transport.commandport import HELPER_MAYA_VERSION
+
 # Set up logging
 logger = logging.getLogger(__name__)
 
@@ -64,10 +68,26 @@ def is_command_port_open(port: int = DEFAULT_PORT) -> bool:
     return port_name in get_open_ports()
 
 
+def default_echo_output() -> bool:
+    """Return the echoOutput setting this Maya version needs.
+
+    Maya 2024 cannot echo command output -- it writes ``str`` to a binary socket
+    and the port stops responding after the first command that prints. The
+    transport uses a helper protocol there and needs echo off. Every other
+    version echoes correctly and uses it.
+
+    Returns:
+        False on Maya 2024, True on every other version.
+    """
+    import maya.cmds as cmds
+
+    return str(cmds.about(version=True)) != HELPER_MAYA_VERSION
+
+
 def open_command_port(
     port: int = DEFAULT_PORT,
     source_type: str = "python",
-    echo_output: bool = False,
+    echo_output: bool | None = None,
 ) -> bool:
     """Open Maya's commandPort on the specified port.
 
@@ -76,10 +96,9 @@ def open_command_port(
     Args:
         port: Port number to open (1-65535).
         source_type: Command interpreter ("python" or "mel").
-        echo_output: If True, send command output back to client. Leave this
-            False: the transport reads command output from its own helper's
-            return value, and an echoing port duplicates that value on the wire,
-            which the transport rejects.
+        echo_output: Whether Maya should echo command output back. Leave as None
+            to pick the right setting for this Maya version -- False on 2024,
+            True everywhere else. See ``default_echo_output``.
 
     Returns:
         True if the port is now open (either opened or was already open).
@@ -105,6 +124,9 @@ def open_command_port(
         logger.info("CommandPort already open on %s", port_name)
         return True
 
+    if echo_output is None:
+        echo_output = default_echo_output()
+
     # Open the port
     try:
         cmds.commandPort(
@@ -112,7 +134,7 @@ def open_command_port(
             sourceType=source_type,
             echoOutput=echo_output,
         )
-        logger.info("CommandPort opened on %s", port_name)
+        logger.info("CommandPort opened on %s (echoOutput=%s)", port_name, echo_output)
         return True
     except RuntimeError as e:
         logger.exception("Failed to open commandPort on %s", port_name)

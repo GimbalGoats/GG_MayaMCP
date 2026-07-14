@@ -9,43 +9,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed every tool returning empty output on Maya 2024. Maya's `commandPort`
-  returns a value only for a single bare expression, so commands ending in
-  `print(json.dumps(result))` sent nothing back and each response failed to
-  parse. Commands are now base64-encoded and run through a helper installed in
-  Maya's `__main__`, which captures stdout and returns it in a JSON envelope.
-  `execute()` still returns the command's stdout, so tool modules are unchanged.
-- Worked around Maya 2024 breaking its own `commandPort` when `echoOutput=True`:
-  Maya writes command output to the socket as `str` rather than `bytes`, so the
-  first command that prints anything raises inside Maya's echo writer and the
-  port stops responding to every later command. Commands no longer print, so
-  that path is never taken.
-- The Maya-side helper is now installed on demand rather than probed for on each
-  connection, so a command against a ready Maya costs one round trip, and a Maya
-  restart or a helper left behind by an older server version heals automatically
-  on the next command.
+**Maya 2024 only.** Nothing below changes behaviour on any other Maya version.
+
+- Fixed every tool returning empty output on Maya 2024. Maya 2024 cannot echo
+  command output: its `CommandPort.py` writes the output to the socket as `str`
+  rather than `bytes`, so the first command that prints anything raises inside
+  Maya's echo writer and the port stops responding to every later command. The
+  port must therefore be opened with `echoOutput=False` on 2024, which leaves
+  only the value channel — and that returns a value solely for a single bare
+  expression, so commands ending in `print(json.dumps(result))` sent nothing
+  back and every response failed to parse.
+- On Maya 2024, commands are now base64-encoded and run through a helper
+  installed in Maya's `__main__`, which captures stdout and returns it in a JSON
+  envelope. `execute()` still returns the command's output, so tool modules are
+  unchanged and callers cannot tell which protocol ran.
+- On Maya 2024, an exception inside Maya is now reported as `MayaCommandError`
+  carrying Maya's traceback, instead of arriving as unparseable output.
+- The Maya 2024 helper is installed on demand, so a command against a ready Maya
+  costs one round trip, and a Maya restart or a helper left behind by an older
+  server version heals automatically on the next command.
 
 ### Changed
 
-- Maya's `commandPort` should now be opened with `echoOutput=False`, and
-  `scripts/userSetup.py`, `scripts/enable_commandport.py`, and the MCP panel
-  default to it. This is a recommendation, not a hard requirement: the helper
-  captures stdout, so commands print nothing, Maya's echo path never runs, and
-  an existing `echoOutput=True` setup keeps working on Maya 2024 (verified
-  against a live session). `echoOutput=False` is preferred because it avoids
-  that machinery entirely and because on Maya versions with a working echo the
-  response would be duplicated on the wire, which the transport rejects rather
-  than guessing which copy is real.
-- Removed commandPort response echo-deduplication and Maya/Arnold startup-noise
-  filtering. Command output now travels as the helper's return value instead of
-  an echoed stream, so that noise no longer reaches the parser.
+- The transport now reads Maya's version once per connection and picks a
+  protocol. Maya 2024 uses the helper protocol above; **every other version
+  keeps the existing path unchanged** — command sent verbatim, echoed output
+  parsed, noise filtering and echo-deduplication intact. A version Maya does not
+  report also takes the existing path. The version is read with a bare
+  expression that produces no stdout, so the probe is safe even on a 2024 port
+  whose echo is already broken.
+- `commandPort` should now be opened with `echoOutput=False` on Maya 2024 and
+  `echoOutput=True` everywhere else. `scripts/userSetup.py`,
+  `scripts/enable_commandport.py`, and the MCP panel now choose this
+  automatically from `cmds.about(version=True)`; the documented snippet does the
+  same, so it is safe to paste into any version.
 
 ### Documentation
 
 - Added README badges and clearer release-asset guidance for finding the
   Claude Desktop MCPB package.
-- Documented the commandPort command protocol and the `echoOutput=False`
-  requirement in the transport spec.
+- Documented both commandPort protocols, the Maya 2024 echo defect behind the
+  split, and the per-version `echoOutput` setting in the transport spec.
 
 ## [0.5.0] - 2026-04-30
 

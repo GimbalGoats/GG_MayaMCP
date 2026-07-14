@@ -97,32 +97,66 @@ If it expires, Maya MCP raises `MayaTimeoutError`.
 
 ## Command Protocol
 
-Open the port with `echoOutput=False`.
+There are two protocols. The transport reads Maya's version once per connection
+and picks one; tool modules never see the difference, because `execute()` returns
+the command's output either way.
 
-Commands are not sent to Maya verbatim. Maya's `commandPort` returns a value only
-when what it receives is a single bare expression it can evaluate; a payload
-containing any statement is executed and always answers `None`. A command ending
-in `print(json.dumps(result))` would therefore send nothing back.
+| Maya version | `echoOutput` | Protocol |
+|---|---|---|
+| 2024 | `False` | Helper protocol (below) |
+| everything else | `True` | Standard: command sent verbatim, echoed output parsed |
 
-Commands also execute in the `maya.app.general.CommandPort` namespace with a fresh
-locals mapping each time, so nothing assigned at top level survives to the next
-command. Maya's `__main__` does persist, and a function stored there can be reached
-from a single expression.
+Anything that is not Maya 2024 — including a version Maya declines to report —
+takes the standard path, which is the one every version other than 2024 has
+always used and is unchanged by the 2024 work.
 
-The transport builds on those two facts:
+The version is read with a bare expression (`cmds.about(version=True)`) that
+produces no stdout, so the probe is safe even on a 2024 port whose echo is
+already broken.
 
-1. On first use it installs a helper into Maya's `__main__`, as one expression.
-2. Every command is then sent as one expression, `_mcp_exec("<base64>")`.
+### Standard protocol (all versions except 2024)
+
+Commands are sent as-is. Maya echoes their output back, and the transport
+normalizes that stream before tool code sees it:
+
+- strips empty and `None` fragments
+- drops known Maya startup/plugin warning lines that can arrive before output
+- prefers JSON-like payloads when present
+- deduplicates repeated JSON echoes
+- returns the last unique JSON block when Maya printed more than one
+- preserves useful non-JSON output lines when a command does not return JSON
+
+### Maya 2024 protocol
+
+Maya 2024 cannot echo command output at all. Its `CommandPort.py` writes the
+output to the socket as `str` rather than `bytes`, so the first command that
+prints anything raises inside Maya's echo writer, and the port stops responding
+to every command afterwards. The port must therefore be opened with
+`echoOutput=False`, which leaves only the value channel — and that channel
+returns a value **only for a single bare expression**. A payload containing any
+statement is executed and always answers `None`, so a command ending in
+`print(json.dumps(result))` sends nothing back.
+
+Commands also execute in the `maya.app.general.CommandPort` namespace with a
+fresh locals mapping each time, so nothing assigned at top level survives to the
+next command. Maya's `__main__` does persist, and a function stored there can be
+reached from a single expression.
+
+The 2024 path builds on those two facts:
+
+1. A helper is installed into Maya's `__main__`, as one expression.
+2. Every command is sent as one expression, `_mcp_exec("<base64>")`.
 3. The helper executes the payload with stdout redirected, and returns a JSON
    envelope as its value: `{"v", "ok", "stdout", "error", "error_type", "traceback"}`.
 4. `execute()` unwraps the envelope and returns the captured stdout.
 
-Callers see none of this. A command ending in `print(json.dumps(result))` still gets
-that JSON back from `execute()`, so tool modules are unaffected by the encoding.
+The command is base64-encoded rather than embedded as source: the payload
+survives byte-for-byte, including multi-line string literals that textual
+re-indentation would silently corrupt.
 
-Because output is carried by the helper's return value rather than echoed, Maya
-startup and plugin warnings no longer share the response stream, and no
-noise-filtering or echo-deduplication is required.
+Because output rides the helper's return value instead of an echoed stream, Maya
+startup and plugin warnings never share the response, so the 2024 path needs no
+noise filtering or echo-deduplication.
 
 The helper is version-stamped (`HELPER_VERSION`) and installed on demand: the
 transport sends the command first and only bootstraps when Maya reports the
@@ -130,21 +164,8 @@ helper missing or returns an envelope stamped with a different version. A comman
 against a ready Maya therefore costs one round trip, and a Maya restart or a
 stale helper heals on the next command with no user action.
 
-### Why `echoOutput=False`
-
-Commands print nothing — the helper captures stdout — so Maya's echo path never
-runs and this transport works against a port opened either way. `echoOutput=False`
-is still the documented setting, for two reasons:
-
-- On Maya 2024, `echoOutput=True` is broken. Maya's `CommandPort.py` writes
-  command output to the socket as `str` rather than `bytes`, so the first command
-  that prints anything raises inside Maya's echo writer and the port stops
-  responding to everything afterwards. Nothing this transport sends triggers it,
-  but anything else sharing that port would brick it.
-- On Maya versions whose echo works, the port would send the helper's return
-  value back more than once. The transport detects the duplicate responses and
-  raises `MayaCommandError` explaining how to reopen the port, rather than
-  guessing which copy is real.
+On this path an exception inside Maya is reported as `MayaCommandError` carrying
+Maya's traceback, rather than arriving as unparseable output.
 
 Tool modules should not implement their own socket read loops or commandPort response cleanup.
 
@@ -183,10 +204,14 @@ try:
 except RuntimeError:
     pass
 
+# Maya 2024 cannot echo command output, so the port must not try; every other
+# version echoes normally. This picks the right setting automatically.
+echo_output = cmds.about(version=True) != "2024"
+
 cmds.commandPort(
     name=":7001",
     sourceType="python",
-    echoOutput=False,
+    echoOutput=echo_output,
     noreturn=False,
     bufferSize=16384,
 )
