@@ -7,10 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed every tool returning empty output on Maya 2024. Maya's `commandPort`
+  returns a value only for a single bare expression, so commands ending in
+  `print(json.dumps(result))` sent nothing back and each response failed to
+  parse. Commands are now base64-encoded and run through a helper installed in
+  Maya's `__main__`, which captures stdout and returns it in a JSON envelope.
+  `execute()` still returns the command's stdout, so tool modules are unchanged.
+
+### Changed
+
+- **Breaking:** Maya's `commandPort` must now be opened with `echoOutput=False`.
+  `scripts/userSetup.py`, `scripts/enable_commandport.py`, and the MCP panel now
+  do this by default; existing setups that open the port themselves must be
+  updated. A port opened with `echoOutput=True` is detected and reported with
+  instructions rather than failing obscurely.
+- Removed commandPort response echo-deduplication and Maya/Arnold startup-noise
+  filtering. Command output now travels as the helper's return value instead of
+  an echoed stream, so that noise no longer reaches the parser.
+
 ### Documentation
 
 - Added README badges and clearer release-asset guidance for finding the
   Claude Desktop MCPB package.
+- Documented the commandPort command protocol and the `echoOutput=False`
+  requirement in the transport spec.
 
 ## [0.5.0] - 2026-04-30
 

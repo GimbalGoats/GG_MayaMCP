@@ -34,18 +34,20 @@ def enable_commandport(port: int = 7001, source_type: str = "python") -> None:
     except RuntimeError:
         pass
 
-    # Open new commandPort
+    # Open new commandPort. echoOutput must stay False: the MCP transport reads
+    # command output from its own helper's return value, and an echoing port
+    # duplicates that value on the wire, which the transport rejects.
     cmds.commandPort(
         name=port_name,
         sourceType=source_type,
-        echoOutput=True,
+        echoOutput=False,
         noreturn=False,
         bufferSize=16384,
     )
 
     print(f"commandPort opened on localhost{port_name}")
     print(f"  Source type: {source_type}")
-    print("  Echo output: enabled")
+    print("  Echo output: disabled")
     print()
     print("Maya MCP server can now connect to Maya.")
     print(f"To disable: cmds.commandPort(name=':{port}', close=True)")

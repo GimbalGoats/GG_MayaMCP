@@ -67,7 +67,7 @@ def is_command_port_open(port: int = DEFAULT_PORT) -> bool:
 def open_command_port(
     port: int = DEFAULT_PORT,
     source_type: str = "python",
-    echo_output: bool = True,
+    echo_output: bool = False,
 ) -> bool:
     """Open Maya's commandPort on the specified port.
 
@@ -76,7 +76,10 @@ def open_command_port(
     Args:
         port: Port number to open (1-65535).
         source_type: Command interpreter ("python" or "mel").
-        echo_output: If True, send command output back to client.
+        echo_output: If True, send command output back to client. Leave this
+            False: the transport reads command output from its own helper's
+            return value, and an echoing port duplicates that value on the wire,
+            which the transport rejects.
 
     Returns:
         True if the port is now open (either opened or was already open).

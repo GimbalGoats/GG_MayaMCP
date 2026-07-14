@@ -82,7 +82,7 @@ except RuntimeError:
 cmds.commandPort(
     name=":7001",
     sourceType="python",
-    echoOutput=True,
+    echoOutput=False,
     noreturn=False,
     bufferSize=16384,
 )

@@ -88,12 +88,14 @@ def _start_command_port() -> None:
         print(f"[MCP] commandPort already open on {port_name}")
         return
 
-    # Open the port
+    # Open the port. echoOutput must stay False: the MCP transport reads command
+    # output from its own helper's return value, and an echoing port duplicates
+    # that value on the wire, which the transport rejects.
     try:
         cmds.commandPort(
             name=port_name,
             sourceType="python",
-            echoOutput=True,
+            echoOutput=False,
         )
         print(f"[MCP] commandPort opened on {port_name}")
     except RuntimeError as e:

@@ -8,7 +8,7 @@ They are skipped in CI and must be run manually with:
 To run with Maya, first enable the commandPort in Maya:
 
     import maya.cmds as cmds
-    cmds.commandPort(name=":7001", sourceType="python", echoOutput=True)
+    cmds.commandPort(name=":7001", sourceType="python", echoOutput=False)
 
 All tests in this directory are marked with @pytest.mark.integration.
 """

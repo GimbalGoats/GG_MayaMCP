@@ -11,6 +11,18 @@ The client handles:
     - Retry with exponential backoff
     - Error translation to typed exceptions
 
+The port must be opened with ``echoOutput=False``::
+
+    cmds.commandPort(name=":7001", sourceType="python", echoOutput=False)
+
+Commands do not travel over the wire as-is. Maya's commandPort only returns a
+value when what it receives is a single bare expression, so each command is
+base64-encoded and handed to a helper installed in Maya's ``__main__``, which
+runs it, captures its stdout, and returns a JSON envelope. Callers see none of
+this: ``execute()`` returns the command's stdout, so a command ending in
+``print(json.dumps(result))`` still gets that JSON back. See
+``_MAYA_HELPER_SOURCE`` for why this indirection is necessary.
+
 Example:
     Basic usage::
 
@@ -18,7 +30,7 @@ Example:
 
         client = CommandPortClient()
         client.connect()
-        result = client.execute("cmds.ls(selection=True)")
+        result = client.execute("import json; print(json.dumps(cmds.ls()))")
         client.disconnect()
 
 Note:
@@ -28,13 +40,16 @@ Note:
 
 from __future__ import annotations
 
+import base64
 import contextlib
+import json
 import logging
 import socket
 import threading
 import time
 
 from maya_mcp.errors import (
+    MayaCommandError,
     MayaTimeoutError,
     MayaUnavailableError,
 )
@@ -54,92 +69,113 @@ BUFFER_SIZE = 65536
 _client: CommandPortClient | None = None
 _client_lock = threading.Lock()
 
-_MAYA_COMMANDPORT_NOISE_LINES = {
-    "Arnold renderer not loaded.",
-    "The MtoA plug-in needed for this scene is not loaded.",
-    "Make sure Autoload is on in the Plug-in Manager.",
-    "See this article for more detail.",
-    "https://www.autodesk.com/maya-arnold-not-available-error",
-}
+# Protocol version of the Maya-side helper. Bump when _MAYA_HELPER_SOURCE
+# changes shape so a stale helper left in Maya by an older server is replaced.
+HELPER_VERSION = 1
+
+# Maya-side helper, installed into Maya's __main__ namespace once per connection.
+#
+# Why this exists: Maya's commandPort only returns a value when the payload it
+# receives is a single bare expression it can eval. A multi-statement payload is
+# exec'd and always answers "None", so a command ending in print(...) sends
+# nothing back on a port opened with echoOutput=False. Commands also run in the
+# maya.app.general.CommandPort namespace with a fresh locals dict each time, so
+# nothing assigned at top level survives -- but __main__ does persist, and a
+# function stashed there is reachable from a single expression.
+#
+# So: install this helper once, then send every command as one expression,
+# _mcp_exec("<base64>"), which returns a JSON envelope as its value.
+_MAYA_HELPER_SOURCE = f'''
+import base64 as _mcp_base64
+import contextlib as _mcp_contextlib
+import io as _mcp_io
+import json as _mcp_json
+import traceback as _mcp_traceback
+
+_MCP_HELPER_VERSION = {HELPER_VERSION}
 
 
-def _is_noise_line(part: str) -> bool:
-    """Return True for known Maya commandPort noise lines."""
-    return part in _MAYA_COMMANDPORT_NOISE_LINES
+def _mcp_envelope(ok, stdout, error=None, error_type=None, tb=""):
+    return _mcp_json.dumps({{
+        "v": _MCP_HELPER_VERSION,
+        "ok": ok,
+        "stdout": stdout,
+        "error": error,
+        "error_type": error_type,
+        "traceback": tb,
+    }})
 
 
-def _parse_maya_response(raw_response: str) -> str:
-    """Parse Maya commandPort response to extract the actual output.
+def _mcp_exec(payload_b64):
+    """Run a base64-encoded payload, return a JSON envelope. Never raises."""
+    try:
+        source = _mcp_base64.b64decode(payload_b64).decode("utf-8")
+    except Exception as exc:
+        return _mcp_envelope(
+            False, "", "Could not decode payload: %s" % exc, type(exc).__name__
+        )
 
-    Maya's commandPort with echoOutput=True returns responses in a format like::
+    namespace = {{"__name__": "__maya_mcp__"}}
+    buffer = _mcp_io.StringIO()
+    try:
+        with _mcp_contextlib.redirect_stdout(buffer):
+            exec(source, namespace)
+    except Exception as exc:
+        return _mcp_envelope(
+            False,
+            buffer.getvalue(),
+            str(exc),
+            type(exc).__name__,
+            _mcp_traceback.format_exc(),
+        )
+    return _mcp_envelope(True, buffer.getvalue())
+'''
 
-        'None\\n\\x00<actual_output>\\n\\x00\\n\\n\\x00'
 
-    With echoOutput=True, Maya may echo the output twice, resulting in::
+def _bootstrap_expression() -> str:
+    """Build the single expression that installs the helper into Maya's __main__."""
+    encoded = base64.b64encode(_MAYA_HELPER_SOURCE.encode("utf-8")).decode("ascii")
+    return (
+        f"exec(__import__('base64').b64decode('{encoded}').decode('utf-8'),"
+        " __import__('__main__').__dict__)"
+    )
 
-        '{"success": true}\\n{"success": true}'
 
-    Some Maya commands (e.g. ``cmds.file()``) produce their own output before
-    our ``print(json.dumps(result))`` statement.  In those cases the response
-    contains multiple non-empty parts and the JSON payload may not be the first
-    one.
+def _call_expression(command: str) -> str:
+    """Build the single expression that runs ``command`` through the helper."""
+    encoded = base64.b64encode(command.encode("utf-8")).decode("ascii")
+    return f"__import__('__main__')._mcp_exec('{encoded}')"
 
-    Strategy:
-        1. Split by null bytes / newlines, strip whitespace, drop empty / "None".
-        2. Find all JSON-like parts (start with ``{`` or ``[``).
-        3. If multiple identical JSON parts exist (echoOutput duplication), return one.
-        4. Drop known Maya startup/plugin warning lines that can arrive on the
-           commandPort stream before command output.
-        5. Prefer the **last** unique JSON part, because our ``print(json.dumps(...))``
-           is always the final statement.
-        6. Fall back to the unique non-empty non-JSON parts joined by newline.
+
+def _response_parts(raw_response: str) -> list[str]:
+    """Split a raw commandPort response into stripped, non-empty parts."""
+    parts = raw_response.replace("\x00", "\n").split("\n")
+    return [part.strip() for part in parts if part.strip()]
+
+
+def _find_envelopes(raw_response: str) -> list[dict[str, object]]:
+    """Extract every helper envelope present in a raw commandPort response.
+
+    A port opened with echoOutput=True echoes the value back more than once, so
+    the count matters: it is how an echo-enabled port is detected.
 
     Args:
         raw_response: Raw response string from Maya commandPort.
 
     Returns:
-        The extracted output string, or empty string if no output found.
-
-    Example:
-        >>> _parse_maya_response('None\\n\\x00{"test": 1}\\n\\x00\\n\\n\\x00')
-        '{"test": 1}'
-        >>> _parse_maya_response('None\\n\\x00\\n\\x00{"ok": true}\\n\\x00')
-        '{"ok": true}'
-        >>> _parse_maya_response('{"success": true}\\n{"success": true}')
-        '{"success": true}'
+        Every decoded envelope found, in wire order.
     """
-    if not raw_response:
-        return ""
-
-    # Remove null bytes and split into parts
-    parts = raw_response.replace("\x00", "\n").split("\n")
-
-    # Filter out empty strings and 'None' (from print() return)
-    filtered = [
-        p.strip()
-        for p in parts
-        if p.strip() and p.strip() != "None" and not _is_noise_line(p.strip())
-    ]
-
-    if not filtered:
-        return ""
-
-    # Find all JSON-like parts
-    json_parts = [p for p in filtered if p.startswith(("{", "["))]
-
-    if json_parts:
-        # Deduplicate: if all JSON parts are identical, return just one
-        # This handles echoOutput duplication
-        unique_json = list(dict.fromkeys(json_parts))  # Preserve order, remove dups
-        if len(unique_json) == 1:
-            return unique_json[0]
-        # If different, return the last one (our print is always last)
-        return unique_json[-1]
-
-    # Fall back to unique non-empty parts for non-JSON responses. Returning all
-    # useful lines preserves command output when Maya logs unrelated text on the
-    # same commandPort stream.
-    return "\n".join(dict.fromkeys(filtered))
+    envelopes = []
+    for part in _response_parts(raw_response):
+        if not part.startswith("{"):
+            continue
+        try:
+            decoded = json.loads(part)
+        except ValueError:
+            continue
+        if isinstance(decoded, dict) and "ok" in decoded and "stdout" in decoded:
+            envelopes.append(decoded)
+    return envelopes
 
 
 def get_client() -> CommandPortClient:
@@ -231,6 +267,7 @@ class CommandPortClient:
         self.state = ClientState(config=self.config)
         self._socket: socket.socket | None = None
         self._lock = threading.RLock()
+        self._bootstrapped = False
 
     def connect(self) -> bool:
         """Establish connection to Maya commandPort.
@@ -330,41 +367,125 @@ class CommandPortClient:
             return was_connected
 
     def execute(self, command: str) -> str:
-        """Execute a Python command in Maya and return the result.
+        """Execute a Python command in Maya and return whatever it printed.
 
-        Sends a command to Maya via commandPort and waits for the response.
-        Automatically connects if not already connected. If the connection
-        drops during the send phase, reconnects and retries once.
+        The command is run through the Maya-side helper (installed on first use)
+        and its stdout is captured and returned, so a command ending in
+        ``print(json.dumps(result))`` gets that JSON back exactly as before.
 
         Args:
             command: Python code to execute in Maya.
 
         Returns:
-            Command output as string.
+            Whatever the command wrote to stdout, stripped.
 
         Raises:
             MayaUnavailableError: Cannot connect to Maya.
-            MayaCommandError: Command execution failed.
+            MayaCommandError: Command raised inside Maya, or the port speaks a
+                protocol this client cannot use (e.g. opened with echoOutput=True).
             MayaTimeoutError: Command timed out.
 
         Example:
-            >>> result = client.execute("cmds.ls(selection=True)")
+            >>> result = client.execute("import json; print(json.dumps(cmds.ls()))")
             >>> print(result)
-            ['pCube1', 'pSphere1']
+            ["pCube1", "pSphere1"]
         """
         with self._lock:
-            return self._execute_with_retry(command, allow_retry=True)
+            self._ensure_bootstrapped()
+            return self._run_command(command)
 
-    def _execute_with_retry(self, command: str, *, allow_retry: bool) -> str:
-        """Execute a command with optional reconnect-and-retry on send failure.
+    def _run_command(self, command: str) -> str:
+        """Send one command through the helper and unwrap its envelope."""
+        raw = self._send_expression(_call_expression(command), allow_retry=True)
+        envelope = self._require_envelope(raw, command=command)
+
+        if not envelope.get("ok"):
+            maya_error = str(envelope.get("error") or "Unknown Maya error")
+            error_type = str(envelope.get("error_type") or "Exception")
+            logger.error("Command raised in Maya: %s: %s", error_type, maya_error)
+            logger.debug("Maya traceback:\n%s", envelope.get("traceback") or "")
+            raise MayaCommandError(
+                message=f"Command failed in Maya: {error_type}: {maya_error}",
+                command=command,
+                maya_error=maya_error,
+            )
+
+        response = str(envelope.get("stdout") or "").strip()
+        self.state.update_contact()
+        self.state.last_error = None
+        logger.debug("Command completed (%d chars response)", len(response))
+        return response
+
+    def _require_envelope(self, raw_response: str, *, command: str) -> dict[str, object]:
+        """Pull exactly one helper envelope out of a raw response.
+
+        More than one envelope means the port was opened with echoOutput=True:
+        Maya echoes the value back alongside the return value. This client speaks
+        the echo-off protocol only, so say that plainly rather than failing later
+        with an unhelpful parse error.
+        """
+        envelopes = _find_envelopes(raw_response)
+
+        if len(envelopes) == 1:
+            return envelopes[0]
+
+        if len(envelopes) > 1:
+            port = self.config.port
+            raise MayaCommandError(
+                message=(
+                    "Maya's commandPort appears to be open with echoOutput=True, "
+                    "which this client does not support. Reopen it with "
+                    "echoOutput=False:\n"
+                    f"    cmds.commandPort(name=':{port}', close=True)\n"
+                    f"    cmds.commandPort(name=':{port}', sourceType='python', "
+                    "echoOutput=False)"
+                ),
+                command=command,
+                maya_error=f"received {len(envelopes)} echoed responses",
+            )
+
+        preview = raw_response[:200] or "<empty>"
+        raise MayaCommandError(
+            message=(
+                "Maya returned no usable response. The commandPort may be open "
+                "with sourceType='mel' instead of 'python'."
+            ),
+            command=command,
+            maya_error=f"unparseable response: {preview!r}",
+        )
+
+    def _ensure_bootstrapped(self) -> None:
+        """Install the Maya-side helper if this connection has not verified it yet.
+
+        The helper lives in Maya's ``__main__`` so it survives across sockets, but
+        Maya may have restarted, so verify rather than assume.
+        """
+        if self._bootstrapped:
+            return
+
+        probe = self._send_expression(
+            "__import__('__main__').__dict__.get('_MCP_HELPER_VERSION')",
+            allow_retry=True,
+        )
+        installed = str(HELPER_VERSION) in _response_parts(probe)
+
+        if not installed:
+            logger.info("Installing Maya-side helper (v%d)", HELPER_VERSION)
+            self._send_expression(_bootstrap_expression(), allow_retry=True)
+
+        self._bootstrapped = True
+
+    def _send_expression(self, expression: str, *, allow_retry: bool) -> str:
+        """Send one expression and return the raw response, retrying on send failure.
 
         Args:
-            command: Python code to execute in Maya.
+            expression: A single Python expression for Maya to eval.
             allow_retry: If True, reconnect and retry once on send-phase errors.
 
         Returns:
-            Command output as string.
+            Raw response string from Maya.
         """
+        command = expression
         # Ensure connected
         if self._socket is None:
             self.connect()
@@ -420,15 +541,9 @@ class CommandPortClient:
 
             raw_response = b"".join(response_parts).decode("utf-8").strip()
 
-            # Parse Maya's response format to extract actual output
-            response = _parse_maya_response(raw_response)
-
-            # Update state on success
             self.state.update_contact()
             self.state.last_error = None
-            logger.debug("Command completed (%d chars response)", len(response))
-
-            return response
+            return raw_response
 
         except TimeoutError as exc:
             self.state.last_error = f"Command timed out after {self.config.command_timeout}s"
@@ -451,7 +566,7 @@ class CommandPortClient:
                 logger.warning("Connection lost during send, reconnecting: %s", e)
                 try:
                     self.connect()
-                    return self._execute_with_retry(command, allow_retry=False)
+                    return self._send_expression(expression, allow_retry=False)
                 except (MayaUnavailableError, OSError):
                     pass  # Fall through to raise original error
 
@@ -553,6 +668,9 @@ class CommandPortClient:
             with contextlib.suppress(OSError):
                 self._socket.close()
             self._socket = None
+        # The helper lives in Maya's __main__, which outlives a dropped socket,
+        # but Maya may have restarted underneath us. Re-verify on next connect.
+        self._bootstrapped = False
 
     def _handle_socket_error(self) -> None:
         """Handle a socket error by cleaning up and updating state."""

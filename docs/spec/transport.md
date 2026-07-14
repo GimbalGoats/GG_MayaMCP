@@ -95,20 +95,42 @@ Used after the command is sent and the server is waiting for Maya to respond.
 
 If it expires, Maya MCP raises `MayaTimeoutError`.
 
-## Response Handling
+## Command Protocol
 
-Maya `commandPort` can echo output, include null bytes, or return duplicate JSON fragments when `echoOutput=True`.
+The port must be opened with `echoOutput=False`.
 
-The transport normalizes that noise before tool code sees the result:
+Commands are not sent to Maya verbatim. Maya's `commandPort` returns a value only
+when what it receives is a single bare expression it can evaluate; a payload
+containing any statement is executed and always answers `None`. A command ending
+in `print(json.dumps(result))` would therefore send nothing back.
 
-- strips empty and `None` fragments
-- drops known Maya startup/plugin warning lines that can arrive on the commandPort stream before command output
-- prefers JSON-like payloads when present
-- deduplicates repeated JSON echoes
-- returns the last unique JSON block when Maya printed more than one
-- preserves useful non-JSON output lines after cleanup when a command does not return JSON
+Commands also execute in the `maya.app.general.CommandPort` namespace with a fresh
+locals mapping each time, so nothing assigned at top level survives to the next
+command. Maya's `__main__` does persist, and a function stored there can be reached
+from a single expression.
 
-That keeps parsing logic centralized instead of spreading it across tool modules.
+The transport builds on those two facts:
+
+1. On first use it installs a helper into Maya's `__main__`, as one expression.
+2. Every command is then sent as one expression, `_mcp_exec("<base64>")`.
+3. The helper executes the payload with stdout redirected, and returns a JSON
+   envelope as its value: `{"v", "ok", "stdout", "error", "error_type", "traceback"}`.
+4. `execute()` unwraps the envelope and returns the captured stdout.
+
+Callers see none of this. A command ending in `print(json.dumps(result))` still gets
+that JSON back from `execute()`, so tool modules are unaffected by the encoding.
+
+Because output is carried by the helper's return value rather than echoed, Maya
+startup and plugin warnings no longer share the response stream, and no
+noise-filtering or echo-deduplication is required.
+
+The helper is version-stamped (`HELPER_VERSION`). The transport probes for it on
+each new connection and reinstalls it when absent or stale, so a Maya restart
+recovers without user action.
+
+If a port is opened with `echoOutput=True`, Maya echoes the value back more than
+once. The transport detects the duplicate envelopes and raises `MayaCommandError`
+explaining how to reopen the port, rather than failing later on a confusing parse.
 
 Tool modules should not implement their own socket read loops or commandPort response cleanup.
 
@@ -150,7 +172,7 @@ except RuntimeError:
 cmds.commandPort(
     name=":7001",
     sourceType="python",
-    echoOutput=True,
+    echoOutput=False,
     noreturn=False,
     bufferSize=16384,
 )
