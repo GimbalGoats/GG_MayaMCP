@@ -11,7 +11,7 @@ The client handles:
     - Retry with exponential backoff
     - Error translation to typed exceptions
 
-The port must be opened with ``echoOutput=False``::
+Open the port with ``echoOutput=False``::
 
     cmds.commandPort(name=":7001", sourceType="python", echoOutput=False)
 
@@ -22,6 +22,16 @@ runs it, captures its stdout, and returns a JSON envelope. Callers see none of
 this: ``execute()`` returns the command's stdout, so a command ending in
 ``print(json.dumps(result))`` still gets that JSON back. See
 ``_MAYA_HELPER_SOURCE`` for why this indirection is necessary.
+
+Because the helper captures stdout, commands print nothing and Maya's echo path
+never runs, so this transport works against a port opened either way. That
+matters on Maya 2024, where ``echoOutput=True`` is actively broken: Maya's
+``CommandPort.py`` writes command output to the socket as ``str`` rather than
+``bytes``, so the first command that prints anything raises inside Maya's echo
+writer and poisons the port for every later command. ``echoOutput=False`` is
+still the documented setting -- it avoids that machinery entirely, and on older
+Maya versions a working echo would duplicate the helper's return value on the
+wire (see ``_require_envelope``).
 
 Example:
     Basic usage::
@@ -147,6 +157,34 @@ def _call_expression(command: str) -> str:
     return f"__import__('__main__')._mcp_exec('{encoded}')"
 
 
+# What Maya answers when the helper is not installed (or Maya restarted and lost
+# it): the exception's text, returned as the expression's value. The call goes
+# through __main__, so a missing helper is an AttributeError; the NameError form
+# is matched too in case the helper is ever invoked as a bare name.
+_HELPER_MISSING_MARKERS = (
+    "has no attribute '_mcp_exec'",
+    "'_mcp_exec' is not defined",
+)
+
+
+def _helper_is_missing(raw_response: str) -> bool:
+    """Return True when Maya reports that the helper does not exist."""
+    return any(marker in raw_response for marker in _HELPER_MISSING_MARKERS)
+
+
+def _needs_helper(raw_response: str) -> bool:
+    """Return True when the helper must be (re)installed before retrying.
+
+    Covers both a Maya that never had the helper and one left holding a helper
+    from an older server version.
+    """
+    if _helper_is_missing(raw_response):
+        return True
+
+    envelopes = _find_envelopes(raw_response)
+    return len(envelopes) == 1 and envelopes[0].get("v") != HELPER_VERSION
+
+
 def _response_parts(raw_response: str) -> list[str]:
     """Split a raw commandPort response into stripped, non-empty parts."""
     parts = raw_response.replace("\x00", "\n").split("\n")
@@ -267,7 +305,6 @@ class CommandPortClient:
         self.state = ClientState(config=self.config)
         self._socket: socket.socket | None = None
         self._lock = threading.RLock()
-        self._bootstrapped = False
 
     def connect(self) -> bool:
         """Establish connection to Maya commandPort.
@@ -391,12 +428,24 @@ class CommandPortClient:
             ["pCube1", "pSphere1"]
         """
         with self._lock:
-            self._ensure_bootstrapped()
             return self._run_command(command)
 
     def _run_command(self, command: str) -> str:
-        """Send one command through the helper and unwrap its envelope."""
-        raw = self._send_expression(_call_expression(command), allow_retry=True)
+        """Send one command through the helper and unwrap its envelope.
+
+        Rather than probing for the helper on every connection, this sends the
+        command first and installs the helper only if Maya reports it missing or
+        stale. The common case costs one round trip, and a Maya restart heals
+        itself on the next command.
+        """
+        expression = _call_expression(command)
+        raw = self._send_expression(expression, allow_retry=True)
+
+        if _needs_helper(raw):
+            logger.info("Installing Maya-side helper (v%d)", HELPER_VERSION)
+            self._send_expression(_bootstrap_expression(), allow_retry=True)
+            raw = self._send_expression(expression, allow_retry=True)
+
         envelope = self._require_envelope(raw, command=command)
 
         if not envelope.get("ok"):
@@ -419,61 +468,44 @@ class CommandPortClient:
     def _require_envelope(self, raw_response: str, *, command: str) -> dict[str, object]:
         """Pull exactly one helper envelope out of a raw response.
 
-        More than one envelope means the port was opened with echoOutput=True:
-        Maya echoes the value back alongside the return value. This client speaks
-        the echo-off protocol only, so say that plainly rather than failing later
-        with an unhelpful parse error.
+        Two envelopes means the port echoed the helper's return value back
+        alongside it. Maya 2024's echo path never gets that far -- it breaks on
+        the first byte it tries to write -- but a Maya whose echo works would
+        duplicate the value, so reject it rather than guess which copy is real.
         """
         envelopes = _find_envelopes(raw_response)
 
         if len(envelopes) == 1:
             return envelopes[0]
 
+        port = self.config.port
+        reopen = (
+            f"    cmds.commandPort(name=':{port}', close=True)\n"
+            f"    cmds.commandPort(name=':{port}', sourceType='python', echoOutput=False)"
+        )
+
         if len(envelopes) > 1:
-            port = self.config.port
             raise MayaCommandError(
                 message=(
-                    "Maya's commandPort appears to be open with echoOutput=True, "
-                    "which this client does not support. Reopen it with "
-                    "echoOutput=False:\n"
-                    f"    cmds.commandPort(name=':{port}', close=True)\n"
-                    f"    cmds.commandPort(name=':{port}', sourceType='python', "
-                    "echoOutput=False)"
+                    "Maya echoed the response back more than once, which means the "
+                    "commandPort is open with echoOutput=True. Reopen it with "
+                    f"echoOutput=False:\n{reopen}"
                 ),
                 command=command,
-                maya_error=f"received {len(envelopes)} echoed responses",
+                maya_error=f"received {len(envelopes)} copies of the response",
             )
 
         preview = raw_response[:200] or "<empty>"
         raise MayaCommandError(
             message=(
-                "Maya returned no usable response. The commandPort may be open "
-                "with sourceType='mel' instead of 'python'."
+                "Maya returned no usable response. The commandPort may be open with "
+                "sourceType='mel' instead of 'python', or opened with echoOutput=True "
+                "and already broken by an earlier command (Maya 2024 cannot echo "
+                f"command output and stops responding once it tries). Reopen it:\n{reopen}"
             ),
             command=command,
             maya_error=f"unparseable response: {preview!r}",
         )
-
-    def _ensure_bootstrapped(self) -> None:
-        """Install the Maya-side helper if this connection has not verified it yet.
-
-        The helper lives in Maya's ``__main__`` so it survives across sockets, but
-        Maya may have restarted, so verify rather than assume.
-        """
-        if self._bootstrapped:
-            return
-
-        probe = self._send_expression(
-            "__import__('__main__').__dict__.get('_MCP_HELPER_VERSION')",
-            allow_retry=True,
-        )
-        installed = str(HELPER_VERSION) in _response_parts(probe)
-
-        if not installed:
-            logger.info("Installing Maya-side helper (v%d)", HELPER_VERSION)
-            self._send_expression(_bootstrap_expression(), allow_retry=True)
-
-        self._bootstrapped = True
 
     def _send_expression(self, expression: str, *, allow_retry: bool) -> str:
         """Send one expression and return the raw response, retrying on send failure.
@@ -668,9 +700,6 @@ class CommandPortClient:
             with contextlib.suppress(OSError):
                 self._socket.close()
             self._socket = None
-        # The helper lives in Maya's __main__, which outlives a dropped socket,
-        # but Maya may have restarted underneath us. Re-verify on next connect.
-        self._bootstrapped = False
 
     def _handle_socket_error(self) -> None:
         """Handle a socket error by cleaning up and updating state."""

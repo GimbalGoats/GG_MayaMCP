@@ -26,6 +26,7 @@ from maya_mcp.transport.commandport import (
     _bootstrap_expression,
     _call_expression,
     _find_envelopes,
+    _needs_helper,
 )
 from maya_mcp.types import ConnectionConfig, ConnectionStatus
 
@@ -46,11 +47,12 @@ def envelope_bytes(
     ok: bool = True,
     error: str | None = None,
     error_type: str | None = None,
+    version: int | None = None,
 ) -> bytes:
     """Build a wire-format response the way the Maya-side helper would."""
     payload = json.dumps(
         {
-            "v": HELPER_VERSION,
+            "v": HELPER_VERSION if version is None else version,
             "ok": ok,
             "stdout": stdout,
             "error": error,
@@ -59,6 +61,16 @@ def envelope_bytes(
         }
     )
     return f"{payload}\n\x00".encode()
+
+
+# What Maya 2024 actually answers when the helper is absent. The client calls
+# through __main__, so this is an AttributeError, not a NameError. Verified
+# against a live session -- do not "tidy" it without re-checking Maya.
+HELPER_MISSING = b"module '__main__' has no attribute '_mcp_exec'\n\x00"
+# The NameError form, for a bare-name call.
+HELPER_MISSING_NAMEERROR = b"name '_mcp_exec' is not defined\n\x00"
+# What Maya answers to the bootstrap expression (exec returns None).
+BOOTSTRAP_ACK = b"None\n\x00"
 
 
 class BlockingCommandSocket:
@@ -216,6 +228,42 @@ class TestProtocolEncoding:
     def test_bootstrap_expression_is_a_single_expression(self) -> None:
         """The bootstrap must also be one line, or commandPort would exec it."""
         assert "\n" not in _bootstrap_expression()
+
+    def test_call_reaches_the_helper_through_main(self) -> None:
+        """The call goes via __main__, which is why a missing helper is an
+        AttributeError rather than a NameError. _needs_helper depends on this."""
+        assert "__main__" in _call_expression("pass")
+
+
+class TestNeedsHelper:
+    """Tests for deciding when to (re)install the Maya-side helper.
+
+    The marker strings here are what a live Maya 2024 actually returns; they are
+    the load-bearing part of self-healing, so they are pinned deliberately.
+    """
+
+    def test_detects_missing_helper_attribute_error(self) -> None:
+        """The real response for the client's __main__-routed call."""
+        assert _needs_helper(HELPER_MISSING.decode("utf-8")) is True
+
+    def test_detects_missing_helper_name_error(self) -> None:
+        """The bare-name form is recognised too."""
+        assert _needs_helper(HELPER_MISSING_NAMEERROR.decode("utf-8")) is True
+
+    def test_current_version_envelope_needs_nothing(self) -> None:
+        """A healthy response triggers no reinstall."""
+        assert _needs_helper(envelope_bytes("ok\n").decode("utf-8")) is False
+
+    def test_stale_version_envelope_triggers_reinstall(self) -> None:
+        """A helper from another server version is replaced."""
+        stale = envelope_bytes("ok\n", version=HELPER_VERSION + 1).decode("utf-8")
+
+        assert _needs_helper(stale) is True
+
+    def test_unrelated_response_needs_nothing(self) -> None:
+        """A response with no marker and no envelope is not a bootstrap signal."""
+        assert _needs_helper("None") is False
+        assert _needs_helper("") is False
 
 
 class TestGlobalClient:
@@ -417,12 +465,7 @@ class TestCommandPortClientExecute:
     def test_execute_returns_captured_stdout(self) -> None:
         """Execute returns what the command printed, unwrapped from the envelope."""
         client = CommandPortClient()
-        fake_socket = ScriptedSocket(
-            [
-                f"{HELPER_VERSION}\n\x00".encode(),
-                envelope_bytes("['pCube1', 'pSphere1']\n"),
-            ]
-        )
+        fake_socket = ScriptedSocket([envelope_bytes("['pCube1', 'pSphere1']\n")])
 
         with patch("socket.socket", return_value=fake_socket):
             client.connect()
@@ -434,12 +477,7 @@ class TestCommandPortClientExecute:
         """The command reaches Maya base64-wrapped, never as raw multi-line code."""
         client = CommandPortClient()
         command = "import json\nprint(json.dumps({'a': 1}))\n"
-        fake_socket = ScriptedSocket(
-            [
-                f"{HELPER_VERSION}\n\x00".encode(),
-                envelope_bytes('{"a": 1}\n'),
-            ]
-        )
+        fake_socket = ScriptedSocket([envelope_bytes('{"a": 1}\n')])
 
         with patch("socket.socket", return_value=fake_socket):
             client.connect()
@@ -453,12 +491,7 @@ class TestCommandPortClientExecute:
     def test_execute_auto_connects(self) -> None:
         """Execute connects automatically if not connected."""
         client = CommandPortClient()
-        fake_socket = ScriptedSocket(
-            [
-                f"{HELPER_VERSION}\n\x00".encode(),
-                envelope_bytes("result\n"),
-            ]
-        )
+        fake_socket = ScriptedSocket([envelope_bytes("result\n")])
 
         with patch("socket.socket", return_value=fake_socket):
             result = client.execute("print('result')")
@@ -466,16 +499,23 @@ class TestCommandPortClientExecute:
             assert result == "result"
             assert client.is_connected()
 
-    def test_execute_installs_helper_when_missing(self) -> None:
-        """A Maya without the helper gets it installed before the command runs."""
+    def test_execute_costs_one_round_trip_when_helper_present(self) -> None:
+        """No probe: a command against a ready Maya is a single send."""
         client = CommandPortClient()
-        fake_socket = ScriptedSocket(
-            [
-                b"None\n\x00",  # probe: helper absent
-                b"None\n\x00",  # bootstrap acknowledged
-                envelope_bytes("done\n"),
-            ]
-        )
+        fake_socket = ScriptedSocket([envelope_bytes("one\n"), envelope_bytes("two\n")])
+
+        with patch("socket.socket", return_value=fake_socket):
+            client.connect()
+            assert client.execute("print('one')") == "one"
+            assert client.execute("print('two')") == "two"
+
+        assert len(fake_socket.sent) == 2
+        assert all(not sent.strip().startswith("exec(") for sent in fake_socket.sent)
+
+    def test_execute_installs_helper_when_missing_then_retries(self) -> None:
+        """A Maya without the helper gets it installed and the command re-sent."""
+        client = CommandPortClient()
+        fake_socket = ScriptedSocket([HELPER_MISSING, BOOTSTRAP_ACK, envelope_bytes("done\n")])
 
         with patch("socket.socket", return_value=fake_socket):
             client.connect()
@@ -484,31 +524,35 @@ class TestCommandPortClientExecute:
         assert result == "done"
         assert len(fake_socket.sent) == 3
         assert fake_socket.sent[1].strip() == _bootstrap_expression()
+        # The command is retried verbatim after the bootstrap.
+        assert fake_socket.sent[0] == fake_socket.sent[2]
 
-    def test_execute_skips_bootstrap_when_helper_present(self) -> None:
-        """A helper already in Maya is not reinstalled."""
+    def test_execute_reinstalls_stale_helper(self) -> None:
+        """A helper from an older server version is replaced, not trusted."""
         client = CommandPortClient()
         fake_socket = ScriptedSocket(
             [
-                f"{HELPER_VERSION}\n\x00".encode(),
-                envelope_bytes("done\n"),
+                envelope_bytes("old\n", version=HELPER_VERSION + 1),
+                BOOTSTRAP_ACK,
+                envelope_bytes("new\n"),
             ]
         )
 
         with patch("socket.socket", return_value=fake_socket):
             client.connect()
-            client.execute("print('done')")
+            result = client.execute("print('x')")
 
-        assert len(fake_socket.sent) == 2
-        assert all(not sent.strip().startswith("exec(") for sent in fake_socket.sent)
+        assert result == "new"
+        assert fake_socket.sent[1].strip() == _bootstrap_expression()
 
-    def test_execute_probes_helper_only_once_per_connection(self) -> None:
-        """The version probe is not repeated for every command."""
+    def test_execute_recovers_when_maya_loses_helper_mid_session(self) -> None:
+        """A Maya restart heals on the next command without reconnecting."""
         client = CommandPortClient()
         fake_socket = ScriptedSocket(
             [
-                f"{HELPER_VERSION}\n\x00".encode(),
                 envelope_bytes("one\n"),
+                HELPER_MISSING,  # Maya restarted; __main__ lost the helper
+                BOOTSTRAP_ACK,
                 envelope_bytes("two\n"),
             ]
         )
@@ -518,27 +562,6 @@ class TestCommandPortClientExecute:
             assert client.execute("print('one')") == "one"
             assert client.execute("print('two')") == "two"
 
-        assert len(fake_socket.sent) == 3
-
-    def test_execute_reinstalls_helper_after_reconnect(self) -> None:
-        """A dropped socket forces a fresh probe, in case Maya restarted."""
-        client = CommandPortClient()
-        fake_socket = ScriptedSocket(
-            [
-                f"{HELPER_VERSION}\n\x00".encode(),
-                envelope_bytes("one\n"),
-                f"{HELPER_VERSION}\n\x00".encode(),
-                envelope_bytes("two\n"),
-            ]
-        )
-
-        with patch("socket.socket", return_value=fake_socket):
-            client.connect()
-            client.execute("print('one')")
-            client.disconnect()
-            client.connect()
-            client.execute("print('two')")
-
         assert len(fake_socket.sent) == 4
 
     def test_execute_raises_when_command_raises_in_maya(self) -> None:
@@ -546,13 +569,12 @@ class TestCommandPortClientExecute:
         client = CommandPortClient()
         fake_socket = ScriptedSocket(
             [
-                f"{HELPER_VERSION}\n\x00".encode(),
                 envelope_bytes(
                     "",
                     ok=False,
                     error="division by zero",
                     error_type="ZeroDivisionError",
-                ),
+                )
             ]
         )
 
@@ -565,11 +587,11 @@ class TestCommandPortClientExecute:
         assert exc_info.value.maya_error == "division by zero"
         assert "ZeroDivisionError" in exc_info.value.message
 
-    def test_execute_detects_echo_output_port(self) -> None:
-        """A duplicated envelope means echoOutput=True; say so explicitly."""
+    def test_execute_detects_echoing_port(self) -> None:
+        """A duplicated response means the port echoed it; say so explicitly."""
         client = CommandPortClient()
         duplicated = envelope_bytes("dup\n") + envelope_bytes("dup\n")
-        fake_socket = ScriptedSocket([f"{HELPER_VERSION}\n\x00".encode(), duplicated])
+        fake_socket = ScriptedSocket([duplicated])
 
         with patch("socket.socket", return_value=fake_socket):
             client.connect()
@@ -583,7 +605,9 @@ class TestCommandPortClientExecute:
     def test_execute_raises_on_unparseable_response(self) -> None:
         """A response with no envelope is reported rather than returned as empty."""
         client = CommandPortClient()
-        fake_socket = ScriptedSocket([f"{HELPER_VERSION}\n\x00".encode(), b"None\n\x00"])
+        # "None" carries no missing-helper marker and no envelope, so there is
+        # nothing to bootstrap from -- it is reported straight away.
+        fake_socket = ScriptedSocket([b"None\n\x00"])
 
         with patch("socket.socket", return_value=fake_socket):
             client.connect()
@@ -592,6 +616,20 @@ class TestCommandPortClientExecute:
                 client.execute("print('x')")
 
         assert "no usable response" in exc_info.value.message
+        assert len(fake_socket.sent) == 1
+
+    def test_execute_mentions_echo_brick_on_empty_response(self) -> None:
+        """An empty response points at the Maya 2024 echo brick, not just mel."""
+        client = CommandPortClient()
+        fake_socket = ScriptedSocket([b"", b"", b""])
+
+        with patch("socket.socket", return_value=fake_socket):
+            client.connect()
+
+            with pytest.raises(MayaCommandError) as exc_info:
+                client.execute("print('x')")
+
+        assert "echoOutput=True" in exc_info.value.message
 
     def test_execute_timeout(self) -> None:
         """Execute raises MayaTimeoutError on timeout."""
@@ -636,12 +674,7 @@ class TestCommandPortClientExecute:
 
         with patch("socket.socket") as mock_socket_class:
             mock_socket_first = MagicMock()
-            mock_socket_retry = ScriptedSocket(
-                [
-                    f"{HELPER_VERSION}\n\x00".encode(),
-                    envelope_bytes('{"ok": true}\n'),
-                ]
-            )
+            mock_socket_retry = ScriptedSocket([envelope_bytes('{"ok": true}\n')])
             mock_socket_class.side_effect = [
                 mock_socket_first,
                 mock_socket_retry,
@@ -657,8 +690,8 @@ class TestCommandPortClientExecute:
             assert result == '{"ok": true}'
             # First socket sendall was called, then failed
             mock_socket_first.sendall.assert_called_once()
-            # Retry socket carried the probe and then the command
-            assert len(mock_socket_retry.sent) == 2
+            # Retry socket carried the command
+            assert len(mock_socket_retry.sent) == 1
 
     def test_execute_no_retry_on_receive_failure(self) -> None:
         """Execute does NOT retry on receive-phase failure."""
@@ -731,8 +764,6 @@ class TestCommandPortClientExecute:
 
         with patch("socket.socket", return_value=fake_socket):
             client.connect()
-            # Skip the helper probe so this exercises serialization only.
-            client._bootstrapped = True
 
             first_thread = threading.Thread(target=execute, args=("first",))
             second_thread = threading.Thread(target=execute, args=("second",))
@@ -781,8 +812,6 @@ class TestCommandPortClientExecute:
 
         with patch("socket.socket", return_value=fake_socket):
             client.connect()
-            # Skip the helper probe so this exercises locking only.
-            client._bootstrapped = True
 
             execute_thread = threading.Thread(target=execute)
             mutation_thread = threading.Thread(target=mutate_lifecycle)

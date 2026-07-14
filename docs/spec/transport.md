@@ -97,7 +97,7 @@ If it expires, Maya MCP raises `MayaTimeoutError`.
 
 ## Command Protocol
 
-The port must be opened with `echoOutput=False`.
+Open the port with `echoOutput=False`.
 
 Commands are not sent to Maya verbatim. Maya's `commandPort` returns a value only
 when what it receives is a single bare expression it can evaluate; a payload
@@ -124,13 +124,27 @@ Because output is carried by the helper's return value rather than echoed, Maya
 startup and plugin warnings no longer share the response stream, and no
 noise-filtering or echo-deduplication is required.
 
-The helper is version-stamped (`HELPER_VERSION`). The transport probes for it on
-each new connection and reinstalls it when absent or stale, so a Maya restart
-recovers without user action.
+The helper is version-stamped (`HELPER_VERSION`) and installed on demand: the
+transport sends the command first and only bootstraps when Maya reports the
+helper missing or returns an envelope stamped with a different version. A command
+against a ready Maya therefore costs one round trip, and a Maya restart or a
+stale helper heals on the next command with no user action.
 
-If a port is opened with `echoOutput=True`, Maya echoes the value back more than
-once. The transport detects the duplicate envelopes and raises `MayaCommandError`
-explaining how to reopen the port, rather than failing later on a confusing parse.
+### Why `echoOutput=False`
+
+Commands print nothing — the helper captures stdout — so Maya's echo path never
+runs and this transport works against a port opened either way. `echoOutput=False`
+is still the documented setting, for two reasons:
+
+- On Maya 2024, `echoOutput=True` is broken. Maya's `CommandPort.py` writes
+  command output to the socket as `str` rather than `bytes`, so the first command
+  that prints anything raises inside Maya's echo writer and the port stops
+  responding to everything afterwards. Nothing this transport sends triggers it,
+  but anything else sharing that port would brick it.
+- On Maya versions whose echo works, the port would send the helper's return
+  value back more than once. The transport detects the duplicate responses and
+  raises `MayaCommandError` explaining how to reopen the port, rather than
+  guessing which copy is real.
 
 Tool modules should not implement their own socket read loops or commandPort response cleanup.
 

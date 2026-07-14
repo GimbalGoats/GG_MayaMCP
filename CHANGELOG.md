@@ -15,14 +15,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parse. Commands are now base64-encoded and run through a helper installed in
   Maya's `__main__`, which captures stdout and returns it in a JSON envelope.
   `execute()` still returns the command's stdout, so tool modules are unchanged.
+- Worked around Maya 2024 breaking its own `commandPort` when `echoOutput=True`:
+  Maya writes command output to the socket as `str` rather than `bytes`, so the
+  first command that prints anything raises inside Maya's echo writer and the
+  port stops responding to every later command. Commands no longer print, so
+  that path is never taken.
+- The Maya-side helper is now installed on demand rather than probed for on each
+  connection, so a command against a ready Maya costs one round trip, and a Maya
+  restart or a helper left behind by an older server version heals automatically
+  on the next command.
 
 ### Changed
 
-- **Breaking:** Maya's `commandPort` must now be opened with `echoOutput=False`.
-  `scripts/userSetup.py`, `scripts/enable_commandport.py`, and the MCP panel now
-  do this by default; existing setups that open the port themselves must be
-  updated. A port opened with `echoOutput=True` is detected and reported with
-  instructions rather than failing obscurely.
+- Maya's `commandPort` should now be opened with `echoOutput=False`, and
+  `scripts/userSetup.py`, `scripts/enable_commandport.py`, and the MCP panel
+  default to it. This is a recommendation, not a hard requirement: the helper
+  captures stdout, so commands print nothing, Maya's echo path never runs, and
+  an existing `echoOutput=True` setup keeps working on Maya 2024 (verified
+  against a live session). `echoOutput=False` is preferred because it avoids
+  that machinery entirely and because on Maya versions with a working echo the
+  response would be duplicated on the wire, which the transport rejects rather
+  than guessing which copy is real.
 - Removed commandPort response echo-deduplication and Maya/Arnold startup-noise
   filtering. Command output now travels as the helper's return value instead of
   an echoed stream, so that noise no longer reaches the parser.
