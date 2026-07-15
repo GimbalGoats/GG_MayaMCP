@@ -333,9 +333,7 @@ class TestCommandPortClientConnect:
             mock_socket.recv.side_effect = [
                 b'plugin output\n{"__maya_mcp_compat__":"2024:1"}\n\x00',
                 TimeoutError(),
-                json.dumps(
-                    {"__maya_mcp_buffer__": MAYA_2024_REQUIRED_PROBE_SIZE}
-                ).encode()
+                json.dumps({"__maya_mcp_buffer__": MAYA_2024_REQUIRED_PROBE_SIZE}).encode()
                 + b"\n\x00",
                 TimeoutError(),
                 b'{"__maya_mcp_response__":{"ok":true,"result":"{\\"ok\\": true}"}}\n\x00',

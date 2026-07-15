@@ -551,9 +551,7 @@ class CommandPortClient:
         )
         response = self._receive_response(timeout=probe_timeout)
         if not response:
-            raise _MayaCompatibilityProbeTimeout(
-                "Maya compatibility probe returned no response"
-            )
+            raise _MayaCompatibilityProbeTimeout("Maya compatibility probe returned no response")
         try:
             mode = json.loads(response)[_MAYA_COMPATIBILITY_PROBE_KEY]
         except (json.JSONDecodeError, KeyError, TypeError) as exc:
@@ -576,9 +574,7 @@ class CommandPortClient:
         payload_size = MAYA_2024_REQUIRED_PROBE_SIZE
         padding = "x" * payload_size
         probe = (
-            "__import__('json').dumps({"
-            f"'{_MAYA_COMPATIBILITY_BUFFER_KEY}':len('{padding}')"
-            "})\n"
+            f"__import__('json').dumps({{'{_MAYA_COMPATIBILITY_BUFFER_KEY}':len('{padding}')}})\n"
         )
         self._socket.settimeout(timeout)
         self._send_compatibility_probe(
