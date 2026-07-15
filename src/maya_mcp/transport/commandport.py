@@ -39,6 +39,7 @@ import time
 from maya_mcp.commandport_protocol import (
     MAYA_2024_HANDLER_NAME,
     MAYA_2024_PORTS_NAME,
+    MAYA_2024_REQUIRED_PROBE_SIZE,
 )
 from maya_mcp.errors import (
     MayaCommandError,
@@ -557,7 +558,7 @@ class CommandPortClient:
         """Prove the active listener accepts commands beyond Maya's default buffer."""
         if self._socket is None:
             return
-        payload_size = 4097
+        payload_size = MAYA_2024_REQUIRED_PROBE_SIZE
         padding = "x" * payload_size
         probe = (
             "__import__('json').dumps({"

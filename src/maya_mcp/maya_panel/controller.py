@@ -134,7 +134,13 @@ def open_command_port(
     is_maya_2024_compatibility = port_kwargs.get("bufferSize") == MAYA_2024_COMMAND_PORT_BUFFER_SIZE
 
     if existing_port_name is not None:
-        if not is_maya_2024_compatibility or not replace_existing:
+        if is_maya_2024_compatibility and not replace_existing:
+            logger.warning(
+                "Existing Maya 2024 commandPort on %s is not compatibility-marked",
+                port_name,
+            )
+            return False
+        if not is_maya_2024_compatibility:
             logger.info("CommandPort already open on %s", port_name)
             return True
         cmds.commandPort(name=existing_port_name, close=True)

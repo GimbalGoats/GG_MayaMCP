@@ -232,6 +232,15 @@ def test_control_panel_replaces_an_existing_broken_maya_2024_port(
     assert calls[1]["bufferSize"] == MAYA_2024_COMMAND_PORT_BUFFER_SIZE
 
 
+def test_control_panel_reports_unmarked_maya_2024_inet_port_as_incompatible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = _install_fake_maya(monkeypatch, "2024", open_ports=[":7002"])
+
+    assert controller.open_command_port(7002) is False
+    assert calls == []
+
+
 def test_control_panel_opens_inet_beside_named_socket(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -21,7 +21,11 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 
 import maya_mcp.transport.commandport as transport_module
-from maya_mcp.commandport_protocol import MAYA_2024_HANDLER_NAME, MAYA_2024_PORTS_NAME
+from maya_mcp.commandport_protocol import (
+    MAYA_2024_HANDLER_NAME,
+    MAYA_2024_PORTS_NAME,
+    MAYA_2024_REQUIRED_PROBE_SIZE,
+)
 from maya_mcp.errors import MayaCommandError, MayaTimeoutError, MayaUnavailableError
 from maya_mcp.transport.commandport import CommandPortClient, _parse_maya_response
 from maya_mcp.types import ConnectionConfig, ConnectionStatus
@@ -304,7 +308,10 @@ class TestCommandPortClientConnect:
             mock_socket.recv.side_effect = [
                 b'plugin output\n{"__maya_mcp_compat__":"2024:1"}\n\x00',
                 TimeoutError(),
-                b'{"__maya_mcp_buffer__":4097}\n\x00',
+                json.dumps(
+                    {"__maya_mcp_buffer__": MAYA_2024_REQUIRED_PROBE_SIZE}
+                ).encode()
+                + b"\n\x00",
                 TimeoutError(),
                 b'{"__maya_mcp_response__":{"ok":true,"result":"{\\"ok\\": true}"}}\n\x00',
                 TimeoutError(),
@@ -321,7 +328,7 @@ class TestCommandPortClientConnect:
         assert "_maya_mcp_command_port_2024" in sent[0]
         assert "_maya_mcp_command_port_2024_ports" in sent[0]
         assert "7002" in sent[0]
-        assert len(sent[1]) > 4096
+        assert len(sent[1]) > 8 * 1024 * 1024
         assert "__maya_mcp_buffer__" in sent[1]
         assert sent[2].count("\n") == 1
         assert "_maya_mcp_command_port_2024" in sent[2]
@@ -362,7 +369,7 @@ class TestCommandPortClientConnect:
                 client.connect()
 
         sent = [item.args[0] for item in mock_socket.sendall.call_args_list]
-        assert len(sent[1]) > 4096
+        assert len(sent[1]) > 8 * 1024 * 1024
         assert client._socket is None
 
     def test_maya_2024_response_envelope_preserves_repeated_output(self) -> None:
