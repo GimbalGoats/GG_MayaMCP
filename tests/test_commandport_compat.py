@@ -227,6 +227,10 @@ def test_control_panel_replaces_an_existing_broken_maya_2024_port(
     assert controller.open_command_port(7002)
     assert calls == []
 
+    assert controller.open_command_port(7002, replace_existing=True)
+    assert calls[0] == {"name": ":7002", "close": True}
+    assert calls[1]["bufferSize"] == MAYA_2024_COMMAND_PORT_BUFFER_SIZE
+
 
 def test_control_panel_opens_inet_beside_named_socket(
     monkeypatch: pytest.MonkeyPatch,

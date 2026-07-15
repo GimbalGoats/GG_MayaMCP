@@ -122,7 +122,11 @@ def open_command_port(
     # cannot return responses. Replace an existing Python/echo port in that one
     # release; all other versions retain the established early-return path.
     existing_port_name = get_open_port_name(port)
-    if existing_port_name is not None and is_maya_2024_compatible_port(port):
+    if (
+        existing_port_name is not None
+        and is_maya_2024_compatible_port(port)
+        and not replace_existing
+    ):
         logger.info("CommandPort already open on %s", port_name)
         return True
 
