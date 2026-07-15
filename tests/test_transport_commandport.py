@@ -191,6 +191,7 @@ class TestCommandPortClientInit:
         assert client.config.command_timeout == 30.0
         assert client.config.max_retries == 3
         assert client._auto_detect_maya_compatibility is True
+        assert client.source_type == "python"
 
     def test_custom_config(self) -> None:
         """Client accepts custom configuration."""
@@ -260,6 +261,17 @@ class TestCommandPortClientConnect:
             assert result is True
             # Socket should only be created once
             assert mock_socket_class.call_count == 1
+
+    def test_mel_connection_skips_python_compatibility_probe(self) -> None:
+        client = CommandPortClient(source_type="mel")
+
+        with patch("socket.socket") as mock_socket_class:
+            mock_socket = MagicMock()
+            mock_socket_class.return_value = mock_socket
+
+            assert client.connect() is True
+
+        mock_socket.sendall.assert_not_called()
 
     def test_connect_refused_retries(self) -> None:
         """Connection refused triggers retries with backoff."""
@@ -371,6 +383,25 @@ class TestCommandPortClientConnect:
         sent = [item.args[0] for item in mock_socket.sendall.call_args_list]
         assert len(sent[1]) > 8 * 1024 * 1024
         assert client._socket is None
+
+    def test_maya_2024_buffer_send_timeout_does_not_retry_connection(self) -> None:
+        client = CommandPortClient(max_retries=3, auto_detect_maya_compatibility=True)
+
+        with patch("socket.socket") as mock_socket_class:
+            mock_socket = MagicMock()
+            mock_socket.recv.side_effect = [
+                b'{"__maya_mcp_compat__":"2024:1"}\n\x00',
+                TimeoutError(),
+            ]
+            mock_socket.sendall.side_effect = [None, TimeoutError()]
+            mock_socket_class.return_value = mock_socket
+
+            with pytest.raises(MayaUnavailableError) as exc_info:
+                client.connect()
+
+        assert exc_info.value.attempts == 1
+        assert "buffer probe" in str(exc_info.value.last_error)
+        assert mock_socket_class.call_count == 1
 
     def test_maya_2024_response_envelope_preserves_repeated_output(self) -> None:
         client = CommandPortClient(auto_detect_maya_compatibility=False)

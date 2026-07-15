@@ -35,6 +35,7 @@ import logging
 import socket
 import threading
 import time
+from typing import Literal
 
 from maya_mcp.commandport_protocol import (
     MAYA_2024_HANDLER_NAME,
@@ -231,6 +232,7 @@ class CommandPortClient:
         max_retries: int = 3,
         retry_base_delay: float = 0.5,
         auto_detect_maya_compatibility: bool = True,
+        source_type: Literal["python", "mel"] = "python",
     ) -> None:
         """Initialize the CommandPortClient.
 
@@ -244,10 +246,14 @@ class CommandPortClient:
             auto_detect_maya_compatibility: Detect the Maya 2024 response mode
                 once per socket connection. Enabled by default for every public
                 client; low-level legacy callers can explicitly opt out.
+            source_type: Maya commandPort interpreter. Compatibility detection
+                applies only to Python listeners.
 
         Raises:
             ValueError: If configuration is invalid.
         """
+        if source_type not in {"python", "mel"}:
+            raise ValueError(f"Unsupported commandPort source type: {source_type}")
         self.config = ConnectionConfig(
             host=host,
             port=port,
@@ -260,6 +266,7 @@ class CommandPortClient:
         self._socket: socket.socket | None = None
         self._lock = threading.RLock()
         self._auto_detect_maya_compatibility = auto_detect_maya_compatibility
+        self.source_type = source_type
         self._maya_2024_compatibility = False
 
     def connect(self) -> bool:
@@ -296,7 +303,7 @@ class CommandPortClient:
                     self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
                     self._socket.settimeout(self.config.connect_timeout)
                     self._socket.connect((self.config.host, self.config.port))
-                    if self._auto_detect_maya_compatibility:
+                    if self._auto_detect_maya_compatibility and self.source_type == "python":
                         self._detect_maya_compatibility()
 
                     # Connection successful
@@ -538,7 +545,10 @@ class CommandPortClient:
         # one full command deadline rather than multiplying it across retries.
         probe_timeout = self.config.command_timeout
         self._socket.settimeout(probe_timeout)
-        self._socket.sendall(probe.encode("utf-8"))
+        self._send_compatibility_probe(
+            probe,
+            error="Maya compatibility probe timed out while sending",
+        )
         response = self._receive_response(timeout=probe_timeout)
         if not response:
             raise _MayaCompatibilityProbeTimeout(
@@ -565,7 +575,10 @@ class CommandPortClient:
             f"'{_MAYA_COMPATIBILITY_BUFFER_KEY}':len('{padding}')"
             "})\n"
         )
-        self._socket.sendall(probe.encode("utf-8"))
+        self._send_compatibility_probe(
+            probe,
+            error="Maya 2024 compatibility buffer probe timed out while sending",
+        )
         response = self._receive_response(timeout=timeout)
         if not response:
             raise _MayaCompatibilityProbeTimeout(
@@ -581,6 +594,14 @@ class CommandPortClient:
             raise _MayaCompatibilityProbeInvalid(
                 "Maya 2024 compatibility buffer probe returned an unexpected size"
             )
+
+    def _send_compatibility_probe(self, probe: str, *, error: str) -> None:
+        if self._socket is None:
+            return
+        try:
+            self._socket.sendall(probe.encode("utf-8"))
+        except TimeoutError as exc:
+            raise _MayaCompatibilityProbeTimeout(error) from exc
 
     def _receive_response(self, *, timeout: float | None = None) -> str:
         """Read and parse one commandPort response."""
@@ -656,6 +677,7 @@ class CommandPortClient:
         self,
         host: str | None = None,
         port: int | None = None,
+        source_type: Literal["python", "mel"] | None = None,
     ) -> None:
         """Update connection configuration.
 
@@ -664,6 +686,7 @@ class CommandPortClient:
         Args:
             host: New target host (optional).
             port: New target port (optional).
+            source_type: New command interpreter (optional).
 
         Raises:
             ValueError: If new configuration is invalid.
@@ -678,6 +701,9 @@ class CommandPortClient:
             # Update config
             new_host = host if host is not None else self.config.host
             new_port = port if port is not None else self.config.port
+            new_source_type = source_type if source_type is not None else self.source_type
+            if new_source_type not in {"python", "mel"}:
+                raise ValueError(f"Unsupported commandPort source type: {new_source_type}")
 
             self.config = ConnectionConfig(
                 host=new_host,
@@ -688,6 +714,7 @@ class CommandPortClient:
                 retry_base_delay=self.config.retry_base_delay,
             )
             self.state.config = self.config
+            self.source_type = new_source_type
 
     def _cleanup_socket(self) -> None:
         """Clean up the socket connection."""
