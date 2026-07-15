@@ -58,9 +58,9 @@ class FakeCmds:
     ("name", "expected"),
     [
         (":7002", True),
-        ("localhost:7002", True),
-        ("127.0.0.1:7002", True),
-        ("[::1]:7002", True),
+        ("localhost:7002", False),
+        ("127.0.0.1:7002", False),
+        ("[::1]:7002", False),
         ("7002", False),
         ("/tmp/maya:7002", False),
         ("maya-command-7002", False),
@@ -215,11 +215,11 @@ def test_control_panel_applies_maya_2024_compatibility_policy(
 def test_control_panel_replaces_an_existing_broken_maya_2024_port(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls = _install_fake_maya(monkeypatch, "2024", open_ports=["127.0.0.1:7002"])
+    calls = _install_fake_maya(monkeypatch, "2024", open_ports=[":7002"])
 
     assert controller.open_command_port(7002, replace_existing=True)
 
-    assert calls[0] == {"name": "127.0.0.1:7002", "close": True}
+    assert calls[0] == {"name": ":7002", "close": True}
     assert calls[1]["echoOutput"] is False
     assert calls[1]["bufferSize"] == MAYA_2024_COMMAND_PORT_BUFFER_SIZE
 
@@ -228,25 +228,26 @@ def test_control_panel_replaces_an_existing_broken_maya_2024_port(
     assert calls == []
 
 
-def test_control_panel_leaves_unknown_maya_2024_port_unchanged(
+def test_control_panel_opens_inet_beside_named_socket(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls = _install_fake_maya(monkeypatch, "2024", open_ports=["localhost:7002"])
 
     assert controller.open_command_port(7002)
 
-    assert calls == []
+    assert calls[-1]["name"] == ":7002"
+    assert {"name": "localhost:7002", "close": True} not in calls
 
 
-def test_port_status_reports_host_prefixed_listener(
+def test_port_status_ignores_named_socket_with_port_suffix(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _install_fake_maya(monkeypatch, "2024", open_ports=["127.0.0.1:7002"])
 
     status = controller.get_port_status(7002)
 
-    assert status["is_open"] is True
-    assert status["port_name"] == "127.0.0.1:7002"
+    assert status["is_open"] is False
+    assert status["port_name"] == ":7002"
 
 
 def test_control_panel_ignores_unix_domain_command_port_names(
@@ -292,17 +293,17 @@ def test_user_setup_applies_maya_2024_compatibility_policy(
 def test_user_setup_explicitly_replaces_an_owned_broken_maya_2024_port(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls = _install_fake_maya(monkeypatch, "2024", open_ports=["localhost:7001"])
+    calls = _install_fake_maya(monkeypatch, "2024", open_ports=[":7001"])
 
     namespace = runpy.run_path(str(Path("scripts/userSetup.py")))
     namespace["_start_command_port"].__globals__["REPLACE_EXISTING_COMMAND_PORT"] = True
     namespace["_start_command_port"]()
 
-    assert calls[0] == {"name": "localhost:7001", "close": True}
+    assert calls[0] == {"name": ":7001", "close": True}
     assert calls[1]["echoOutput"] is False
 
 
-def test_user_setup_leaves_unknown_maya_2024_port_unchanged(
+def test_user_setup_opens_inet_beside_named_socket(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls = _install_fake_maya(monkeypatch, "2024", open_ports=["localhost:7001"])
@@ -310,7 +311,8 @@ def test_user_setup_leaves_unknown_maya_2024_port_unchanged(
     namespace = runpy.run_path(str(Path("scripts/userSetup.py")))
     namespace["_start_command_port"]()
 
-    assert calls == []
+    assert calls[-1]["name"] == ":7001"
+    assert {"name": "localhost:7001", "close": True} not in calls
 
 
 def test_existing_maya_2025_port_is_left_untouched(
@@ -324,15 +326,15 @@ def test_existing_maya_2025_port_is_left_untouched(
     assert calls == []
 
 
-def test_manual_script_replaces_host_prefixed_port(
+def test_manual_script_replaces_inet_port(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls = _install_fake_maya(monkeypatch, "2024", open_ports=["localhost:7002"])
+    calls = _install_fake_maya(monkeypatch, "2024", open_ports=[":7002"])
 
     namespace = runpy.run_path(str(Path("scripts/enable_commandport.py")))
     namespace["enable_commandport"](7002)
 
-    assert calls[0] == {"name": "localhost:7002", "close": True}
+    assert calls[0] == {"name": ":7002", "close": True}
     assert calls[1]["name"] == ":7002"
 
 

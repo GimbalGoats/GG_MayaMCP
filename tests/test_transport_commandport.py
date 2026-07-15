@@ -304,6 +304,8 @@ class TestCommandPortClientConnect:
             mock_socket.recv.side_effect = [
                 b'plugin output\n{"__maya_mcp_compat__":"2024:1"}\n\x00',
                 TimeoutError(),
+                b'{"__maya_mcp_buffer__":4097}\n\x00',
+                TimeoutError(),
                 b'{"__maya_mcp_response__":{"ok":true,"result":"{\\"ok\\": true}"}}\n\x00',
                 TimeoutError(),
             ]
@@ -319,9 +321,11 @@ class TestCommandPortClientConnect:
         assert "_maya_mcp_command_port_2024" in sent[0]
         assert "_maya_mcp_command_port_2024_ports" in sent[0]
         assert "7002" in sent[0]
-        assert sent[1].count("\n") == 1
-        assert "_maya_mcp_command_port_2024" in sent[1]
-        assert "__maya_mcp_response__" in sent[1]
+        assert len(sent[1]) > 4096
+        assert "__maya_mcp_buffer__" in sent[1]
+        assert sent[2].count("\n") == 1
+        assert "_maya_mcp_command_port_2024" in sent[2]
+        assert "__maya_mcp_response__" in sent[2]
 
         fake_cmds = types.SimpleNamespace(about=lambda **_kwargs: "2024")
         fake_maya = types.ModuleType("maya")
@@ -337,10 +341,29 @@ class TestCommandPortClientConnect:
             ),
         ):
             probe_result = json.loads(eval(compile(sent[0], "<probe>", "eval")))
-            command_result = json.loads(eval(compile(sent[1], "<command>", "eval")))
+            command_result = json.loads(eval(compile(sent[2], "<command>", "eval")))
 
         assert probe_result == {"__maya_mcp_compat__": "2024:1"}
         assert command_result["__maya_mcp_response__"]["ok"] is True
+
+    def test_maya_2024_stale_marker_cannot_bypass_buffer_probe(self) -> None:
+        client = CommandPortClient(max_retries=1, auto_detect_maya_compatibility=True)
+
+        with patch("socket.socket") as mock_socket_class:
+            mock_socket = MagicMock()
+            mock_socket.recv.side_effect = [
+                b'{"__maya_mcp_compat__":"2024:1"}\n\x00',
+                TimeoutError(),
+                TimeoutError(),
+            ]
+            mock_socket_class.return_value = mock_socket
+
+            with pytest.raises(MayaUnavailableError):
+                client.connect()
+
+        sent = [item.args[0] for item in mock_socket.sendall.call_args_list]
+        assert len(sent[1]) > 4096
+        assert client._socket is None
 
     def test_maya_2024_response_envelope_preserves_repeated_output(self) -> None:
         client = CommandPortClient(auto_detect_maya_compatibility=False)
@@ -469,6 +492,29 @@ class TestCommandPortClientConnect:
                 client.connect()
 
         mock_socket.close.assert_called_once()
+
+    def test_auto_detection_retries_transient_probe_timeout(self) -> None:
+        client = CommandPortClient(
+            max_retries=2,
+            retry_base_delay=0.01,
+            auto_detect_maya_compatibility=True,
+        )
+        first_socket = MagicMock()
+        first_socket.recv.side_effect = TimeoutError()
+        second_socket = MagicMock()
+        second_socket.recv.side_effect = [
+            b'{"__maya_mcp_compat__":"2025:0"}\n\x00',
+            TimeoutError(),
+        ]
+
+        with patch("socket.socket", side_effect=[first_socket, second_socket]), patch(
+            "time.sleep"
+        ) as sleep_mock:
+            assert client.connect()
+
+        first_socket.close.assert_called_once()
+        sleep_mock.assert_called_once_with(0.01)
+        assert client._socket is second_socket
 
 
 class TestCommandPortClientDisconnect:

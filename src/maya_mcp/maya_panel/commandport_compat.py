@@ -33,13 +33,7 @@ def requires_maya_2024_compatibility(
 
 def is_loopback_command_port_name(name: object, port: int) -> bool:
     """Return whether Maya's port name is an accepted loopback TCP form."""
-    value = str(name).lower()
-    return value in {
-        f":{port}",
-        f"localhost:{port}",
-        f"127.0.0.1:{port}",
-        f"[::1]:{port}",
-    }
+    return str(name) == f":{port}"
 
 
 def is_maya_2024_compatible_port(port: int) -> bool:

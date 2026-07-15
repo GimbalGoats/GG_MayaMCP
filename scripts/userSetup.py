@@ -49,13 +49,7 @@ except ImportError:
     MAYA_2024_COMMAND_PORT_BUFFER_SIZE = 9 * 1024 * 1024
 
     def is_loopback_command_port_name(name: object, port: int) -> bool:
-        value = str(name).lower()
-        return value in {
-            f":{port}",
-            f"localhost:{port}",
-            f"127.0.0.1:{port}",
-            f"[::1]:{port}",
-        }
+        return str(name) == f":{port}"
 
     def _maya_2024_handler(command: str) -> dict[str, object]:
         try:

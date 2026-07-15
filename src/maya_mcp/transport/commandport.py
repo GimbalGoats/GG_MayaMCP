@@ -57,11 +57,20 @@ logger = logging.getLogger(__name__)
 # Buffer size for socket receive
 BUFFER_SIZE = 65536
 _MAYA_COMPATIBILITY_PROBE_KEY = "__maya_mcp_compat__"
+_MAYA_COMPATIBILITY_BUFFER_KEY = "__maya_mcp_buffer__"
 _MAYA_COMPATIBILITY_RESPONSE_KEY = "__maya_mcp_response__"
 
 
 class _MayaCompatibilityProbeError(TimeoutError):
     """A connected port did not complete the compatibility handshake."""
+
+
+class _MayaCompatibilityProbeTimeout(_MayaCompatibilityProbeError):
+    """A compatibility response did not arrive before the probe deadline."""
+
+
+class _MayaCompatibilityProbeInvalid(_MayaCompatibilityProbeError):
+    """A compatibility response arrived but did not match the protocol."""
 
 
 # Module-level client instance for singleton pattern
@@ -296,6 +305,9 @@ class CommandPortClient:
                     logger.info("Connected to Maya at %s:%d", self.config.host, self.config.port)
                     return True
 
+                except _MayaCompatibilityProbeTimeout as exc:
+                    last_error = str(exc)
+                    self._cleanup_socket()
                 except _MayaCompatibilityProbeError as exc:
                     last_error = str(exc)
                     self._cleanup_socket()
@@ -529,14 +541,46 @@ class CommandPortClient:
         self._socket.sendall(probe.encode("utf-8"))
         response = self._receive_response(timeout=probe_timeout)
         if not response:
-            raise _MayaCompatibilityProbeError("Maya compatibility probe returned no response")
+            raise _MayaCompatibilityProbeTimeout(
+                "Maya compatibility probe returned no response"
+            )
         try:
             mode = json.loads(response)[_MAYA_COMPATIBILITY_PROBE_KEY]
         except (json.JSONDecodeError, KeyError, TypeError) as exc:
-            raise _MayaCompatibilityProbeError(
+            raise _MayaCompatibilityProbeInvalid(
                 "Maya compatibility probe returned an invalid response"
             ) from exc
-        self._maya_2024_compatibility = mode == "2024:1"
+        if mode == "2024:1":
+            self._verify_maya_2024_buffer(probe_timeout)
+            self._maya_2024_compatibility = True
+
+    def _verify_maya_2024_buffer(self, timeout: float) -> None:
+        """Prove the active listener accepts commands beyond Maya's default buffer."""
+        if self._socket is None:
+            return
+        payload_size = 4097
+        padding = "x" * payload_size
+        probe = (
+            "__import__('json').dumps({"
+            f"'{_MAYA_COMPATIBILITY_BUFFER_KEY}':len('{padding}')"
+            "})\n"
+        )
+        self._socket.sendall(probe.encode("utf-8"))
+        response = self._receive_response(timeout=timeout)
+        if not response:
+            raise _MayaCompatibilityProbeTimeout(
+                "Maya 2024 compatibility buffer probe returned no response"
+            )
+        try:
+            accepted_size = json.loads(response)[_MAYA_COMPATIBILITY_BUFFER_KEY]
+        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+            raise _MayaCompatibilityProbeInvalid(
+                "Maya 2024 compatibility buffer probe returned an invalid response"
+            ) from exc
+        if accepted_size != payload_size:
+            raise _MayaCompatibilityProbeInvalid(
+                "Maya 2024 compatibility buffer probe returned an unexpected size"
+            )
 
     def _receive_response(self, *, timeout: float | None = None) -> str:
         """Read and parse one commandPort response."""
