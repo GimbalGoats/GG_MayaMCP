@@ -475,25 +475,24 @@ class TestCommandPortClientConnect:
         sent = [item.args[0].decode("utf-8") for item in mock_socket.sendall.call_args_list]
         assert sent[1] == "print('ok')\n"
 
-    def test_auto_detection_does_not_frame_without_maya_side_handler(self) -> None:
-        client = CommandPortClient(auto_detect_maya_compatibility=True)
+    def test_auto_detection_rejects_maya_2024_without_handler(self) -> None:
+        client = CommandPortClient(max_retries=3, auto_detect_maya_compatibility=True)
 
         with patch("socket.socket") as mock_socket_class:
             mock_socket = MagicMock()
             mock_socket.recv.side_effect = [
                 b'{"__maya_mcp_compat__":"2024:0"}\n\x00',
                 TimeoutError(),
-                b"legacy\n\x00",
-                TimeoutError(),
             ]
             mock_socket_class.return_value = mock_socket
 
-            client.connect()
-            result = client.execute("print('legacy')")
+            with pytest.raises(MayaUnavailableError) as exc_info:
+                client.connect()
 
-        assert result == "legacy"
-        sent = [item.args[0].decode("utf-8") for item in mock_socket.sendall.call_args_list]
-        assert sent[1] == "print('legacy')\n"
+        assert exc_info.value.attempts == 1
+        assert "reopen" in str(exc_info.value.last_error)
+        assert mock_socket_class.call_count == 1
+        assert client._socket is None
 
     def test_auto_detection_discards_connection_after_inconclusive_probe(self) -> None:
         client = CommandPortClient(

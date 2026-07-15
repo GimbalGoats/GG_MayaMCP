@@ -563,6 +563,11 @@ class CommandPortClient:
         if mode == "2024:1":
             self._verify_maya_2024_buffer(probe_timeout)
             self._maya_2024_compatibility = True
+        elif isinstance(mode, str) and mode.startswith("2024:"):
+            raise _MayaCompatibilityProbeInvalid(
+                "Maya 2024 commandPort lacks the compatibility handler; "
+                "close and reopen it with the GG_MayaMCP helper"
+            )
 
     def _verify_maya_2024_buffer(self, timeout: float) -> None:
         """Prove the active listener accepts commands beyond Maya's default buffer."""

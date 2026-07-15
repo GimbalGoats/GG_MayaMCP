@@ -31,7 +31,7 @@ def tool_maya_connect(
     host: Annotated[str, "Target host (localhost only)"] = "localhost",
     port: Annotated[int, "Target port number"] = 7001,
     source_type: Annotated[
-        Literal["python", "mel"],
+        Literal["python"],
         "Command interpreter type",
     ] = "python",
 ) -> MayaConnectOutput:
@@ -40,7 +40,7 @@ def tool_maya_connect(
     Args:
         host: Target host (localhost or 127.0.0.1 only).
         port: Target port number.
-        source_type: Command interpreter (python or mel).
+        source_type: Command interpreter (Python only).
 
     Returns:
         Connection result with connected status, host, port, and error.

@@ -33,7 +33,7 @@ class MayaDisconnectOutput(TypedDict):
 def maya_connect(
     host: str = "localhost",
     port: int = 7001,
-    source_type: Literal["python", "mel"] = "python",
+    source_type: Literal["python"] = "python",
 ) -> MayaConnectOutput:
     """Establish a connection to Maya's commandPort.
 
@@ -57,7 +57,7 @@ def maya_connect(
         >>> if result["connected"]:
         ...     print("Connected!")
     """
-    if source_type == "mel":
+    if source_type != "python":
         return {
             "connected": False,
             "host": host,
