@@ -314,9 +314,22 @@ class TestCommandPortClientConnect:
 
     def test_auto_detection_enables_single_line_framing_only_for_maya_2024(self) -> None:
         client = CommandPortClient(port=7002, auto_detect_maya_compatibility=True)
+        active_timeout: float | None = None
+        buffer_send_timeouts: list[float | None] = []
 
         with patch("socket.socket") as mock_socket_class:
             mock_socket = MagicMock()
+
+            def record_timeout(value: float) -> None:
+                nonlocal active_timeout
+                active_timeout = value
+
+            def record_send(data: bytes) -> None:
+                if b"__maya_mcp_buffer__" in data:
+                    buffer_send_timeouts.append(active_timeout)
+
+            mock_socket.settimeout.side_effect = record_timeout
+            mock_socket.sendall.side_effect = record_send
             mock_socket.recv.side_effect = [
                 b'plugin output\n{"__maya_mcp_compat__":"2024:1"}\n\x00',
                 TimeoutError(),
@@ -342,6 +355,7 @@ class TestCommandPortClientConnect:
         assert "7002" in sent[0]
         assert len(sent[1]) > 8 * 1024 * 1024
         assert "__maya_mcp_buffer__" in sent[1]
+        assert buffer_send_timeouts == [client.config.command_timeout]
         assert sent[2].count("\n") == 1
         assert "_maya_mcp_command_port_2024" in sent[2]
         assert "__maya_mcp_response__" in sent[2]

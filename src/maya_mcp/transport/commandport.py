@@ -580,6 +580,7 @@ class CommandPortClient:
             f"'{_MAYA_COMPATIBILITY_BUFFER_KEY}':len('{padding}')"
             "})\n"
         )
+        self._socket.settimeout(timeout)
         self._send_compatibility_probe(
             probe,
             error="Maya 2024 compatibility buffer probe timed out while sending",
