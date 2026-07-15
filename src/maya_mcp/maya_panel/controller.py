@@ -26,6 +26,7 @@ import logging
 from maya_mcp.maya_panel.commandport_compat import (
     MAYA_2024_COMMAND_PORT_BUFFER_SIZE,
     command_port_open_kwargs,
+    is_loopback_command_port_name,
     is_maya_2024_compatible_port,
     mark_maya_2024_compatible_port,
     unmark_maya_2024_compatible_port,
@@ -73,9 +74,8 @@ def is_command_port_open(port: int = DEFAULT_PORT) -> bool:
 
 def get_open_port_name(port: int = DEFAULT_PORT) -> str | None:
     """Return Maya's reported name for an open TCP commandPort number."""
-    port_number = str(port)
     return next(
-        (name for name in get_open_ports() if str(name).rsplit(":", 1)[-1] == port_number),
+        (name for name in get_open_ports() if is_loopback_command_port_name(name, port)),
         None,
     )
 

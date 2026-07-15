@@ -25,6 +25,7 @@ from maya_mcp.maya_panel.commandport_compat import (
     MAYA_2024_PORTS_NAME,
     MAYA_2024_STATE_NAME,
     command_port_open_kwargs,
+    is_loopback_command_port_name,
     mark_maya_2024_compatible_port,
 )
 
@@ -51,6 +52,25 @@ class FakeCmds:
     def about(self, *, majorVersion: bool = False) -> str:
         assert majorVersion
         return self.major_version
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        (":7002", True),
+        ("localhost:7002", True),
+        ("127.0.0.1:7002", True),
+        ("[::1]:7002", True),
+        ("7002", False),
+        ("/tmp/maya:7002", False),
+        ("maya-command-7002", False),
+    ],
+)
+def test_loopback_tcp_port_names_do_not_match_unix_domain_names(
+    name: str,
+    expected: bool,
+) -> None:
+    assert is_loopback_command_port_name(name, 7002) is expected
 
 
 def test_maya_2024_installs_full_command_response_handler() -> None:
@@ -229,6 +249,20 @@ def test_port_status_reports_host_prefixed_listener(
     assert status["port_name"] == "127.0.0.1:7002"
 
 
+def test_control_panel_ignores_unix_domain_command_port_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = _install_fake_maya(
+        monkeypatch,
+        "2024",
+        open_ports=["7002", "/tmp/maya:7002"],
+    )
+
+    assert controller.get_open_port_name(7002) is None
+    assert controller.open_command_port(7002)
+    assert calls[-1]["name"] == ":7002"
+
+
 def test_manual_enable_script_applies_maya_2024_compatibility_policy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -342,6 +376,7 @@ def test_standalone_fallback_works_without_installed_package(
 
     monkeypatch.setattr(builtins, "__import__", import_without_package)
     namespace = runpy.run_path(str(Path(script)))
+    assert namespace["is_loopback_command_port_name"]("/tmp/maya:7002", 7002) is False
     if script.endswith("userSetup.py"):
         namespace["_start_command_port"]()
     else:

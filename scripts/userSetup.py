@@ -36,6 +36,7 @@ try:
     from maya_mcp.maya_panel.commandport_compat import (
         MAYA_2024_COMMAND_PORT_BUFFER_SIZE,
         command_port_open_kwargs,
+        is_loopback_command_port_name,
         is_maya_2024_compatible_port,
         mark_maya_2024_compatible_port,
         requires_maya_2024_compatibility,
@@ -46,6 +47,15 @@ except ImportError:
     _STATE_NAME = "_maya_mcp_command_port_2024_state"
     _PORTS_NAME = "_maya_mcp_command_port_2024_ports"
     MAYA_2024_COMMAND_PORT_BUFFER_SIZE = 9 * 1024 * 1024
+
+    def is_loopback_command_port_name(name: object, port: int) -> bool:
+        value = str(name).lower()
+        return value in {
+            f":{port}",
+            f"localhost:{port}",
+            f"127.0.0.1:{port}",
+            f"[::1]:{port}",
+        }
 
     def _maya_2024_handler(command: str) -> dict[str, object]:
         try:
@@ -202,7 +212,7 @@ def _start_command_port() -> None:
     # configuration always agree. Later Maya versions keep the no-op behavior.
     open_ports = cmds.commandPort(query=True, listPorts=True) or []
     existing_port_name = next(
-        (name for name in open_ports if str(name).rsplit(":", 1)[-1] == str(DEFAULT_PORT)),
+        (name for name in open_ports if is_loopback_command_port_name(name, DEFAULT_PORT)),
         None,
     )
     if existing_port_name is not None:

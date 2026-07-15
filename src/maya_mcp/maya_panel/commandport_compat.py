@@ -31,6 +31,17 @@ def requires_maya_2024_compatibility(
     return str(cmds.about(majorVersion=True)) == "2024" and source_type == "python" and echo_output
 
 
+def is_loopback_command_port_name(name: object, port: int) -> bool:
+    """Return whether Maya's port name is an accepted loopback TCP form."""
+    value = str(name).lower()
+    return value in {
+        f":{port}",
+        f"localhost:{port}",
+        f"127.0.0.1:{port}",
+        f"[::1]:{port}",
+    }
+
+
 def is_maya_2024_compatible_port(port: int) -> bool:
     """Return whether this Maya process opened ``port`` with the workaround."""
     return port in getattr(builtins, MAYA_2024_PORTS_NAME, set())
