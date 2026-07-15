@@ -185,7 +185,7 @@ def test_control_panel_replaces_an_existing_broken_maya_2024_port(
 ) -> None:
     calls = _install_fake_maya(monkeypatch, "2024", open_ports=["127.0.0.1:7002"])
 
-    assert controller.open_command_port(7002)
+    assert controller.open_command_port(7002, replace_existing=True)
 
     assert calls[0] == {"name": "127.0.0.1:7002", "close": True}
     assert calls[1]["echoOutput"] is False
@@ -194,6 +194,27 @@ def test_control_panel_replaces_an_existing_broken_maya_2024_port(
     calls.clear()
     assert controller.open_command_port(7002)
     assert calls == []
+
+
+def test_control_panel_leaves_unknown_maya_2024_port_unchanged(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = _install_fake_maya(monkeypatch, "2024", open_ports=["localhost:7002"])
+
+    assert controller.open_command_port(7002)
+
+    assert calls == []
+
+
+def test_port_status_reports_host_prefixed_listener(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_maya(monkeypatch, "2024", open_ports=["127.0.0.1:7002"])
+
+    status = controller.get_port_status(7002)
+
+    assert status["is_open"] is True
+    assert status["port_name"] == "127.0.0.1:7002"
 
 
 def test_manual_enable_script_applies_maya_2024_compatibility_policy(

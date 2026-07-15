@@ -84,6 +84,8 @@ def open_command_port(
     port: int = DEFAULT_PORT,
     source_type: str = "python",
     echo_output: bool = True,
+    *,
+    replace_existing: bool = False,
 ) -> bool:
     """Open Maya's commandPort on the specified port.
 
@@ -93,6 +95,9 @@ def open_command_port(
         port: Port number to open (1-65535).
         source_type: Command interpreter ("python" or "mel").
         echo_output: If True, send command output back to client.
+        replace_existing: Replace an unknown existing Maya 2024 listener.
+            Leave False for automatic startup; set True only after explicit
+            user confirmation that this helper owns the port.
 
     Returns:
         True if the port is now open (either opened or was already open).
@@ -125,7 +130,7 @@ def open_command_port(
     is_maya_2024_compatibility = port_kwargs.get("bufferSize") == MAYA_2024_COMMAND_PORT_BUFFER_SIZE
 
     if existing_port_name is not None:
-        if not is_maya_2024_compatibility:
+        if not is_maya_2024_compatibility or not replace_existing:
             logger.info("CommandPort already open on %s", port_name)
             return True
         cmds.commandPort(name=existing_port_name, close=True)
@@ -229,11 +234,11 @@ def get_port_status(port: int = DEFAULT_PORT) -> dict[str, object]:
         {'is_open': True, 'port': 7001, 'port_name': ':7001', 'all_ports': [':7001']}
     """
     all_ports = get_open_ports()
-    port_name = f":{port}"
+    open_port_name = get_open_port_name(port)
 
     return {
-        "is_open": port_name in all_ports,
+        "is_open": open_port_name is not None,
         "port": port,
-        "port_name": port_name,
+        "port_name": open_port_name or f":{port}",
         "all_ports": all_ports,
     }
