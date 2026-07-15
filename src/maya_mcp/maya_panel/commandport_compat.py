@@ -60,7 +60,9 @@ def _maya_2024_handler(command: str) -> dict[str, object]:
 
 def _execute_maya_2024_command(command: str) -> str:
     """Execute one complete Python payload and preserve stdout/result semantics."""
-    namespace = getattr(builtins, MAYA_2024_STATE_NAME)
+    # Preserve access to Maya's interactive globals without retaining command
+    # temporaries or overwriting user variables between requests.
+    namespace = dict(getattr(builtins, MAYA_2024_STATE_NAME))
     tree = ast.parse(command, filename="<maya-mcp-commandPort>", mode="exec")
     result: object = None
     output = io.StringIO()

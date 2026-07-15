@@ -54,7 +54,7 @@ except ImportError:
             return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
 
     def _execute_maya_2024_command(command: str) -> str:
-        namespace = getattr(builtins, _STATE_NAME)
+        namespace = dict(getattr(builtins, _STATE_NAME))
         tree = ast.parse(command, filename="<maya-mcp-commandPort>", mode="exec")
         result = None
         output = io.StringIO()

@@ -108,6 +108,18 @@ def test_maya_2024_handler_uses_maya_main_namespace(
     assert handler("maya_mcp_existing_helper()") == {"ok": True, "result": "available"}
 
 
+def test_maya_2024_handler_does_not_mutate_or_retain_main_namespace() -> None:
+    command_port_open_kwargs(FakeCmds("2024"), "python", True)
+    handler = getattr(builtins, MAYA_2024_HANDLER_NAME)
+
+    assert handler("maya_mcp_temporary = ['large', 'result']\nmaya_mcp_temporary") == {
+        "ok": True,
+        "result": "['large', 'result']",
+    }
+    assert "maya_mcp_temporary" not in vars(__main__)
+    assert handler("'maya_mcp_temporary' in globals()") == {"ok": True, "result": "False"}
+
+
 def test_maya_2024_handler_does_not_inherit_helper_future_flags() -> None:
     command_port_open_kwargs(FakeCmds("2024"), "python", True)
     handler = getattr(builtins, MAYA_2024_HANDLER_NAME)
