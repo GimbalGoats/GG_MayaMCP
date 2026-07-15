@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import builtins
 import json
+import subprocess
 import sys
 import threading
 import types
@@ -20,13 +21,26 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 
 import maya_mcp.transport.commandport as transport_module
+from maya_mcp.commandport_protocol import MAYA_2024_HANDLER_NAME, MAYA_2024_PORTS_NAME
 from maya_mcp.errors import MayaCommandError, MayaTimeoutError, MayaUnavailableError
-from maya_mcp.maya_panel.commandport_compat import (
-    MAYA_2024_HANDLER_NAME,
-    MAYA_2024_PORTS_NAME,
-)
 from maya_mcp.transport.commandport import CommandPortClient, _parse_maya_response
 from maya_mcp.types import ConnectionConfig, ConnectionStatus
+
+
+def test_transport_import_does_not_load_maya_panel_package() -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; import maya_mcp.transport.commandport; "
+            "assert 'maya_mcp.maya_panel' not in sys.modules",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
 
 
 class BlockingCommandSocket:
@@ -422,6 +436,8 @@ class TestCommandPortClientConnect:
 
     def test_auto_detection_discards_connection_after_inconclusive_probe(self) -> None:
         client = CommandPortClient(
+            connect_timeout=2.0,
+            command_timeout=30.0,
             max_retries=1,
             auto_detect_maya_compatibility=True,
         )
@@ -436,7 +452,8 @@ class TestCommandPortClientConnect:
 
         mock_socket.close.assert_called_once()
         assert client._socket is None
-        assert call(client.config.command_timeout) in mock_socket.settimeout.call_args_list
+        assert call(client.config.connect_timeout) in mock_socket.settimeout.call_args_list
+        assert call(client.config.command_timeout) not in mock_socket.settimeout.call_args_list
         mock_socket_class.assert_called_once()
         assert exc_info.value.attempts == 1
 

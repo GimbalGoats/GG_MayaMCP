@@ -36,14 +36,14 @@ import socket
 import threading
 import time
 
+from maya_mcp.commandport_protocol import (
+    MAYA_2024_HANDLER_NAME,
+    MAYA_2024_PORTS_NAME,
+)
 from maya_mcp.errors import (
     MayaCommandError,
     MayaTimeoutError,
     MayaUnavailableError,
-)
-from maya_mcp.maya_panel.commandport_compat import (
-    MAYA_2024_HANDLER_NAME,
-    MAYA_2024_PORTS_NAME,
 )
 from maya_mcp.types import (
     ClientState,
@@ -524,9 +524,10 @@ class CommandPortClient:
             f"{self.config.port} in getattr(__import__('builtins'),'{MAYA_2024_PORTS_NAME}',())"
             f" and callable(getattr(__import__('builtins'),'{MAYA_2024_HANDLER_NAME}',None))))}})\n"
         )
-        self._socket.settimeout(self.config.command_timeout)
+        probe_timeout = min(self.config.connect_timeout, self.config.command_timeout)
+        self._socket.settimeout(probe_timeout)
         self._socket.sendall(probe.encode("utf-8"))
-        response = self._receive_response(timeout=self.config.command_timeout)
+        response = self._receive_response(timeout=probe_timeout)
         if not response:
             raise _MayaCompatibilityProbeError("Maya compatibility probe returned no response")
         try:
