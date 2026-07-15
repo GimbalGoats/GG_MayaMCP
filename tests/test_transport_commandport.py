@@ -475,8 +475,7 @@ class TestCommandPortClientConnect:
 
         mock_socket.close.assert_called_once()
         assert client._socket is None
-        assert call(client.config.connect_timeout) in mock_socket.settimeout.call_args_list
-        assert call(client.config.command_timeout) not in mock_socket.settimeout.call_args_list
+        assert call(client.config.command_timeout) in mock_socket.settimeout.call_args_list
         mock_socket_class.assert_called_once()
         assert exc_info.value.attempts == 1
 
@@ -493,28 +492,26 @@ class TestCommandPortClientConnect:
 
         mock_socket.close.assert_called_once()
 
-    def test_auto_detection_retries_transient_probe_timeout(self) -> None:
+    def test_auto_detection_does_not_multiply_full_probe_timeout(self) -> None:
         client = CommandPortClient(
             max_retries=2,
             retry_base_delay=0.01,
             auto_detect_maya_compatibility=True,
         )
-        first_socket = MagicMock()
-        first_socket.recv.side_effect = TimeoutError()
-        second_socket = MagicMock()
-        second_socket.recv.side_effect = [
-            b'{"__maya_mcp_compat__":"2025:0"}\n\x00',
-            TimeoutError(),
-        ]
+        mock_socket = MagicMock()
+        mock_socket.recv.side_effect = TimeoutError()
 
-        with patch("socket.socket", side_effect=[first_socket, second_socket]), patch(
-            "time.sleep"
-        ) as sleep_mock:
-            assert client.connect()
+        with (
+            patch("socket.socket", return_value=mock_socket) as socket_class,
+            patch("time.sleep") as sleep_mock,
+            pytest.raises(MayaUnavailableError) as exc_info,
+        ):
+            client.connect()
 
-        first_socket.close.assert_called_once()
-        sleep_mock.assert_called_once_with(0.01)
-        assert client._socket is second_socket
+        mock_socket.close.assert_called_once()
+        sleep_mock.assert_not_called()
+        socket_class.assert_called_once()
+        assert exc_info.value.attempts == 1
 
 
 class TestCommandPortClientDisconnect:

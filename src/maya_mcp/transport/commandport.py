@@ -305,9 +305,6 @@ class CommandPortClient:
                     logger.info("Connected to Maya at %s:%d", self.config.host, self.config.port)
                     return True
 
-                except _MayaCompatibilityProbeTimeout as exc:
-                    last_error = str(exc)
-                    self._cleanup_socket()
                 except _MayaCompatibilityProbeError as exc:
                     last_error = str(exc)
                     self._cleanup_socket()
@@ -536,7 +533,9 @@ class CommandPortClient:
             f"{self.config.port} in getattr(__import__('builtins'),'{MAYA_2024_PORTS_NAME}',())"
             f" and callable(getattr(__import__('builtins'),'{MAYA_2024_HANDLER_NAME}',None))))}})\n"
         )
-        probe_timeout = min(self.config.connect_timeout, self.config.command_timeout)
+        # TCP is connected; this probe executes on Maya's main thread and gets
+        # one full command deadline rather than multiplying it across retries.
+        probe_timeout = self.config.command_timeout
         self._socket.settimeout(probe_timeout)
         self._socket.sendall(probe.encode("utf-8"))
         response = self._receive_response(timeout=probe_timeout)
