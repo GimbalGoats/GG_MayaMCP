@@ -57,6 +57,14 @@ def maya_connect(
         >>> if result["connected"]:
         ...     print("Connected!")
     """
+    if source_type == "mel":
+        return {
+            "connected": False,
+            "host": host,
+            "port": port,
+            "error": "MEL commandPorts are not supported by MCP tool execution",
+        }
+
     client = get_client()
 
     # Reconfigure if host/port differ
