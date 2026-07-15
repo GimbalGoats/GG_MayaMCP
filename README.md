@@ -64,24 +64,11 @@ pip install -e ".[dev]"
 
 ### 2. Open Maya `commandPort`
 
-Run this in Maya's Script Editor on the Python tab:
-
-```python
-import maya.cmds as cmds
-
-try:
-    cmds.commandPort(name=":7001", close=True)
-except RuntimeError:
-    pass
-
-cmds.commandPort(
-    name=":7001",
-    sourceType="python",
-    echoOutput=True,
-    noreturn=False,
-    bufferSize=16384,
-)
-```
+Download, then paste and run, the complete
+[`scripts/enable_commandport.py`](https://github.com/GimbalGoats/GG_MayaMCP/blob/main/scripts/enable_commandport.py)
+file in Maya's Python Script Editor. The helper keeps the established Python +
+`echoOutput` path on Maya 2025 and later. On Maya 2024 only, it selects the
+loopback-only response compatibility path required by that release.
 
 ### 3. Start the server
 

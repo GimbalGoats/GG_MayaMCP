@@ -68,6 +68,8 @@ include = [
     "/src",
     "/tests",
     "/docs",
+    "/scripts/enable_commandport.py",
+    "/scripts/userSetup.py",
 ]
 
 # Ruff configuration

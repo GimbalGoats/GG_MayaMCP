@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Restored reliable commandPort responses on Maya 2024 with an exact-version compatibility policy while preserving the existing Maya 2025-and-later path.
+
 ### Documentation
 
 - Added README badges and clearer release-asset guidance for finding the

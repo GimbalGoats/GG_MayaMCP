@@ -23,6 +23,14 @@ from __future__ import annotations
 
 import logging
 
+from maya_mcp.maya_panel.commandport_compat import (
+    MAYA_2024_COMMAND_PORT_BUFFER_SIZE,
+    command_port_open_kwargs,
+    is_maya_2024_compatible_port,
+    mark_maya_2024_compatible_port,
+    unmark_maya_2024_compatible_port,
+)
+
 # Set up logging
 logger = logging.getLogger(__name__)
 
@@ -60,8 +68,16 @@ def is_command_port_open(port: int = DEFAULT_PORT) -> bool:
         >>> is_command_port_open(7001)
         True
     """
-    port_name = f":{port}"
-    return port_name in get_open_ports()
+    return get_open_port_name(port) is not None
+
+
+def get_open_port_name(port: int = DEFAULT_PORT) -> str | None:
+    """Return Maya's reported name for an open TCP commandPort number."""
+    port_number = str(port)
+    return next(
+        (name for name in get_open_ports() if str(name).rsplit(":", 1)[-1] == port_number),
+        None,
+    )
 
 
 def open_command_port(
@@ -97,18 +113,33 @@ def open_command_port(
 
     port_name = f":{port}"
 
-    # Check if already open
-    if is_command_port_open(port):
+    # Maya 2024 ports opened without the compatibility policy accept sockets but
+    # cannot return responses. Replace an existing Python/echo port in that one
+    # release; all other versions retain the established early-return path.
+    existing_port_name = get_open_port_name(port)
+    if existing_port_name is not None and is_maya_2024_compatible_port(port):
         logger.info("CommandPort already open on %s", port_name)
         return True
+
+    port_kwargs = command_port_open_kwargs(cmds, source_type, echo_output)
+    is_maya_2024_compatibility = port_kwargs.get("bufferSize") == MAYA_2024_COMMAND_PORT_BUFFER_SIZE
+
+    if existing_port_name is not None:
+        if not is_maya_2024_compatibility:
+            logger.info("CommandPort already open on %s", port_name)
+            return True
+        cmds.commandPort(name=existing_port_name, close=True)
+        unmark_maya_2024_compatible_port(port)
+        logger.info("Replacing incompatible Maya 2024 commandPort on %s", port_name)
 
     # Open the port
     try:
         cmds.commandPort(
             name=port_name,
-            sourceType=source_type,
-            echoOutput=echo_output,
+            **port_kwargs,
         )
+        if is_maya_2024_compatibility:
+            mark_maya_2024_compatible_port(port)
         logger.info("CommandPort opened on %s", port_name)
         return True
     except RuntimeError as e:
@@ -137,13 +168,15 @@ def close_command_port(port: int = DEFAULT_PORT) -> bool:
     port_name = f":{port}"
 
     # Check if open
-    if not is_command_port_open(port):
+    existing_port_name = get_open_port_name(port)
+    if existing_port_name is None:
         logger.info("CommandPort already closed on %s", port_name)
         return True
 
     # Close the port
     try:
-        cmds.commandPort(name=port_name, close=True)
+        cmds.commandPort(name=existing_port_name, close=True)
+        unmark_maya_2024_compatible_port(port)
         logger.info("CommandPort closed on %s", port_name)
         return True
     except RuntimeError as e:

@@ -71,22 +71,10 @@ pip install maya-mcp
 
 2. Open Maya `commandPort`
 
-```python
-import maya.cmds as cmds
-
-try:
-    cmds.commandPort(name=":7001", close=True)
-except RuntimeError:
-    pass
-
-cmds.commandPort(
-    name=":7001",
-    sourceType="python",
-    echoOutput=True,
-    noreturn=False,
-    bufferSize=16384,
-)
-```
+Download, then paste and run, the complete
+[`scripts/enable_commandport.py`](https://github.com/GimbalGoats/GG_MayaMCP/blob/main/scripts/enable_commandport.py) file in
+Maya's Python Script Editor. It applies the exact Maya 2024 response workaround
+and leaves Maya 2025 and later on the normal Python + `echoOutput` path.
 
 3. Start the server
 
