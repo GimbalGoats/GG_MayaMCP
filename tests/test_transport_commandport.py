@@ -10,13 +10,21 @@ These tests verify the CommandPortClient's behavior including:
 
 from __future__ import annotations
 
+import builtins
+import json
+import sys
 import threading
+import types
 from unittest.mock import MagicMock, call, patch
 
 import pytest
 
 import maya_mcp.transport.commandport as transport_module
 from maya_mcp.errors import MayaCommandError, MayaTimeoutError, MayaUnavailableError
+from maya_mcp.maya_panel.commandport_compat import (
+    MAYA_2024_HANDLER_NAME,
+    MAYA_2024_PORTS_NAME,
+)
 from maya_mcp.transport.commandport import CommandPortClient, _parse_maya_response
 from maya_mcp.types import ConnectionConfig, ConnectionStatus
 
@@ -301,6 +309,25 @@ class TestCommandPortClientConnect:
         assert "_maya_mcp_command_port_2024" in sent[1]
         assert "__maya_mcp_response__" in sent[1]
 
+        fake_cmds = types.SimpleNamespace(about=lambda **_kwargs: "2024")
+        fake_maya = types.ModuleType("maya")
+        fake_maya.cmds = fake_cmds  # type: ignore[attr-defined]
+        with (
+            patch.dict(sys.modules, {"maya": fake_maya, "maya.cmds": fake_cmds}),
+            patch.object(builtins, MAYA_2024_PORTS_NAME, {7002}, create=True),
+            patch.object(
+                builtins,
+                MAYA_2024_HANDLER_NAME,
+                lambda command: {"ok": True, "result": command},
+                create=True,
+            ),
+        ):
+            probe_result = json.loads(eval(compile(sent[0], "<probe>", "eval")))
+            command_result = json.loads(eval(compile(sent[1], "<command>", "eval")))
+
+        assert probe_result == {"__maya_mcp_compat__": "2024:1"}
+        assert command_result["__maya_mcp_response__"]["ok"] is True
+
     def test_maya_2024_response_envelope_preserves_repeated_output(self) -> None:
         client = CommandPortClient(auto_detect_maya_compatibility=False)
         client._maya_2024_compatibility = True
@@ -337,6 +364,18 @@ class TestCommandPortClientConnect:
 
         with pytest.raises(MayaUnavailableError):
             client.execute("print('tick')")
+
+        assert client._socket is None
+        assert client.get_status() == ConnectionStatus.OFFLINE
+
+    def test_maya_2024_empty_response_is_a_timeout_and_discards_socket(self) -> None:
+        client = CommandPortClient(auto_detect_maya_compatibility=False)
+        client._maya_2024_compatibility = True
+        client._socket = MagicMock()
+        client._socket.recv.side_effect = TimeoutError()
+
+        with pytest.raises(MayaTimeoutError):
+            client.execute("slow_command()")
 
         assert client._socket is None
         assert client.get_status() == ConnectionStatus.OFFLINE

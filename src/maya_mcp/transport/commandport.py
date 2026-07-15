@@ -433,6 +433,16 @@ class CommandPortClient:
 
             response = self._receive_response()
             if self._maya_2024_compatibility:
+                if not response:
+                    self.state.last_error = (
+                        f"Command timed out after {self.config.command_timeout}s"
+                    )
+                    self._handle_socket_error()
+                    raise MayaTimeoutError(
+                        message="Command execution timed out",
+                        timeout_seconds=self.config.command_timeout,
+                        operation="execute",
+                    )
                 try:
                     payload = json.loads(response)[_MAYA_COMPATIBILITY_RESPONSE_KEY]
                 except (json.JSONDecodeError, KeyError, TypeError) as exc:
