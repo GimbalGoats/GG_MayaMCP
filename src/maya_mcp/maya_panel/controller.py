@@ -122,19 +122,12 @@ def open_command_port(
     # cannot return responses. Replace an existing Python/echo port in that one
     # release; all other versions retain the established early-return path.
     existing_port_name = get_open_port_name(port)
-    if (
-        existing_port_name is not None
-        and is_maya_2024_compatible_port(port)
-        and not replace_existing
-    ):
-        logger.info("CommandPort already open on %s", port_name)
-        return True
-
     port_kwargs = command_port_open_kwargs(cmds, source_type, echo_output)
     is_maya_2024_compatibility = port_kwargs.get("bufferSize") == MAYA_2024_COMMAND_PORT_BUFFER_SIZE
 
     if existing_port_name is not None:
-        if is_maya_2024_compatibility and not replace_existing:
+        compatibility_marked = is_maya_2024_compatible_port(port)
+        if is_maya_2024_compatibility and not compatibility_marked and not replace_existing:
             logger.warning(
                 "Existing Maya 2024 commandPort on %s is not compatibility-marked",
                 port_name,
@@ -145,7 +138,7 @@ def open_command_port(
             return True
         cmds.commandPort(name=existing_port_name, close=True)
         unmark_maya_2024_compatible_port(port)
-        logger.info("Replacing incompatible Maya 2024 commandPort on %s", port_name)
+        logger.info("Refreshing Maya 2024 commandPort on %s", port_name)
 
     # Open the port
     try:

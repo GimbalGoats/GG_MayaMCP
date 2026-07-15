@@ -225,8 +225,10 @@ def test_control_panel_replaces_an_existing_broken_maya_2024_port(
 
     calls.clear()
     assert controller.open_command_port(7002)
-    assert calls == []
+    assert calls[0] == {"name": ":7002", "close": True}
+    assert calls[1]["bufferSize"] == MAYA_2024_COMMAND_PORT_BUFFER_SIZE
 
+    calls.clear()
     assert controller.open_command_port(7002, replace_existing=True)
     assert calls[0] == {"name": ":7002", "close": True}
     assert calls[1]["bufferSize"] == MAYA_2024_COMMAND_PORT_BUFFER_SIZE
@@ -314,6 +316,19 @@ def test_user_setup_explicitly_replaces_an_owned_broken_maya_2024_port(
 
     assert calls[0] == {"name": ":7001", "close": True}
     assert calls[1]["echoOutput"] is False
+
+
+def test_user_setup_refreshes_a_marked_maya_2024_port(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = _install_fake_maya(monkeypatch, "2024", open_ports=[":7001"])
+    mark_maya_2024_compatible_port(7001)
+
+    namespace = runpy.run_path(str(Path("scripts/userSetup.py")))
+    namespace["_start_command_port"]()
+
+    assert calls[0] == {"name": ":7001", "close": True}
+    assert calls[1]["bufferSize"] == MAYA_2024_COMMAND_PORT_BUFFER_SIZE
 
 
 def test_user_setup_opens_inet_beside_named_socket(

@@ -212,10 +212,10 @@ def _start_command_port() -> None:
     if existing_port_name is not None:
         already_compatible = is_maya_2024_compatible_port(DEFAULT_PORT)
         needs_compatibility = requires_maya_2024_compatibility(cmds, "python", True)
-        if already_compatible or not needs_compatibility:
+        if not needs_compatibility:
             print(f"[MCP] commandPort already open on {existing_port_name}")
             return
-        if not REPLACE_EXISTING_COMMAND_PORT:
+        if not already_compatible and not REPLACE_EXISTING_COMMAND_PORT:
             print(
                 f"[MCP] Warning: commandPort {existing_port_name} is not owned by this "
                 "startup script; leaving it unchanged"
@@ -231,7 +231,7 @@ def _start_command_port() -> None:
             return
         cmds.commandPort(name=existing_port_name, close=True)
         unmark_maya_2024_compatible_port(DEFAULT_PORT)
-        print(f"[MCP] Replacing incompatible Maya 2024 commandPort on {port_name}")
+        print(f"[MCP] Refreshing Maya 2024 commandPort on {port_name}")
 
     # Open the port
     try:
