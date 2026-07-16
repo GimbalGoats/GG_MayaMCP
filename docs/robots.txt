@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://gimbalgoats.github.io/GG_MayaMCP/sitemap.xml

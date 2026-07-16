@@ -1,0 +1,24 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.GimbalGoats/maya-mcp",
+  "title": "Maya MCP",
+  "description": "Control Autodesk Maya scenes with 71 typed tools for modeling, animation, shading, and more.",
+  "version": "0.6.0",
+  "websiteUrl": "https://gimbalgoats.github.io/GG_MayaMCP/",
+  "repository": {
+    "url": "https://github.com/GimbalGoats/GG_MayaMCP",
+    "source": "github",
+    "id": "1184183752"
+  },
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "maya-mcp",
+      "version": "0.6.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

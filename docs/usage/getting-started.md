@@ -13,7 +13,7 @@ This page is the fastest reliable setup path.
 
 You need:
 
-- Autodesk Maya running on the same machine as the MCP server
+- Autodesk Maya 2024 or later running on the same machine as the MCP server
 - Python 3.10.1 or newer
 - an MCP client that can start a local `stdio` server
 

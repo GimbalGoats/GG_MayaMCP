@@ -256,7 +256,19 @@ For Anthropic review, prepare:
 - a test Maya scene or clear reviewer setup steps
 
 Use the Desktop extension submission form from Anthropic's Connectors Directory
-submission page.
+[submission page](https://claude.com/docs/connectors/building/submission).
+
+Suggested public submission fields:
+
+- name: `Maya MCP`
+- website: `https://gimbalgoats.github.io/GG_MayaMCP/`
+- source: `https://github.com/GimbalGoats/GG_MayaMCP`
+- support: `https://github.com/GimbalGoats/GG_MayaMCP/issues`
+- privacy: `https://gimbalgoats.github.io/GG_MayaMCP/privacy/`
+- package: the exact `maya-mcp-<version>.mcpb` asset from the matching release
+
+Publisher identity and acceptance of Anthropic's directory terms must be
+completed by the responsible submitter.
 
 ## Related Docs
 
@@ -264,3 +276,4 @@ submission page.
 - [Client Setup](client-setup.md)
 - [Privacy Policy](../privacy.md)
 - [Security Specification](../spec/security.md)
+- [Distribution and Marketplace Publishing](../distribution.md)

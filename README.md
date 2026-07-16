@@ -1,4 +1,6 @@
-# Maya MCP
+# Maya MCP Server for Autodesk Maya
+
+<!-- mcp-name: io.github.GimbalGoats/maya-mcp -->
 
 [![Python 3.10.1+](https://img.shields.io/badge/python-3.10.1%2B-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://img.shields.io/pypi/v/maya-mcp.svg)](https://pypi.org/project/maya-mcp/)
@@ -11,7 +13,9 @@
 
 ![Maya MCP banner](docs/assets/maya-mcp-banner.png)
 
-Maya MCP is a local Model Context Protocol server for controlling Autodesk Maya through Maya's `commandPort`.
+Maya MCP is an open-source, local Model Context Protocol server for controlling Autodesk Maya through Maya's `commandPort`.
+
+Supported Maya versions: Autodesk Maya 2024 and later.
 
 It gives MCP clients a typed tool surface for scene work, nodes, selection, modeling, shading, skinning, animation, curves, scripts, and viewport capture without importing Maya modules in the server process.
 
