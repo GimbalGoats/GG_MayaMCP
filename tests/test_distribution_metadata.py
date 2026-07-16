@@ -40,3 +40,12 @@ def test_pypi_readme_contains_registry_ownership_marker() -> None:
     readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
 
     assert f"<!-- mcp-name: {REGISTRY_NAME} -->" in readme
+
+
+def test_registry_publish_waits_for_the_exact_pypi_release() -> None:
+    """Keep registry publication independent of whichever release is latest."""
+    workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "publish-pypi.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "f\"https://pypi.org/pypi/maya-mcp/{os.environ['VERSION']}/json\"" in workflow

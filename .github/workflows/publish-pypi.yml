@@ -162,7 +162,8 @@ jobs:
           import os
           import urllib.request
 
-          with urllib.request.urlopen("https://pypi.org/pypi/maya-mcp/json", timeout=15) as response:
+          url = f"https://pypi.org/pypi/maya-mcp/{os.environ['VERSION']}/json"
+          with urllib.request.urlopen(url, timeout=15) as response:
               package = json.load(response)
 
           assert package["info"]["version"] == os.environ["VERSION"]
