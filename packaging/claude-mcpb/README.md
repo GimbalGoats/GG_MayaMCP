@@ -59,24 +59,11 @@ unless `publish_pypi` is enabled.
 
 ## Maya Setup
 
-Run this in Maya's Script Editor on the Python tab:
-
-```python
-import maya.cmds as cmds
-
-try:
-    cmds.commandPort(name=":7001", close=True)
-except RuntimeError:
-    pass
-
-cmds.commandPort(
-    name=":7001",
-    sourceType="python",
-    echoOutput=True,
-    noreturn=False,
-    bufferSize=16384,
-)
-```
+Paste and run the complete bundled `scripts/enable_commandport.py` file in
+Maya's Python Script Editor. It is also available from the
+[GG_MayaMCP repository](https://github.com/GimbalGoats/GG_MayaMCP/blob/main/scripts/enable_commandport.py).
+The helper selects the response workaround only for Maya 2024; Maya 2025 and
+later retain the established Python + `echoOutput` path.
 
 ## First Calls
 

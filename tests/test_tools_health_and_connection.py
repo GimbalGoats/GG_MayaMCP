@@ -79,6 +79,7 @@ class TestMayaConnect:
         mock_client = MagicMock()
         mock_client.config.host = "localhost"
         mock_client.config.port = 7001
+        mock_client.source_type = "python"
 
         with patch("maya_mcp.tools.connection.get_client", return_value=mock_client):
             result = maya_connect()
@@ -96,6 +97,7 @@ class TestMayaConnect:
         mock_client = MagicMock()
         mock_client.config.host = "localhost"
         mock_client.config.port = 7001
+        mock_client.source_type = "python"
         mock_client.connect.side_effect = MayaUnavailableError(
             message="Connection refused",
             host="localhost",
@@ -114,12 +116,29 @@ class TestMayaConnect:
         mock_client = MagicMock()
         mock_client.config.host = "localhost"
         mock_client.config.port = 7001
+        mock_client.source_type = "python"
 
         with patch("maya_mcp.tools.connection.get_client", return_value=mock_client):
             result = maya_connect(port=7002)
 
-        mock_client.reconfigure.assert_called_once_with(host="localhost", port=7002)
+        mock_client.reconfigure.assert_called_once_with(
+            host="localhost", port=7002, source_type="python"
+        )
         assert result["port"] == 7002
+
+    def test_connect_rejects_mel_without_mutating_shared_tool_client(self) -> None:
+        mock_client = MagicMock()
+        mock_client.config.host = "localhost"
+        mock_client.config.port = 7001
+        mock_client.source_type = "python"
+
+        with patch("maya_mcp.tools.connection.get_client", return_value=mock_client):
+            result = maya_connect(source_type="mel")
+
+        mock_client.reconfigure.assert_not_called()
+        mock_client.connect.assert_not_called()
+        assert result["connected"] is False
+        assert "not supported" in str(result["error"])
 
 
 class TestMayaDisconnect:

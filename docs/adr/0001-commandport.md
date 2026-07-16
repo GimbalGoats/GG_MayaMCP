@@ -79,22 +79,13 @@ Because `commandPort` itself is not authenticated, Maya MCP adds controls at the
 
 ## Example Maya Setup
 
-```python
-import maya.cmds as cmds
-
-try:
-    cmds.commandPort(name=":7001", close=True)
-except RuntimeError:
-    pass
-
-cmds.commandPort(
-    name=":7001",
-    sourceType="python",
-    echoOutput=True,
-    noreturn=False,
-    bufferSize=16384,
-)
-```
+Use the bundled `scripts/enable_commandport.py` helper or the Maya control
+panel rather than opening the port directly. The centralized policy keeps the
+normal Python + `echoOutput` configuration for Maya 2025 and later. Maya 2024
+alone disables the broken `echoOutput` path and installs a complete-payload
+Python response handler. Each public transport client detects the exact major version
+once per connection, then uses single-expression framing only for Maya 2024.
+Maya's default input-warning policy is preserved.
 
 ## Related Documents
 

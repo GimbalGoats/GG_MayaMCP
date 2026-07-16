@@ -47,6 +47,7 @@ Copy-Item -LiteralPath (Join-Path $repoRoot "pyproject.toml") -Destination $stag
 Copy-Item -LiteralPath (Join-Path $repoRoot "CHANGELOG.md") -Destination $stageDir
 Copy-Item -LiteralPath (Join-Path $repoRoot "src") -Destination $stageDir -Recurse
 Copy-Item -LiteralPath (Join-Path $repoRoot "docs") -Destination $stageDir -Recurse
+Copy-Item -LiteralPath (Join-Path $repoRoot "scripts") -Destination $stageDir -Recurse
 
 $mcpbCommand = Get-Command mcpb -ErrorAction SilentlyContinue
 if (-not $mcpbCommand) {

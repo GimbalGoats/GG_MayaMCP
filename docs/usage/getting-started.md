@@ -47,28 +47,15 @@ py -m pip install -e ".[dev]"
 
 ## 2. Open Maya `commandPort`
 
-Open Maya, then run this in the Script Editor on the Python tab:
-
-```python
-import maya.cmds as cmds
-
-try:
-    cmds.commandPort(name=":7001", close=True)
-except RuntimeError:
-    pass
-
-cmds.commandPort(
-    name=":7001",
-    sourceType="python",
-    echoOutput=True,
-    noreturn=False,
-    bufferSize=16384,
-)
-```
+Open Maya, then download, paste, and run the complete
+[`scripts/enable_commandport.py`](https://github.com/GimbalGoats/GG_MayaMCP/blob/main/scripts/enable_commandport.py)
+file in the Python Script Editor. Source distributions and Claude MCPB packages
+also include this file.
 
 This opens the default port that Maya MCP expects: `localhost:7001`.
 
-If you prefer using the helper script from this repo, use `scripts/enable_commandport.py`.
+The helper selects the response compatibility path only for Maya 2024. Maya
+2025 and later retain the normal Python + `echoOutput` configuration.
 
 ## 3. Start the MCP Server
 

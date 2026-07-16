@@ -3,14 +3,9 @@
 Integration tests require a running Maya instance with commandPort enabled.
 These tests are skipped in CI and must be run manually.
 
-To enable Maya commandPort, run in Maya's Script Editor:
-
-    import maya.cmds as cmds
-    try:
-        cmds.commandPort(name=":7001", close=True)
-    except RuntimeError:
-        pass
-    cmds.commandPort(name=":7001", sourceType="python", echoOutput=True)
+To enable Maya commandPort, paste and run the complete repository
+``scripts/enable_commandport.py`` file in Maya's Python Script Editor. The
+helper includes the Maya 2024 response compatibility policy.
 """
 
 from __future__ import annotations
@@ -88,6 +83,7 @@ def maya_client() -> Generator[CommandPortClient, None, None]:
         connect_timeout=5.0,
         command_timeout=30.0,
         max_retries=1,  # Don't retry too much in tests
+        auto_detect_maya_compatibility=True,
     )
     client.connect()
     transport_module._client = client

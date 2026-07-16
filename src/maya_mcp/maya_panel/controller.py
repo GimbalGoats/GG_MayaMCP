@@ -23,6 +23,15 @@ from __future__ import annotations
 
 import logging
 
+from maya_mcp.maya_panel.commandport_compat import (
+    MAYA_2024_COMMAND_PORT_BUFFER_SIZE,
+    command_port_open_kwargs,
+    is_loopback_command_port_name,
+    is_maya_2024_compatible_port,
+    mark_maya_2024_compatible_port,
+    unmark_maya_2024_compatible_port,
+)
+
 # Set up logging
 logger = logging.getLogger(__name__)
 
@@ -60,14 +69,23 @@ def is_command_port_open(port: int = DEFAULT_PORT) -> bool:
         >>> is_command_port_open(7001)
         True
     """
-    port_name = f":{port}"
-    return port_name in get_open_ports()
+    return get_open_port_name(port) is not None
+
+
+def get_open_port_name(port: int = DEFAULT_PORT) -> str | None:
+    """Return Maya's reported name for an open TCP commandPort number."""
+    return next(
+        (name for name in get_open_ports() if is_loopback_command_port_name(name, port)),
+        None,
+    )
 
 
 def open_command_port(
     port: int = DEFAULT_PORT,
     source_type: str = "python",
     echo_output: bool = True,
+    *,
+    replace_existing: bool = False,
 ) -> bool:
     """Open Maya's commandPort on the specified port.
 
@@ -77,6 +95,9 @@ def open_command_port(
         port: Port number to open (1-65535).
         source_type: Command interpreter ("python" or "mel").
         echo_output: If True, send command output back to client.
+        replace_existing: Replace an unknown existing Maya 2024 listener.
+            Leave False for automatic startup; set True only after explicit
+            user confirmation that this helper owns the port.
 
     Returns:
         True if the port is now open (either opened or was already open).
@@ -97,18 +118,36 @@ def open_command_port(
 
     port_name = f":{port}"
 
-    # Check if already open
-    if is_command_port_open(port):
-        logger.info("CommandPort already open on %s", port_name)
-        return True
+    # Maya 2024 ports opened without the compatibility policy accept sockets but
+    # cannot return responses. Replace an existing Python/echo port in that one
+    # release; all other versions retain the established early-return path.
+    existing_port_name = get_open_port_name(port)
+    port_kwargs = command_port_open_kwargs(cmds, source_type, echo_output)
+    is_maya_2024_compatibility = port_kwargs.get("bufferSize") == MAYA_2024_COMMAND_PORT_BUFFER_SIZE
+
+    if existing_port_name is not None:
+        compatibility_marked = is_maya_2024_compatible_port(port)
+        if is_maya_2024_compatibility and not compatibility_marked and not replace_existing:
+            logger.warning(
+                "Existing Maya 2024 commandPort on %s is not compatibility-marked",
+                port_name,
+            )
+            return False
+        if not is_maya_2024_compatibility:
+            logger.info("CommandPort already open on %s", port_name)
+            return True
+        cmds.commandPort(name=existing_port_name, close=True)
+        unmark_maya_2024_compatible_port(port)
+        logger.info("Refreshing Maya 2024 commandPort on %s", port_name)
 
     # Open the port
     try:
         cmds.commandPort(
             name=port_name,
-            sourceType=source_type,
-            echoOutput=echo_output,
+            **port_kwargs,
         )
+        if is_maya_2024_compatibility:
+            mark_maya_2024_compatible_port(port)
         logger.info("CommandPort opened on %s", port_name)
         return True
     except RuntimeError as e:
@@ -137,13 +176,15 @@ def close_command_port(port: int = DEFAULT_PORT) -> bool:
     port_name = f":{port}"
 
     # Check if open
-    if not is_command_port_open(port):
+    existing_port_name = get_open_port_name(port)
+    if existing_port_name is None:
         logger.info("CommandPort already closed on %s", port_name)
         return True
 
     # Close the port
     try:
-        cmds.commandPort(name=port_name, close=True)
+        cmds.commandPort(name=existing_port_name, close=True)
+        unmark_maya_2024_compatible_port(port)
         logger.info("CommandPort closed on %s", port_name)
         return True
     except RuntimeError as e:
@@ -196,11 +237,11 @@ def get_port_status(port: int = DEFAULT_PORT) -> dict[str, object]:
         {'is_open': True, 'port': 7001, 'port_name': ':7001', 'all_ports': [':7001']}
     """
     all_ports = get_open_ports()
-    port_name = f":{port}"
+    open_port_name = get_open_port_name(port)
 
     return {
-        "is_open": port_name in all_ports,
+        "is_open": open_port_name is not None,
         "port": port,
-        "port_name": port_name,
+        "port_name": open_port_name or f":{port}",
         "all_ports": all_ports,
     }

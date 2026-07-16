@@ -81,24 +81,9 @@ installed but failed or disabled.
 
 ## Enable Maya CommandPort
 
-Run this in Maya's Script Editor on the Python tab:
-
-```python
-import maya.cmds as cmds
-
-try:
-    cmds.commandPort(name=":7001", close=True)
-except RuntimeError:
-    pass
-
-cmds.commandPort(
-    name=":7001",
-    sourceType="python",
-    echoOutput=True,
-    noreturn=False,
-    bufferSize=16384,
-)
-```
+Paste and run the bundled `scripts/enable_commandport.py` file in
+Maya's Python Script Editor. This includes the exact Maya 2024 response
+compatibility policy; Maya 2025 and later keep the normal commandPort path.
 
 The port number must match the Claude Desktop extension setting.
 

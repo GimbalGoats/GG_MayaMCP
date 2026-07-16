@@ -28,13 +28,22 @@ Note:
 
 from __future__ import annotations
 
+import base64
 import contextlib
+import json
 import logging
 import socket
 import threading
 import time
+from typing import Literal
 
+from maya_mcp.commandport_protocol import (
+    MAYA_2024_HANDLER_NAME,
+    MAYA_2024_PORTS_NAME,
+    MAYA_2024_REQUIRED_PROBE_SIZE,
+)
 from maya_mcp.errors import (
+    MayaCommandError,
     MayaTimeoutError,
     MayaUnavailableError,
 )
@@ -49,6 +58,26 @@ logger = logging.getLogger(__name__)
 
 # Buffer size for socket receive
 BUFFER_SIZE = 65536
+_MAYA_COMPATIBILITY_PROBE_KEY = "__maya_mcp_compat__"
+_MAYA_COMPATIBILITY_BUFFER_KEY = "__maya_mcp_buffer__"
+_MAYA_COMPATIBILITY_RESPONSE_KEY = "__maya_mcp_response__"
+_MAYA_COMPATIBILITY_REOPEN_GUIDANCE = "close and reopen it with the GG_MayaMCP helper"
+
+
+class _MayaCompatibilityProbeError(TimeoutError):
+    """A connected port did not complete the compatibility handshake."""
+
+
+class _MayaCompatibilityProbeTimeout(_MayaCompatibilityProbeError):
+    """A compatibility response did not arrive before the probe deadline."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(f"{message}; {_MAYA_COMPATIBILITY_REOPEN_GUIDANCE}")
+
+
+class _MayaCompatibilityProbeInvalid(_MayaCompatibilityProbeError):
+    """A compatibility response arrived but did not match the protocol."""
+
 
 # Module-level client instance for singleton pattern
 _client: CommandPortClient | None = None
@@ -158,7 +187,7 @@ def get_client() -> CommandPortClient:
     global _client
     with _client_lock:
         if _client is None:
-            _client = CommandPortClient()
+            _client = CommandPortClient(auto_detect_maya_compatibility=True)
         return _client
 
 
@@ -206,6 +235,8 @@ class CommandPortClient:
         command_timeout: float = 30.0,
         max_retries: int = 3,
         retry_base_delay: float = 0.5,
+        auto_detect_maya_compatibility: bool = True,
+        source_type: Literal["python", "mel"] = "python",
     ) -> None:
         """Initialize the CommandPortClient.
 
@@ -216,10 +247,17 @@ class CommandPortClient:
             command_timeout: Command execution timeout in seconds.
             max_retries: Maximum number of connection retry attempts.
             retry_base_delay: Base delay for exponential backoff (seconds).
+            auto_detect_maya_compatibility: Detect the Maya 2024 response mode
+                once per socket connection. Enabled by default for every public
+                client; low-level legacy callers can explicitly opt out.
+            source_type: Maya commandPort interpreter. Compatibility detection
+                applies only to Python listeners.
 
         Raises:
             ValueError: If configuration is invalid.
         """
+        if source_type not in {"python", "mel"}:
+            raise ValueError(f"Unsupported commandPort source type: {source_type}")
         self.config = ConnectionConfig(
             host=host,
             port=port,
@@ -231,6 +269,9 @@ class CommandPortClient:
         self.state = ClientState(config=self.config)
         self._socket: socket.socket | None = None
         self._lock = threading.RLock()
+        self._auto_detect_maya_compatibility = auto_detect_maya_compatibility
+        self.source_type = source_type
+        self._maya_2024_compatibility = False
 
     def connect(self) -> bool:
         """Establish connection to Maya commandPort.
@@ -256,14 +297,18 @@ class CommandPortClient:
 
             self.state.status = ConnectionStatus.RECONNECTING
             last_error: str | None = None
+            attempts_made = 0
             logger.info("Connecting to Maya at %s:%d", self.config.host, self.config.port)
 
             for attempt in range(self.config.max_retries):
+                attempts_made = attempt + 1
                 try:
                     self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
                     self._socket.settimeout(self.config.connect_timeout)
                     self._socket.connect((self.config.host, self.config.port))
+                    if self._auto_detect_maya_compatibility and self.source_type == "python":
+                        self._detect_maya_compatibility()
 
                     # Connection successful
                     self.state.status = ConnectionStatus.OK
@@ -272,6 +317,10 @@ class CommandPortClient:
                     logger.info("Connected to Maya at %s:%d", self.config.host, self.config.port)
                     return True
 
+                except _MayaCompatibilityProbeError as exc:
+                    last_error = str(exc)
+                    self._cleanup_socket()
+                    break
                 except TimeoutError:
                     last_error = f"Connection timed out after {self.config.connect_timeout}s"
                     self._cleanup_socket()
@@ -299,7 +348,7 @@ class CommandPortClient:
             self.state.last_error = last_error
             logger.warning(
                 "Failed to connect to Maya after %d attempts: %s",
-                self.config.max_retries,
+                attempts_made,
                 last_error,
             )
 
@@ -307,7 +356,7 @@ class CommandPortClient:
                 message=f"Cannot connect to Maya commandPort at {self.config.host}:{self.config.port}",
                 host=self.config.host,
                 port=self.config.port,
-                attempts=self.config.max_retries,
+                attempts=attempts_made,
                 last_error=last_error,
             )
 
@@ -383,45 +432,65 @@ class CommandPortClient:
             self._socket.settimeout(self.config.command_timeout)
 
             # Prepare command
-            command = command.strip()
-            logger.debug("Executing command (%d chars)", len(command))
+            prepared_command = command.strip()
+            logger.debug("Executing command (%d chars)", len(prepared_command))
+
+            if self._maya_2024_compatibility:
+                encoded = base64.b64encode(prepared_command.encode("utf-8")).decode("ascii")
+                prepared_command = (
+                    "__import__('json').dumps({"
+                    f"'{_MAYA_COMPATIBILITY_RESPONSE_KEY}':"
+                    f"getattr(__import__('builtins'),'{MAYA_2024_HANDLER_NAME}')("
+                    f"__import__('base64').b64decode('{encoded}').decode('utf-8'))}})"
+                )
 
             # Maya commandPort requires a newline to execute the command
-            if not command.endswith("\n"):
-                command += "\n"
+            if not prepared_command.endswith("\n"):
+                prepared_command += "\n"
 
-            command_bytes = command.encode("utf-8")
+            command_bytes = prepared_command.encode("utf-8")
             self._socket.sendall(command_bytes)
             send_completed = True
 
-            # Receive response — use command_timeout for the first chunk (Maya
-            # may take a while to process) and a short follow-up timeout for
-            # subsequent chunks once data starts flowing.
-            response_parts: list[bytes] = []
-            self._socket.settimeout(self.config.command_timeout)
-            try:
-                first_chunk = self._socket.recv(BUFFER_SIZE)
-                if first_chunk:
-                    response_parts.append(first_chunk)
-                    # Data started flowing — switch to a short timeout to
-                    # collect any remaining fragments without a long wait.
-                    self._socket.settimeout(0.05)
-                    while True:
-                        try:
-                            chunk = self._socket.recv(BUFFER_SIZE)
-                            if not chunk:
-                                break
-                            response_parts.append(chunk)
-                        except TimeoutError:
-                            break
-            except TimeoutError:
-                # No response at all within command_timeout
-                pass
-
-            raw_response = b"".join(response_parts).decode("utf-8").strip()
-
-            # Parse Maya's response format to extract actual output
-            response = _parse_maya_response(raw_response)
+            response = self._receive_response()
+            if self._maya_2024_compatibility:
+                if not response:
+                    self.state.last_error = (
+                        f"Command timed out after {self.config.command_timeout}s"
+                    )
+                    self._handle_socket_error()
+                    raise MayaTimeoutError(
+                        message="Command execution timed out",
+                        timeout_seconds=self.config.command_timeout,
+                        operation="execute",
+                    )
+                try:
+                    payload = json.loads(response)[_MAYA_COMPATIBILITY_RESPONSE_KEY]
+                except (json.JSONDecodeError, KeyError, TypeError) as exc:
+                    self.state.last_error = "Invalid Maya 2024 commandPort response envelope"
+                    self._handle_socket_error()
+                    raise MayaUnavailableError(
+                        message="Invalid Maya 2024 commandPort response envelope",
+                        host=self.config.host,
+                        port=self.config.port,
+                        attempts=0,
+                    ) from exc
+                if not isinstance(payload, dict) or not isinstance(payload.get("ok"), bool):
+                    self._handle_socket_error()
+                    raise MayaUnavailableError(
+                        message="Invalid Maya 2024 commandPort response payload",
+                        host=self.config.host,
+                        port=self.config.port,
+                        attempts=0,
+                    )
+                if not payload["ok"]:
+                    maya_error = str(payload.get("error", "Unknown Maya command error"))
+                    raise MayaCommandError(
+                        message=f"Maya command failed: {maya_error}",
+                        command=command,
+                        maya_error=maya_error,
+                    )
+                response = str(payload.get("result", ""))
 
             # Update state on success
             self.state.update_contact()
@@ -463,6 +532,106 @@ class CommandPortClient:
                 attempts=0,
                 last_error=error_msg,
             ) from e
+
+    def _detect_maya_compatibility(self) -> None:
+        """Detect the exact Maya 2024 response mode once on a new connection."""
+        if self._socket is None:
+            return
+        probe = (
+            "__import__('json').dumps({"
+            f"'{_MAYA_COMPATIBILITY_PROBE_KEY}':"
+            "str(__import__('maya.cmds',fromlist=['cmds']).about(majorVersion=True))"
+            "+':' + str(int("
+            f"{self.config.port} in getattr(__import__('builtins'),'{MAYA_2024_PORTS_NAME}',())"
+            f" and callable(getattr(__import__('builtins'),'{MAYA_2024_HANDLER_NAME}',None))))}})\n"
+        )
+        # TCP is connected; this probe executes on Maya's main thread and gets
+        # one full command deadline rather than multiplying it across retries.
+        probe_timeout = self.config.command_timeout
+        self._socket.settimeout(probe_timeout)
+        self._send_compatibility_probe(
+            probe,
+            error="Maya compatibility probe timed out while sending",
+        )
+        response = self._receive_response(timeout=probe_timeout)
+        if not response:
+            raise _MayaCompatibilityProbeTimeout("Maya compatibility probe returned no response")
+        try:
+            mode = json.loads(response)[_MAYA_COMPATIBILITY_PROBE_KEY]
+        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+            raise _MayaCompatibilityProbeInvalid(
+                "Maya compatibility probe returned an invalid response"
+            ) from exc
+        if mode == "2024:1":
+            self._verify_maya_2024_buffer(probe_timeout)
+            self._maya_2024_compatibility = True
+        elif isinstance(mode, str) and mode.startswith("2024:"):
+            raise _MayaCompatibilityProbeInvalid(
+                "Maya 2024 commandPort lacks the compatibility handler; "
+                f"{_MAYA_COMPATIBILITY_REOPEN_GUIDANCE}"
+            )
+
+    def _verify_maya_2024_buffer(self, timeout: float) -> None:
+        """Prove the active listener accepts commands beyond Maya's default buffer."""
+        if self._socket is None:
+            return
+        payload_size = MAYA_2024_REQUIRED_PROBE_SIZE
+        padding = "x" * payload_size
+        probe = (
+            f"__import__('json').dumps({{'{_MAYA_COMPATIBILITY_BUFFER_KEY}':len('{padding}')}})\n"
+        )
+        self._socket.settimeout(timeout)
+        self._send_compatibility_probe(
+            probe,
+            error="Maya 2024 compatibility buffer probe timed out while sending",
+        )
+        response = self._receive_response(timeout=timeout)
+        if not response:
+            raise _MayaCompatibilityProbeTimeout(
+                "Maya 2024 compatibility buffer probe returned no response"
+            )
+        try:
+            accepted_size = json.loads(response)[_MAYA_COMPATIBILITY_BUFFER_KEY]
+        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+            raise _MayaCompatibilityProbeInvalid(
+                "Maya 2024 compatibility buffer probe returned an invalid response"
+            ) from exc
+        if accepted_size != payload_size:
+            raise _MayaCompatibilityProbeInvalid(
+                "Maya 2024 compatibility buffer probe returned an unexpected size"
+            )
+
+    def _send_compatibility_probe(self, probe: str, *, error: str) -> None:
+        if self._socket is None:
+            return
+        try:
+            self._socket.sendall(probe.encode("utf-8"))
+        except TimeoutError as exc:
+            raise _MayaCompatibilityProbeTimeout(error) from exc
+
+    def _receive_response(self, *, timeout: float | None = None) -> str:
+        """Read and parse one commandPort response."""
+        if self._socket is None:
+            return ""
+        response_parts: list[bytes] = []
+        self._socket.settimeout(self.config.command_timeout if timeout is None else timeout)
+        try:
+            first_chunk = self._socket.recv(BUFFER_SIZE)
+            if first_chunk:
+                response_parts.append(first_chunk)
+                self._socket.settimeout(0.05)
+                while True:
+                    try:
+                        chunk = self._socket.recv(BUFFER_SIZE)
+                        if not chunk:
+                            break
+                        response_parts.append(chunk)
+                    except TimeoutError:
+                        break
+        except TimeoutError:
+            pass
+        raw_response = b"".join(response_parts).decode("utf-8").strip()
+        return _parse_maya_response(raw_response)
 
     def is_connected(self) -> bool:
         """Check if currently connected to Maya.
@@ -514,6 +683,7 @@ class CommandPortClient:
         self,
         host: str | None = None,
         port: int | None = None,
+        source_type: Literal["python", "mel"] | None = None,
     ) -> None:
         """Update connection configuration.
 
@@ -522,6 +692,7 @@ class CommandPortClient:
         Args:
             host: New target host (optional).
             port: New target port (optional).
+            source_type: New command interpreter (optional).
 
         Raises:
             ValueError: If new configuration is invalid.
@@ -536,6 +707,9 @@ class CommandPortClient:
             # Update config
             new_host = host if host is not None else self.config.host
             new_port = port if port is not None else self.config.port
+            new_source_type = source_type if source_type is not None else self.source_type
+            if new_source_type not in {"python", "mel"}:
+                raise ValueError(f"Unsupported commandPort source type: {new_source_type}")
 
             self.config = ConnectionConfig(
                 host=new_host,
@@ -546,6 +720,7 @@ class CommandPortClient:
                 retry_base_delay=self.config.retry_base_delay,
             )
             self.state.config = self.config
+            self.source_type = new_source_type
 
     def _cleanup_socket(self) -> None:
         """Clean up the socket connection."""
@@ -553,6 +728,7 @@ class CommandPortClient:
             with contextlib.suppress(OSError):
                 self._socket.close()
             self._socket = None
+        self._maya_2024_compatibility = False
 
     def _handle_socket_error(self) -> None:
         """Handle a socket error by cleaning up and updating state."""
