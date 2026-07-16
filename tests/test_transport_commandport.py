@@ -527,6 +527,7 @@ class TestCommandPortClientConnect:
         assert call(client.config.command_timeout) in mock_socket.settimeout.call_args_list
         mock_socket_class.assert_called_once()
         assert exc_info.value.attempts == 1
+        assert "close and reopen it with the GG_MayaMCP helper" in str(exc_info.value.last_error)
 
     def test_auto_detection_discards_connection_after_invalid_probe(self) -> None:
         client = CommandPortClient(max_retries=1, auto_detect_maya_compatibility=True)

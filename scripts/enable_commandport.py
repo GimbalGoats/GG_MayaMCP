@@ -15,11 +15,6 @@ The commandPort will be opened on localhost:7001 by default.
 
 from __future__ import annotations
 
-import ast
-import builtins
-import contextlib
-import io
-
 import maya.cmds as cmds
 
 try:
@@ -28,10 +23,14 @@ try:
         command_port_open_kwargs,
         is_loopback_command_port_name,
         mark_maya_2024_compatible_port,
-        requires_maya_2024_compatibility,
         unmark_maya_2024_compatible_port,
     )
 except ImportError:
+    import ast
+    import builtins
+    import contextlib
+    import io
+
     _HANDLER_NAME = "_maya_mcp_command_port_2024"
     _STATE_NAME = "_maya_mcp_command_port_2024_state"
     _PORTS_NAME = "_maya_mcp_command_port_2024_ports"

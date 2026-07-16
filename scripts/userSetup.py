@@ -27,11 +27,6 @@ See Also:
 
 from __future__ import annotations
 
-import ast
-import builtins
-import contextlib
-import io
-
 try:
     from maya_mcp.maya_panel.commandport_compat import (
         MAYA_2024_COMMAND_PORT_BUFFER_SIZE,
@@ -43,6 +38,11 @@ try:
         unmark_maya_2024_compatible_port,
     )
 except ImportError:
+    import ast
+    import builtins
+    import contextlib
+    import io
+
     _HANDLER_NAME = "_maya_mcp_command_port_2024"
     _STATE_NAME = "_maya_mcp_command_port_2024_state"
     _PORTS_NAME = "_maya_mcp_command_port_2024_ports"

@@ -392,6 +392,25 @@ def test_standalone_paths_leave_maya_2025_on_existing_behavior(
 
 
 @pytest.mark.parametrize("script", ["scripts/enable_commandport.py", "scripts/userSetup.py"])
+def test_packaged_helpers_skip_standalone_fallback_imports(
+    monkeypatch: pytest.MonkeyPatch,
+    script: str,
+) -> None:
+    _install_fake_maya(monkeypatch, "2025")
+    imported_modules: list[str] = []
+    real_import = builtins.__import__
+
+    def track_import(name: str, *args: object, **kwargs: object) -> object:
+        imported_modules.append(name)
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", track_import)
+    runpy.run_path(str(Path(script)))
+
+    assert {"ast", "builtins", "contextlib", "io"}.isdisjoint(imported_modules)
+
+
+@pytest.mark.parametrize("script", ["scripts/enable_commandport.py", "scripts/userSetup.py"])
 def test_standalone_fallback_works_without_installed_package(
     monkeypatch: pytest.MonkeyPatch,
     script: str,

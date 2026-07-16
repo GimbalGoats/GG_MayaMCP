@@ -61,6 +61,7 @@ BUFFER_SIZE = 65536
 _MAYA_COMPATIBILITY_PROBE_KEY = "__maya_mcp_compat__"
 _MAYA_COMPATIBILITY_BUFFER_KEY = "__maya_mcp_buffer__"
 _MAYA_COMPATIBILITY_RESPONSE_KEY = "__maya_mcp_response__"
+_MAYA_COMPATIBILITY_REOPEN_GUIDANCE = "close and reopen it with the GG_MayaMCP helper"
 
 
 class _MayaCompatibilityProbeError(TimeoutError):
@@ -69,6 +70,9 @@ class _MayaCompatibilityProbeError(TimeoutError):
 
 class _MayaCompatibilityProbeTimeout(_MayaCompatibilityProbeError):
     """A compatibility response did not arrive before the probe deadline."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(f"{message}; {_MAYA_COMPATIBILITY_REOPEN_GUIDANCE}")
 
 
 class _MayaCompatibilityProbeInvalid(_MayaCompatibilityProbeError):
@@ -564,7 +568,7 @@ class CommandPortClient:
         elif isinstance(mode, str) and mode.startswith("2024:"):
             raise _MayaCompatibilityProbeInvalid(
                 "Maya 2024 commandPort lacks the compatibility handler; "
-                "close and reopen it with the GG_MayaMCP helper"
+                f"{_MAYA_COMPATIBILITY_REOPEN_GUIDANCE}"
             )
 
     def _verify_maya_2024_buffer(self, timeout: float) -> None:
