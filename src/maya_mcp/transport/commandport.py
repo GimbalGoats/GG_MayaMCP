@@ -41,6 +41,7 @@ from maya_mcp.commandport_protocol import (
     MAYA_2024_HANDLER_NAME,
     MAYA_2024_PORTS_NAME,
     MAYA_2024_REQUIRED_PROBE_SIZE,
+    MAYA_LEGACY_COMPATIBILITY_VERSIONS,
 )
 from maya_mcp.errors import (
     MayaCommandError,
@@ -247,7 +248,7 @@ class CommandPortClient:
             command_timeout: Command execution timeout in seconds.
             max_retries: Maximum number of connection retry attempts.
             retry_base_delay: Base delay for exponential backoff (seconds).
-            auto_detect_maya_compatibility: Detect the Maya 2024 response mode
+            auto_detect_maya_compatibility: Detect the Maya 2022-2024 response mode
                 once per socket connection. Enabled by default for every public
                 client; low-level legacy callers can explicitly opt out.
             source_type: Maya commandPort interpreter. Compatibility detection
@@ -467,10 +468,10 @@ class CommandPortClient:
                 try:
                     payload = json.loads(response)[_MAYA_COMPATIBILITY_RESPONSE_KEY]
                 except (json.JSONDecodeError, KeyError, TypeError) as exc:
-                    self.state.last_error = "Invalid Maya 2024 commandPort response envelope"
+                    self.state.last_error = "Invalid Maya 2022-2024 commandPort response envelope"
                     self._handle_socket_error()
                     raise MayaUnavailableError(
-                        message="Invalid Maya 2024 commandPort response envelope",
+                        message="Invalid Maya 2022-2024 commandPort response envelope",
                         host=self.config.host,
                         port=self.config.port,
                         attempts=0,
@@ -478,7 +479,7 @@ class CommandPortClient:
                 if not isinstance(payload, dict) or not isinstance(payload.get("ok"), bool):
                     self._handle_socket_error()
                     raise MayaUnavailableError(
-                        message="Invalid Maya 2024 commandPort response payload",
+                        message="Invalid Maya 2022-2024 commandPort response payload",
                         host=self.config.host,
                         port=self.config.port,
                         attempts=0,
@@ -534,7 +535,7 @@ class CommandPortClient:
             ) from e
 
     def _detect_maya_compatibility(self) -> None:
-        """Detect the exact Maya 2024 response mode once on a new connection."""
+        """Detect the Maya 2022-2024 response mode once on a new connection."""
         if self._socket is None:
             return
         probe = (
@@ -562,12 +563,14 @@ class CommandPortClient:
             raise _MayaCompatibilityProbeInvalid(
                 "Maya compatibility probe returned an invalid response"
             ) from exc
-        if mode == "2024:1":
+        compatible_modes = {f"{version}:1" for version in MAYA_LEGACY_COMPATIBILITY_VERSIONS}
+        legacy_prefixes = tuple(f"{version}:" for version in MAYA_LEGACY_COMPATIBILITY_VERSIONS)
+        if mode in compatible_modes:
             self._verify_maya_2024_buffer(probe_timeout)
             self._maya_2024_compatibility = True
-        elif isinstance(mode, str) and mode.startswith("2024:"):
+        elif isinstance(mode, str) and mode.startswith(legacy_prefixes):
             raise _MayaCompatibilityProbeInvalid(
-                "Maya 2024 commandPort lacks the compatibility handler; "
+                "Maya 2022-2024 commandPort lacks the compatibility handler; "
                 f"{_MAYA_COMPATIBILITY_REOPEN_GUIDANCE}"
             )
 
@@ -583,22 +586,22 @@ class CommandPortClient:
         self._socket.settimeout(timeout)
         self._send_compatibility_probe(
             probe,
-            error="Maya 2024 compatibility buffer probe timed out while sending",
+            error="Maya 2022-2024 compatibility buffer probe timed out while sending",
         )
         response = self._receive_response(timeout=timeout)
         if not response:
             raise _MayaCompatibilityProbeTimeout(
-                "Maya 2024 compatibility buffer probe returned no response"
+                "Maya 2022-2024 compatibility buffer probe returned no response"
             )
         try:
             accepted_size = json.loads(response)[_MAYA_COMPATIBILITY_BUFFER_KEY]
         except (json.JSONDecodeError, KeyError, TypeError) as exc:
             raise _MayaCompatibilityProbeInvalid(
-                "Maya 2024 compatibility buffer probe returned an invalid response"
+                "Maya 2022-2024 compatibility buffer probe returned an invalid response"
             ) from exc
         if accepted_size != payload_size:
             raise _MayaCompatibilityProbeInvalid(
-                "Maya 2024 compatibility buffer probe returned an unexpected size"
+                "Maya 2022-2024 compatibility buffer probe returned an unexpected size"
             )
 
     def _send_compatibility_probe(self, probe: str, *, error: str) -> None:

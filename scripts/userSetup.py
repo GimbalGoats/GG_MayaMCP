@@ -125,7 +125,7 @@ except ImportError:
         echo_output: bool,
     ) -> bool:
         return (
-            str(maya_cmds.about(majorVersion=True)) == "2024"
+            str(maya_cmds.about(majorVersion=True)) in {"2022", "2023", "2024"}
             and source_type == "python"
             and echo_output
         )
@@ -157,7 +157,7 @@ DEFAULT_PORT = 7001
 SHOW_PANEL_ON_STARTUP = False
 
 # Set to True only when this script owns the configured port and may replace an
-# unknown existing Maya 2024 listener.
+# unknown existing Maya 2022-2024 listener.
 REPLACE_EXISTING_COMMAND_PORT = False
 
 # ============================================================================
@@ -202,7 +202,7 @@ def _start_command_port() -> None:
 
     port_name = f":{DEFAULT_PORT}"
 
-    # Replace legacy Maya 2024 ports so the installed response handler and port
+    # Replace Maya 2022-2024 ports so the installed response handler and port
     # configuration always agree. Later Maya versions keep the no-op behavior.
     open_ports = cmds.commandPort(query=True, listPorts=True) or []
     existing_port_name = next(
@@ -231,7 +231,7 @@ def _start_command_port() -> None:
             return
         cmds.commandPort(name=existing_port_name, close=True)
         unmark_maya_2024_compatible_port(DEFAULT_PORT)
-        print(f"[MCP] Refreshing Maya 2024 commandPort on {port_name}")
+        print(f"[MCP] Refreshing Maya 2022-2024 commandPort on {port_name}")
 
     # Open the port
     try:

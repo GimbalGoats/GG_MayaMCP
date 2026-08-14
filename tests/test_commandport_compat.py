@@ -73,8 +73,11 @@ def test_loopback_tcp_port_names_do_not_match_unix_domain_names(
     assert is_loopback_command_port_name(name, 7002) is expected
 
 
-def test_maya_2024_installs_full_command_response_handler() -> None:
-    kwargs = command_port_open_kwargs(FakeCmds("2024"), "python", True)
+@pytest.mark.parametrize("maya_version", ["2022", "2023", "2024"])
+def test_maya_2022_through_2024_install_full_command_response_handler(
+    maya_version: str,
+) -> None:
+    kwargs = command_port_open_kwargs(FakeCmds(maya_version), "python", True)
 
     assert kwargs == {
         "sourceType": "python",
