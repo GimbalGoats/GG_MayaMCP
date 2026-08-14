@@ -6,7 +6,8 @@
   "description": "Control a local Autodesk Maya session through a typed MCP tool surface.",
   "long_description": "Maya MCP runs locally on the user's workstation and talks to Autodesk Maya through Maya's localhost commandPort. It exposes typed tools for scene inspection, nodes, selection, mesh data, modeling, shading, skinning, animation, curves, viewport capture, and approved script workflows. Raw code execution is disabled by default and must be explicitly enabled.",
   "author": {
-    "name": "Maya MCP Contributors"
+    "name": "Gimbal Goats",
+    "url": "https://github.com/GimbalGoats"
   },
   "repository": {
     "type": "git",

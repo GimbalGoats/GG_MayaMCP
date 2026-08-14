@@ -42,6 +42,21 @@ def test_pypi_readme_contains_registry_ownership_marker() -> None:
     assert f"<!-- mcp-name: {REGISTRY_NAME} -->" in readme
 
 
+def test_claude_mcpb_metadata_matches_release_and_publisher() -> None:
+    """Keep the MCPB release and directory publisher identity synchronized."""
+    metadata = json.loads(
+        (REPOSITORY_ROOT / "packaging" / "claude-mcpb" / "manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert metadata["version"] == __version__
+    assert metadata["author"] == {
+        "name": "Gimbal Goats",
+        "url": "https://github.com/GimbalGoats",
+    }
+
+
 def test_registry_publish_waits_for_the_exact_pypi_release() -> None:
     """Keep registry publication independent of whichever release is latest."""
     workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "publish-pypi.yml").read_text(

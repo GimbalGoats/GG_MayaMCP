@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Extended the commandPort response compatibility path to Maya 2022 and 2023,
   making Maya 2022 and later the supported release range.
 
+## [0.6.1] - 2026-07-20
+
+### Fixed
+
+- Pointed the Claude Desktop MCPB author metadata at the Gimbal Goats GitHub organization for directory review.
+
 ## [0.6.0] - 2026-07-16
 
 ### Added
@@ -218,7 +224,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - No arbitrary code execution - all operations are explicit tools
 - No raw Python/MEL string evaluation exposed to clients
 
-[Unreleased]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.6.0...main
+[Unreleased]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.6.1...main
+[0.6.1]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/GimbalGoats/GG_MayaMCP/compare/v0.4.0...v0.4.1
