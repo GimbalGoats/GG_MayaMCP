@@ -113,7 +113,7 @@ except ImportError:
         echo_output: bool,
     ) -> bool:
         return (
-            str(maya_cmds.about(majorVersion=True)) == "2024"
+            str(maya_cmds.about(majorVersion=True)) in {"2022", "2023", "2024"}
             and source_type == "python"
             and echo_output
         )
@@ -166,7 +166,7 @@ def enable_commandport(port: int = 7001, source_type: str = "python") -> None:
     print(f"commandPort opened on localhost{port_name}")
     print(f"  Source type: {source_type}")
     if port_kwargs.get("bufferSize") == MAYA_2024_COMMAND_PORT_BUFFER_SIZE:
-        print("  Echo output: Maya 2024 compatibility handler")
+        print("  Echo output: Maya 2022-2024 compatibility handler")
     else:
         print("  Echo output: enabled")
     print()

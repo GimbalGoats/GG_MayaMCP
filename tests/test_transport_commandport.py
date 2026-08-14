@@ -312,7 +312,11 @@ class TestCommandPortClientConnect:
             assert exc_info.value.attempts == 2
             assert "timed out" in str(exc_info.value.last_error)
 
-    def test_auto_detection_enables_single_line_framing_only_for_maya_2024(self) -> None:
+    @pytest.mark.parametrize("maya_version", ["2022", "2023", "2024"])
+    def test_auto_detection_enables_single_line_framing_for_maya_2022_through_2024(
+        self,
+        maya_version: str,
+    ) -> None:
         client = CommandPortClient(port=7002, auto_detect_maya_compatibility=True)
         active_timeout: float | None = None
         buffer_send_timeouts: list[float | None] = []
@@ -331,7 +335,7 @@ class TestCommandPortClientConnect:
             mock_socket.settimeout.side_effect = record_timeout
             mock_socket.sendall.side_effect = record_send
             mock_socket.recv.side_effect = [
-                b'plugin output\n{"__maya_mcp_compat__":"2024:1"}\n\x00',
+                f'plugin output\n{{"__maya_mcp_compat__":"{maya_version}:1"}}\n\x00'.encode(),
                 TimeoutError(),
                 json.dumps({"__maya_mcp_buffer__": MAYA_2024_REQUIRED_PROBE_SIZE}).encode()
                 + b"\n\x00",
@@ -358,7 +362,7 @@ class TestCommandPortClientConnect:
         assert "_maya_mcp_command_port_2024" in sent[2]
         assert "__maya_mcp_response__" in sent[2]
 
-        fake_cmds = types.SimpleNamespace(about=lambda **_kwargs: "2024")
+        fake_cmds = types.SimpleNamespace(about=lambda **_kwargs: maya_version)
         fake_maya = types.ModuleType("maya")
         fake_maya.cmds = fake_cmds  # type: ignore[attr-defined]
         with (
@@ -374,7 +378,7 @@ class TestCommandPortClientConnect:
             probe_result = json.loads(eval(compile(sent[0], "<probe>", "eval")))
             command_result = json.loads(eval(compile(sent[2], "<command>", "eval")))
 
-        assert probe_result == {"__maya_mcp_compat__": "2024:1"}
+        assert probe_result == {"__maya_mcp_compat__": f"{maya_version}:1"}
         assert command_result["__maya_mcp_response__"]["ok"] is True
 
     def test_maya_2024_stale_marker_cannot_bypass_buffer_probe(self) -> None:
@@ -487,13 +491,17 @@ class TestCommandPortClientConnect:
         sent = [item.args[0].decode("utf-8") for item in mock_socket.sendall.call_args_list]
         assert sent[1] == "print('ok')\n"
 
-    def test_auto_detection_rejects_maya_2024_without_handler(self) -> None:
+    @pytest.mark.parametrize("maya_version", ["2022", "2023", "2024"])
+    def test_auto_detection_rejects_maya_2022_through_2024_without_handler(
+        self,
+        maya_version: str,
+    ) -> None:
         client = CommandPortClient(max_retries=3, auto_detect_maya_compatibility=True)
 
         with patch("socket.socket") as mock_socket_class:
             mock_socket = MagicMock()
             mock_socket.recv.side_effect = [
-                b'{"__maya_mcp_compat__":"2024:0"}\n\x00',
+                f'{{"__maya_mcp_compat__":"{maya_version}:0"}}\n\x00'.encode(),
                 TimeoutError(),
             ]
             mock_socket_class.return_value = mock_socket

@@ -13,6 +13,7 @@ from maya_mcp.commandport_protocol import (
     MAYA_2024_HANDLER_NAME,
     MAYA_2024_PORTS_NAME,
     MAYA_2024_STATE_NAME,
+    MAYA_LEGACY_COMPATIBILITY_VERSIONS,
 )
 
 
@@ -22,13 +23,26 @@ class MayaCommands(Protocol):
     def about(self, **kwargs: bool) -> object: ...
 
 
+def requires_maya_legacy_compatibility(
+    cmds: MayaCommands,
+    source_type: str,
+    echo_output: bool,
+) -> bool:
+    """Return whether the Maya 2022-2024 response policy is required."""
+    return (
+        str(cmds.about(majorVersion=True)) in MAYA_LEGACY_COMPATIBILITY_VERSIONS
+        and source_type == "python"
+        and echo_output
+    )
+
+
 def requires_maya_2024_compatibility(
     cmds: MayaCommands,
     source_type: str,
     echo_output: bool,
 ) -> bool:
-    """Return whether the exact Maya 2024 response policy is required."""
-    return str(cmds.about(majorVersion=True)) == "2024" and source_type == "python" and echo_output
+    """Backward-compatible alias for the Maya 2022-2024 policy."""
+    return requires_maya_legacy_compatibility(cmds, source_type, echo_output)
 
 
 def is_loopback_command_port_name(name: object, port: int) -> bool:
@@ -42,7 +56,7 @@ def is_maya_2024_compatible_port(port: int) -> bool:
 
 
 def mark_maya_2024_compatible_port(port: int) -> None:
-    """Record a successfully opened Maya 2024 compatibility port."""
+    """Record a successfully opened Maya 2022-2024 compatibility port."""
     ports = set(getattr(builtins, MAYA_2024_PORTS_NAME, set()))
     ports.add(port)
     setattr(builtins, MAYA_2024_PORTS_NAME, ports)
@@ -121,8 +135,8 @@ def command_port_open_kwargs(
     source_type: str,
     echo_output: bool,
 ) -> dict[str, object]:
-    """Return commandPort kwargs, installing the exact Maya 2024 workaround."""
-    if not requires_maya_2024_compatibility(cmds, source_type, echo_output):
+    """Return commandPort kwargs, installing the Maya 2022-2024 workaround."""
+    if not requires_maya_legacy_compatibility(cmds, source_type, echo_output):
         return {"sourceType": source_type, "echoOutput": echo_output}
 
     setattr(builtins, MAYA_2024_HANDLER_NAME, _maya_2024_handler)

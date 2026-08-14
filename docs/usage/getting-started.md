@@ -13,7 +13,7 @@ This page is the fastest reliable setup path.
 
 You need:
 
-- Autodesk Maya 2024 or later running on the same machine as the MCP server
+- Autodesk Maya 2022 or later running on the same machine as the MCP server
 - Python 3.10.1 or newer
 - an MCP client that can start a local `stdio` server
 
@@ -54,8 +54,8 @@ also include this file.
 
 This opens the default port that Maya MCP expects: `localhost:7001`.
 
-The helper selects the response compatibility path only for Maya 2024. Maya
-2025 and later retain the normal Python + `echoOutput` configuration.
+The helper selects the response compatibility path for Maya 2022 through 2024.
+Maya 2025 and later retain the normal Python + `echoOutput` configuration.
 
 ## 3. Start the MCP Server
 

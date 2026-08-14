@@ -62,7 +62,7 @@ unless `publish_pypi` is enabled.
 Paste and run the complete bundled `scripts/enable_commandport.py` file in
 Maya's Python Script Editor. It is also available from the
 [GG_MayaMCP repository](https://github.com/GimbalGoats/GG_MayaMCP/blob/main/scripts/enable_commandport.py).
-The helper selects the response workaround only for Maya 2024; Maya 2025 and
+The helper selects the response workaround for Maya 2022 through 2024; Maya 2025 and
 later retain the established Python + `echoOutput` path.
 
 ## First Calls

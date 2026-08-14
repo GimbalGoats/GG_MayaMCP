@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Extended the commandPort response compatibility path to Maya 2022 and 2023,
+  making Maya 2022 and later the supported release range.
+
 ## [0.6.1] - 2026-07-20
 
 ### Fixed

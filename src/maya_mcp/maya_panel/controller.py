@@ -95,7 +95,7 @@ def open_command_port(
         port: Port number to open (1-65535).
         source_type: Command interpreter ("python" or "mel").
         echo_output: If True, send command output back to client.
-        replace_existing: Replace an unknown existing Maya 2024 listener.
+        replace_existing: Replace an unknown existing Maya 2022-2024 listener.
             Leave False for automatic startup; set True only after explicit
             user confirmation that this helper owns the port.
 
@@ -118,9 +118,9 @@ def open_command_port(
 
     port_name = f":{port}"
 
-    # Maya 2024 ports opened without the compatibility policy accept sockets but
-    # cannot return responses. Replace an existing Python/echo port in that one
-    # release; all other versions retain the established early-return path.
+    # Maya 2022-2024 ports opened without the compatibility policy accept sockets
+    # but cannot return responses. Replace an existing Python/echo port in those
+    # releases; later versions retain the established early-return path.
     existing_port_name = get_open_port_name(port)
     port_kwargs = command_port_open_kwargs(cmds, source_type, echo_output)
     is_maya_2024_compatibility = port_kwargs.get("bufferSize") == MAYA_2024_COMMAND_PORT_BUFFER_SIZE
@@ -129,7 +129,7 @@ def open_command_port(
         compatibility_marked = is_maya_2024_compatible_port(port)
         if is_maya_2024_compatibility and not compatibility_marked and not replace_existing:
             logger.warning(
-                "Existing Maya 2024 commandPort on %s is not compatibility-marked",
+                "Existing Maya 2022-2024 commandPort on %s is not compatibility-marked",
                 port_name,
             )
             return False
@@ -138,7 +138,7 @@ def open_command_port(
             return True
         cmds.commandPort(name=existing_port_name, close=True)
         unmark_maya_2024_compatible_port(port)
-        logger.info("Refreshing Maya 2024 commandPort on %s", port_name)
+        logger.info("Refreshing Maya 2022-2024 commandPort on %s", port_name)
 
     # Open the port
     try:
