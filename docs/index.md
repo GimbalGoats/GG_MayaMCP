@@ -74,7 +74,7 @@ pip install maya-mcp
 
 Download, then paste and run, the complete
 [`scripts/enable_commandport.py`](https://github.com/GimbalGoats/GG_MayaMCP/blob/main/scripts/enable_commandport.py) file in
-Maya's Python Script Editor. It applies the exact Maya 2024 response workaround
+Maya's Python Script Editor. It applies the Maya 2022-2024 response workaround
 and leaves Maya 2025 and later on the normal Python + `echoOutput` path.
 
 3. Start the server

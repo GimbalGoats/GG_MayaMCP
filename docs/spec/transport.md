@@ -140,11 +140,11 @@ The decision is recorded in [ADR-0001 CommandPort](../adr/0001-commandport.md).
 ## Recommended Maya-Side Setup
 
 Use the bundled `scripts/enable_commandport.py` helper or the Maya control
-panel. Both route through the same exact-version policy. Maya 2024 keeps the
-Python source type, disables its broken `echoOutput` path, and installs a
+panel. Both route through the same version-scoped policy. Maya 2022 through 2024
+keep the Python source type, disable the broken `echoOutput` path, and install a
 complete-payload response handler. Every public transport client identifies the exact
 major version once per connection and frames complete multiline commands into
-one Python expression only for Maya 2024. Its Maya 2024-only input buffer covers
+one Python expression only for Maya 2022 through 2024. The compatibility input buffer covers
 the existing 1 MiB approved-script limit after framing. Maya 2025 and later keep the existing
 command bytes and Python + `echoOutput` path after that cold-path query.
 
@@ -156,7 +156,7 @@ command bytes and Python + `echoOutput` path after that cold-path query.
 - The per-client lock does not coordinate separate `CommandPortClient` instances. Live tests and MCP server flows should route tool calls through the shared transport client instead of keeping multiple commandPort sockets open to the same Maya session.
 - Restart the MCP server after local code changes when validating against a live Maya session.
 - Restart Maya if `commandPort` state becomes confused or stale.
-- Keep the INET commandPort on loopback. The Maya 2024 compatibility path preserves Maya's default input-warning policy; it does not add authentication or broaden the listener.
+- Keep the INET commandPort on loopback. The Maya 2022-2024 compatibility path preserves Maya's default input-warning policy; it does not add authentication or broaden the listener.
 
 ## When To Update This Doc
 

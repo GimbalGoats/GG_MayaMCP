@@ -82,7 +82,7 @@ installed but failed or disabled.
 ## Enable Maya CommandPort
 
 Paste and run the bundled `scripts/enable_commandport.py` file in
-Maya's Python Script Editor. This includes the exact Maya 2024 response
+Maya's Python Script Editor. This includes the Maya 2022-2024 response
 compatibility policy; Maya 2025 and later keep the normal commandPort path.
 
 The port number must match the Claude Desktop extension setting.

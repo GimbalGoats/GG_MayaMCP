@@ -81,10 +81,10 @@ Because `commandPort` itself is not authenticated, Maya MCP adds controls at the
 
 Use the bundled `scripts/enable_commandport.py` helper or the Maya control
 panel rather than opening the port directly. The centralized policy keeps the
-normal Python + `echoOutput` configuration for Maya 2025 and later. Maya 2024
-alone disables the broken `echoOutput` path and installs a complete-payload
+normal Python + `echoOutput` configuration for Maya 2025 and later. Maya 2022
+through 2024 disable the broken `echoOutput` path and install a complete-payload
 Python response handler. Each public transport client detects the exact major version
-once per connection, then uses single-expression framing only for Maya 2024.
+once per connection, then uses single-expression framing only for Maya 2022 through 2024.
 Maya's default input-warning policy is preserved.
 
 ## Related Documents

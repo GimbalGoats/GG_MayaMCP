@@ -15,7 +15,7 @@
 
 Maya MCP is an open-source, local Model Context Protocol server for controlling Autodesk Maya through Maya's `commandPort`.
 
-Supported Maya versions: Autodesk Maya 2024 and later.
+Supported Maya versions: Autodesk Maya 2022 and later.
 
 It gives MCP clients a typed tool surface for scene work, nodes, selection, modeling, shading, skinning, animation, curves, scripts, and viewport capture without importing Maya modules in the server process.
 
@@ -71,8 +71,8 @@ pip install -e ".[dev]"
 Download, then paste and run, the complete
 [`scripts/enable_commandport.py`](https://github.com/GimbalGoats/GG_MayaMCP/blob/main/scripts/enable_commandport.py)
 file in Maya's Python Script Editor. The helper keeps the established Python +
-`echoOutput` path on Maya 2025 and later. On Maya 2024 only, it selects the
-loopback-only response compatibility path required by that release.
+`echoOutput` path on Maya 2025 and later. On Maya 2022 through 2024, it selects
+the loopback-only response compatibility path required by those releases.
 
 ### 3. Start the server
 
