@@ -31,8 +31,8 @@ class MayaDisconnectOutput(TypedDict):
 
 
 def maya_connect(
-    host: str = "localhost",
-    port: int = 7001,
+    host: str | None = None,
+    port: int | None = None,
     source_type: Literal["python"] = "python",
 ) -> MayaConnectOutput:
     """Establish a connection to Maya's commandPort.
@@ -42,7 +42,10 @@ def maya_connect(
 
     Args:
         host: Target host. Only "localhost" or "127.0.0.1" are supported.
-        port: Target port number (1-65535).
+            Defaults to the client's configured host.
+        port: Target port number (1-65535). Defaults to the client's
+            configured port (``MAYA_MCP_PORT``, else 7001), so a bare
+            reconnect never moves the server onto another client's port.
         source_type: Command interpreter type.
 
     Returns:
@@ -57,6 +60,12 @@ def maya_connect(
         >>> if result["connected"]:
         ...     print("Connected!")
     """
+    client = get_client()
+    if host is None:
+        host = client.config.host
+    if port is None:
+        port = client.config.port
+
     if source_type != "python":
         return {
             "connected": False,
@@ -64,8 +73,6 @@ def maya_connect(
             "port": port,
             "error": "MEL commandPorts are not supported by MCP tool execution",
         }
-
-    client = get_client()
 
     # Reconfigure if host/port differ
     if (

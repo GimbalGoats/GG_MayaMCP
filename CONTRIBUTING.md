@@ -62,12 +62,11 @@ All code must be fully type-hinted and pass `mypy --strict`:
 
 ```python
 # Good
-def process_node(node_name: str, attributes: list[str]) -> dict[str, Any]:
-    ...
+def process_node(node_name: str, attributes: list[str]) -> dict[str, Any]: ...
+
 
 # Bad - missing type hints
-def process_node(node_name, attributes):
-    ...
+def process_node(node_name, attributes): ...
 ```
 
 ### Docstrings
@@ -142,13 +141,14 @@ from unittest.mock import MagicMock, patch
 
 from maya_mcp.transport.commandport import CommandPortClient
 
+
 def test_client_handles_connection_refused():
     """Client should raise MayaUnavailableError when connection is refused."""
     client = CommandPortClient(host="localhost", port=7001)
-    
+
     with patch("socket.socket") as mock_socket:
         mock_socket.return_value.connect.side_effect = ConnectionRefusedError()
-        
+
         with pytest.raises(MayaUnavailableError):
             client.execute("print('test')")
 ```
@@ -215,6 +215,7 @@ def list_nodes(node_type: str) -> list[str]:
     """List Maya nodes of a specific type."""
     return core.list_nodes_by_type(node_type)
 
+
 # Bad - tool contains business logic
 @mcp.tool
 def list_nodes(node_type: str) -> list[str]:
@@ -231,12 +232,15 @@ Never import `maya.cmds` in the MCP server process:
 # Good - use transport layer
 from maya_mcp.transport import get_client
 
+
 def get_selection() -> list[str]:
     client = get_client()
     return client.execute("cmds.ls(selection=True)")
 
+
 # Bad - direct Maya import
 import maya.cmds as cmds  # This will fail!
+
 
 def get_selection() -> list[str]:
     return cmds.ls(selection=True)
@@ -249,14 +253,15 @@ Use typed errors from `maya_mcp.errors`:
 ```python
 from maya_mcp.errors import MayaUnavailableError, NodeNotFoundError
 
+
 def get_node(name: str) -> dict[str, Any]:
     if not client.is_connected():
         raise MayaUnavailableError("Not connected to Maya")
-    
+
     result = client.execute(f"cmds.objExists('{name}')")
     if not result:
         raise NodeNotFoundError(f"Node not found: {name}")
-    
+
     return {...}
 ```
 

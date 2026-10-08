@@ -106,6 +106,7 @@ If the panel does not appear:
 
 ```python
 import maya_mcp
+
 print(maya_mcp.__file__)
 ```
 
@@ -113,6 +114,7 @@ If `commandPort` will not open:
 
 ```python
 import maya.cmds as cmds
+
 print(cmds.commandPort(query=True, listPorts=True))
 ```
 

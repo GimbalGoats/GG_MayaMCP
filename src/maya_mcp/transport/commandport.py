@@ -32,10 +32,13 @@ import base64
 import contextlib
 import json
 import logging
+import os
 import socket
 import threading
 import time
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+from typing_extensions import TypedDict
 
 from maya_mcp.commandport_protocol import (
     MAYA_2024_HANDLER_NAME,
@@ -53,6 +56,9 @@ from maya_mcp.types import (
     ConnectionStatus,
     HealthCheckResult,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 logger = logging.getLogger(__name__)
 
@@ -171,11 +177,83 @@ def _parse_maya_response(raw_response: str) -> str:
     return "\n".join(dict.fromkeys(filtered))
 
 
+#: Environment variables read by :func:`get_client` for the shared client.
+ENV_HOST = "MAYA_MCP_HOST"
+ENV_PORT = "MAYA_MCP_PORT"
+ENV_CONNECT_TIMEOUT = "MAYA_MCP_CONNECT_TIMEOUT"
+ENV_COMMAND_TIMEOUT = "MAYA_MCP_COMMAND_TIMEOUT"
+
+
+class ClientEnvOverrides(TypedDict, total=False):
+    """Connection settings taken from the environment."""
+
+    host: str
+    port: int
+    connect_timeout: float
+    command_timeout: float
+
+
+def _parse_env_number(env: Mapping[str, str], name: str, kind: type[float]) -> float | None:
+    value = env.get(name, "").strip()
+    if not value:
+        return None
+    try:
+        return kind(value)
+    except ValueError:
+        expected = "an integer" if kind is int else "a number"
+        raise ValueError(f"{name} must be {expected}, got {value!r}") from None
+
+
+def client_overrides_from_env(environ: Mapping[str, str] | None = None) -> ClientEnvOverrides:
+    """Read shared-client connection settings from the environment.
+
+    Supported variables are ``MAYA_MCP_HOST``, ``MAYA_MCP_PORT``,
+    ``MAYA_MCP_CONNECT_TIMEOUT`` and ``MAYA_MCP_COMMAND_TIMEOUT``. Unset or
+    empty variables are skipped so the client defaults apply.
+
+    Args:
+        environ: Optional environment mapping. Defaults to ``os.environ``.
+
+    Returns:
+        Keyword arguments for :class:`CommandPortClient`.
+
+    Raises:
+        ValueError: If a variable holds a value that cannot be parsed. Host
+            and range validation stay in ``ConnectionConfig``.
+    """
+    env = os.environ if environ is None else environ
+    overrides: ClientEnvOverrides = {}
+
+    host = env.get(ENV_HOST, "").strip()
+    if host:
+        overrides["host"] = host
+
+    port = _parse_env_number(env, ENV_PORT, int)
+    if port is not None:
+        overrides["port"] = int(port)
+
+    connect_timeout = _parse_env_number(env, ENV_CONNECT_TIMEOUT, float)
+    if connect_timeout is not None:
+        overrides["connect_timeout"] = connect_timeout
+
+    command_timeout = _parse_env_number(env, ENV_COMMAND_TIMEOUT, float)
+    if command_timeout is not None:
+        overrides["command_timeout"] = command_timeout
+
+    return overrides
+
+
 def get_client() -> CommandPortClient:
     """Get the global CommandPortClient instance.
 
     Returns a singleton CommandPortClient instance, creating it if necessary.
     This is the recommended way to get a client for use in MCP tools.
+
+    The client honours ``MAYA_MCP_HOST``, ``MAYA_MCP_PORT``,
+    ``MAYA_MCP_CONNECT_TIMEOUT`` and ``MAYA_MCP_COMMAND_TIMEOUT`` (see
+    :func:`client_overrides_from_env`). Giving each MCP client its own port,
+    for example Claude Desktop on 7001 and Claude Code on 7002, keeps their
+    persistent sockets off the same Maya commandPort.
 
     Returns:
         The global CommandPortClient instance.
@@ -187,7 +265,10 @@ def get_client() -> CommandPortClient:
     global _client
     with _client_lock:
         if _client is None:
-            _client = CommandPortClient(auto_detect_maya_compatibility=True)
+            _client = CommandPortClient(
+                auto_detect_maya_compatibility=True,
+                **client_overrides_from_env(),
+            )
         return _client
 
 

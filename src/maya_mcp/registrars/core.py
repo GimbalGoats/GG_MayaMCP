@@ -28,8 +28,14 @@ def tool_health_check() -> HealthCheckOutput:
 
 
 def tool_maya_connect(
-    host: Annotated[str, "Target host (localhost only)"] = "localhost",
-    port: Annotated[int, "Target port number"] = 7001,
+    host: Annotated[
+        str | None,
+        "Target host (localhost only). Omit to keep the configured host.",
+    ] = None,
+    port: Annotated[
+        int | None,
+        "Target port number. Omit to keep the configured port (MAYA_MCP_PORT, default 7001).",
+    ] = None,
     source_type: Annotated[
         Literal["python"],
         "Command interpreter type",
@@ -38,8 +44,9 @@ def tool_maya_connect(
     """Connect to Maya commandPort.
 
     Args:
-        host: Target host (localhost or 127.0.0.1 only).
-        port: Target port number.
+        host: Target host (localhost or 127.0.0.1 only). Omit to keep the
+            configured host.
+        port: Target port number. Omit to keep the configured port.
         source_type: Command interpreter (Python only).
 
     Returns:
